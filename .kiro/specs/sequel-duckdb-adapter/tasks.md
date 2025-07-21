@@ -20,21 +20,21 @@
     - Register adapter with Sequel
     - _Requirements: 1.1, 10.2, 13.1_
 
-  - [ ] 2.3 Fix adapter registration (CRITICAL BUG)
+  - [x] 2.3 Fix adapter registration (CRITICAL BUG)
     - Fix incorrect adapter registration in lib/sequel/adapters/duckdb.rb
     - Change from `Sequel::Database.set_shared_adapter_scheme :duckdb, self` to proper registration
     - Use `Database.adapter_scheme :duckdb, DuckDB::Database` pattern
     - _Requirements: 1.1, 13.1_
 
-- [ ] 3. Set up comprehensive test infrastructure (CRITICAL - TDD REQUIREMENT)
-  - [ ] 3.1 Create test infrastructure following sequel-hexspace pattern
+- [x] 3. Set up comprehensive test infrastructure (CRITICAL - TDD REQUIREMENT)
+  - [x] 3.1 Create test infrastructure following sequel-hexspace pattern
     - Create test/all.rb test runner
     - Create test/spec_helper.rb with test configuration and DuckDB setup
     - Set up test database helpers and utilities for both mock and real DuckDB testing
     - Configure test environment with proper require statements
     - _Requirements: 11.8, 10.4, 13.1_
 
-  - [ ] 3.2 Create core test files with initial structure
+  - [x] 3.2 Create core test files with initial structure
     - Create test/database_test.rb for connection and basic functionality tests
     - Create test/dataset_test.rb for comprehensive SQL generation testing
     - Create test/schema_test.rb for schema operations and introspection
