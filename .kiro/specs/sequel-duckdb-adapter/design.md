@@ -393,29 +393,77 @@ dataset = DB[:users].where(name: 'John')
 dataset.sql.should == "SELECT * FROM users WHERE (name = 'John')"
 ```
 
+## Testing Strategy (CRITICAL COMPONENT)
+
+### Test-Driven Development Approach
+
+**MANDATORY**: All code implementation must follow strict Test-Driven Development (TDD):
+
+1. **Write Tests First**: Before implementing any functionality, comprehensive tests must be written
+2. **Red-Green-Refactor**: Follow the TDD cycle of failing tests, minimal implementation, then refactoring
+3. **100% Coverage**: All implemented functionality must have corresponding test coverage
+4. **Mock and Integration**: Use both mock database tests and real DuckDB integration tests
+
 ### Test Structure
 
 Following sequel-hexspace test organization exactly:
 
 ```
 test/
-├── all.rb                       # Test runner
-├── spec_helper.rb               # Test configuration and setup
-├── database_test.rb             # Database connection and basic functionality tests
-├── dataset_test.rb              # Comprehensive SQL generation tests
-├── schema_test.rb               # Schema operations and introspection tests
-├── prepared_statement_test.rb   # Prepared statement functionality
-├── sql_test.rb                  # SQL generation and syntax tests
-└── type_test.rb                 # Data type handling tests
+├── all.rb                       # Test runner - loads all test files
+├── spec_helper.rb               # Test configuration, setup, and shared utilities
+├── database_test.rb             # Database connection, transactions, and basic functionality
+├── dataset_test.rb              # Comprehensive SQL generation and query execution tests
+├── schema_test.rb               # Schema operations, introspection, and DDL tests
+├── prepared_statement_test.rb   # Prepared statement functionality and parameter binding
+├── sql_test.rb                  # SQL generation syntax and correctness tests
+└── type_test.rb                 # Data type handling, conversion, and mapping tests
 ```
 
-### Test Categories
+### Test Categories and Requirements
 
-1. **SQL Generation Tests**: Use mock databases to test SQL output
-2. **Integration Tests**: Use real DuckDB databases for end-to-end testing
-3. **Schema Tests**: Test schema introspection with various table structures
-4. **Type Conversion Tests**: Test Ruby ↔ DuckDB type mapping
-5. **Error Handling Tests**: Test proper exception mapping
+1. **SQL Generation Tests (Unit Tests)**:
+   - Use Sequel's mock database functionality
+   - Test every SQL generation method
+   - Verify correct SQL syntax and structure
+   - Test edge cases and parameter handling
+   - Must be fast and not require database connections
+
+2. **Integration Tests**:
+   - Use real DuckDB in-memory databases
+   - Test actual database operations
+   - Verify data persistence and retrieval
+   - Test connection management and error handling
+   - Test transaction behavior
+
+3. **Schema Tests**:
+   - Test table creation, modification, and deletion
+   - Test index operations
+   - Test schema introspection accuracy
+   - Test constraint handling
+   - Test various DuckDB-specific schema features
+
+4. **Type Conversion Tests**:
+   - Test Ruby ↔ DuckDB type mapping for all supported types
+   - Test edge cases and null handling
+   - Test precision and scale for numeric types
+   - Test date/time handling and timezone considerations
+   - Test binary data and text encoding
+
+5. **Error Handling Tests**:
+   - Test proper Sequel exception mapping
+   - Test connection failure scenarios
+   - Test SQL syntax error handling
+   - Test constraint violation handling
+   - Test timeout and resource limit scenarios
+
+### Test Implementation Requirements
+
+- **Before Any Code**: Tests must be written before implementing functionality
+- **Comprehensive Coverage**: Every public method must have test coverage
+- **Edge Cases**: Tests must cover error conditions and edge cases
+- **Performance**: Tests should include basic performance validation
+- **Documentation**: Tests serve as executable documentation of expected behavior
 
 ## Performance Considerations
 

@@ -152,20 +152,25 @@ This document outlines the requirements for building a complete Ruby Sequel data
 7. WHEN writing code THEN the system SHALL ensure all SQL generation has corresponding tests
 8. WHEN developing THEN the system SHALL create thorough documentation for autonomous development
 
-### Requirement 11: Testing and Quality Assurance
+### Requirement 11: Testing and Quality Assurance (CRITICAL)
 
 **User Story:** As a maintainer, I want comprehensive test coverage following sequel-hexspace testing patterns for all adapter functionality, so that I can ensure reliability and catch regressions.
 
 #### Acceptance Criteria
 
-1. WHEN SQL generation methods are implemented THEN the system SHALL have unit tests verifying correct SQL output following sequel-hexspace test structure
-2. WHEN database operations are implemented THEN the system SHALL have integration tests using actual DuckDB databases
-3. WHEN data type conversions are implemented THEN the system SHALL have tests covering all supported type mappings
-4. WHEN schema introspection is implemented THEN the system SHALL have tests verifying correct metadata retrieval
-5. WHEN transaction handling is implemented THEN the system SHALL have tests covering commit, rollback, and error scenarios
-6. WHEN error conditions occur THEN the system SHALL have tests verifying proper exception handling
-7. WHEN performance-critical operations are implemented THEN the system SHALL have benchmarks to prevent regressions
-8. WHEN test structure is organized THEN the system SHALL mirror sequel-hexspace test organization with test/all.rb, test/spec_helper.rb, test/database_test.rb, test/dataset_test.rb, test/schema_test.rb, test/prepared_statement_test.rb, test/sql_test.rb, and test/type_test.rb
+1. WHEN any code is implemented THEN the system SHALL have tests written BEFORE the implementation (Test-Driven Development)
+2. WHEN SQL generation methods are implemented THEN the system SHALL have unit tests verifying correct SQL output following sequel-hexspace test structure
+3. WHEN database operations are implemented THEN the system SHALL have integration tests using actual DuckDB databases
+4. WHEN data type conversions are implemented THEN the system SHALL have tests covering all supported type mappings
+5. WHEN schema introspection is implemented THEN the system SHALL have tests verifying correct metadata retrieval
+6. WHEN transaction handling is implemented THEN the system SHALL have tests covering commit, rollback, and error scenarios
+7. WHEN error conditions occur THEN the system SHALL have tests verifying proper exception handling
+8. WHEN performance-critical operations are implemented THEN the system SHALL have benchmarks to prevent regressions
+9. WHEN test structure is organized THEN the system SHALL mirror sequel-hexspace test organization with test/all.rb, test/spec_helper.rb, test/database_test.rb, test/dataset_test.rb, test/schema_test.rb, test/prepared_statement_test.rb, test/sql_test.rb, and test/type_test.rb
+10. WHEN mock database testing is needed THEN the system SHALL use Sequel's mock database functionality for SQL generation testing
+11. WHEN integration testing is needed THEN the system SHALL use actual DuckDB in-memory databases for connection and operation testing
+12. WHEN test coverage is measured THEN the system SHALL achieve 100% coverage of all implemented functionality
+13. WHEN any task involves code implementation THEN the system SHALL create comprehensive tests as the first step of that task
 
 ### Requirement 12: Documentation and Examples
 
