@@ -3,7 +3,7 @@
 require_relative "duckdb/version"
 
 module Sequel
-  module Duckdb
+  module DuckDB
     class Error < StandardError; end
     # Your code goes here...
   end

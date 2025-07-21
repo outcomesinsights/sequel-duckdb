@@ -4,7 +4,7 @@ require_relative "lib/sequel/duckdb/version"
 
 Gem::Specification.new do |spec|
   spec.name = "sequel-duckdb"
-  spec.version = Sequel::Duckdb::VERSION
+  spec.version = Sequel::DuckDB::VERSION
   spec.authors = ["Ryan Duryea"]
   spec.email = ["aguynamedryan@gmail.com"]
 
