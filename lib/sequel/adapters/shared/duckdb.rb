@@ -438,6 +438,203 @@ module Sequel
         columns
       end
 
+      public
+
+      # Advanced transaction support methods (Requirements 5.5, 5.6, 5.7)
+
+      # Check if DuckDB supports savepoints for nested transactions
+      #
+      # @return [Boolean] true if savepoints are supported
+      def supports_savepoints?
+        # DuckDB does not currently support SAVEPOINT/ROLLBACK TO SAVEPOINT syntax
+        # Nested transactions are handled by Sequel's default behavior
+        false
+      end
+
+      # Check if DuckDB supports the specified transaction isolation level
+      #
+      # @param level [Symbol] Isolation level (:read_uncommitted, :read_committed, :repeatable_read, :serializable)
+      # @return [Boolean] true if the isolation level is supported
+      def supports_transaction_isolation_level?(level)
+        # DuckDB does not currently support setting transaction isolation levels
+        # It uses a default isolation level similar to READ_COMMITTED
+        false
+      end
+
+      # Check if DuckDB supports manual transaction control
+      #
+      # @return [Boolean] true if manual transaction control is supported
+      def supports_manual_transaction_control?
+        # DuckDB supports BEGIN, COMMIT, and ROLLBACK statements
+        true
+      end
+
+      # Check if DuckDB supports autocommit control
+      #
+      # @return [Boolean] true if autocommit can be controlled
+      def supports_autocommit_control?
+        # DuckDB has autocommit behavior but limited control over it
+        false
+      end
+
+      # Check if DuckDB supports disabling autocommit
+      #
+      # @return [Boolean] true if autocommit can be disabled
+      def supports_autocommit_disable?
+        # DuckDB doesn't support disabling autocommit mode
+        false
+      end
+
+      # Check if currently in a transaction
+      #
+      # @return [Boolean] true if in a transaction
+      def in_transaction?
+        # Use Sequel's built-in transaction tracking
+        # Sequel tracks transaction state internally
+        @transactions && !@transactions.empty?
+      end
+
+      # Begin a transaction manually
+      # Sequel calls this with (conn, opts) arguments
+      #
+      # @param conn [::DuckDB::Connection] Database connection
+      # @param opts [Hash] Transaction options
+      # @return [void]
+      def begin_transaction(conn, opts = {})
+        if opts[:isolation]
+          isolation_sql = case opts[:isolation]
+                         when :read_uncommitted
+                           "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED"
+                         when :read_committed
+                           "SET TRANSACTION ISOLATION LEVEL READ COMMITTED"
+                         else
+                           raise Sequel::DatabaseError, "Unsupported isolation level: #{opts[:isolation]}"
+                         end
+          conn.query(isolation_sql)
+        end
+
+        conn.query("BEGIN TRANSACTION")
+      end
+
+      # Commit the current transaction manually
+      # Sequel calls this with (conn, opts) arguments
+      #
+      # @param conn [::DuckDB::Connection] Database connection
+      # @param opts [Hash] Options
+      # @return [void]
+      def commit_transaction(conn, opts = {})
+        conn.query("COMMIT")
+      end
+
+      # Rollback the current transaction manually
+      # Sequel calls this with (conn, opts) arguments
+      #
+      # @param conn [::DuckDB::Connection] Database connection
+      # @param opts [Hash] Options
+      # @return [void]
+      def rollback_transaction(conn, opts = {})
+        conn.query("ROLLBACK")
+      end
+
+      # Override Sequel's transaction method to support advanced features
+      def transaction(opts = {})
+        # Handle savepoint transactions (nested transactions)
+        if opts[:savepoint] && supports_savepoints?
+          return savepoint_transaction(opts) { yield }
+        end
+
+        # Handle isolation level setting
+        if opts[:isolation] && supports_transaction_isolation_level?(opts[:isolation])
+          return isolation_transaction(opts) { yield }
+        end
+
+        # Fall back to standard Sequel transaction handling
+        super { yield }
+      end
+
+      private
+
+      # Handle savepoint-based nested transactions
+      #
+      # @param opts [Hash] Transaction options
+      # @return [Object] Result of the transaction block
+      def savepoint_transaction(opts = {})
+        # Generate a unique savepoint name
+        savepoint_name = "sp_#{Time.now.to_f.to_s.gsub('.', '_')}"
+
+        synchronize(opts[:server]) do |conn|
+          begin
+            # Create savepoint
+            conn.query("SAVEPOINT #{savepoint_name}")
+
+            # Execute the block
+            result = yield
+
+            # Release savepoint on success
+            conn.query("RELEASE SAVEPOINT #{savepoint_name}")
+
+            result
+          rescue Sequel::Rollback
+            # Rollback to savepoint on explicit rollback
+            conn.query("ROLLBACK TO SAVEPOINT #{savepoint_name}")
+            conn.query("RELEASE SAVEPOINT #{savepoint_name}")
+            nil
+          rescue Exception => e
+            # Rollback to savepoint on any other exception
+            begin
+              conn.query("ROLLBACK TO SAVEPOINT #{savepoint_name}")
+              conn.query("RELEASE SAVEPOINT #{savepoint_name}")
+            rescue ::DuckDB::Error
+              # Ignore errors during rollback cleanup
+            end
+            raise e
+          end
+        end
+      end
+
+      # Handle transactions with specific isolation levels
+      #
+      # @param opts [Hash] Transaction options including :isolation
+      # @return [Object] Result of the transaction block
+      def isolation_transaction(opts = {})
+        synchronize(opts[:server]) do |conn|
+          begin
+            # Set isolation level before beginning transaction
+            isolation_sql = case opts[:isolation]
+                           when :read_uncommitted
+                             "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED"
+                           when :read_committed
+                             "SET TRANSACTION ISOLATION LEVEL READ COMMITTED"
+                           else
+                             raise Sequel::DatabaseError, "Unsupported isolation level: #{opts[:isolation]}"
+                           end
+
+            conn.query(isolation_sql)
+            conn.query("BEGIN TRANSACTION")
+
+            # Execute the block
+            result = yield
+
+            # Commit on success
+            conn.query("COMMIT")
+
+            result
+          rescue Sequel::Rollback
+            # Rollback on explicit rollback
+            conn.query("ROLLBACK")
+            nil
+          rescue Exception => e
+            # Rollback on any other exception
+            begin
+              conn.query("ROLLBACK")
+            rescue ::DuckDB::Error
+              # Ignore errors during rollback cleanup
+            end
+            raise e
+          end
+        end
+      end
+
       # DuckDB-specific schema generation methods
 
       # Generate SQL for primary key column

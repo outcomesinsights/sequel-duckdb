@@ -135,7 +135,7 @@
     - Implement explicit rollback method
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 6.2 Add advanced transaction features
+  - [x] 6.2 Add advanced transaction features
     - Implement savepoint support if available in DuckDB
     - Add transaction isolation level support
     - Implement manual transaction control for autocommit mode

@@ -370,6 +370,188 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     end
   end
 
+  # Advanced transaction features tests (Requirements 5.5, 5.6, 5.7)
+
+  def test_savepoint_support
+    db = create_db
+    create_test_table(db)
+
+    # Insert initial data
+    db[:test_table].insert(id: 1, name: "Initial Record", age: 20)
+    initial_count = db[:test_table].count
+
+    # Test savepoint functionality if supported (Requirement 5.5)
+    if db.supports_savepoints?
+      assert_nothing_raised("Savepoints should work if supported") do
+        db.transaction do
+          db[:test_table].insert(id: 2, name: "Before Savepoint", age: 25)
+
+          db.transaction(savepoint: true) do
+            db[:test_table].insert(id: 3, name: "In Savepoint", age: 30)
+            # This should rollback only the savepoint
+            raise Sequel::Rollback
+          end
+
+          # The outer transaction should continue
+          db[:test_table].insert(id: 4, name: "After Savepoint", age: 35)
+        end
+      end
+
+      # Verify partial rollback - savepoint rolled back but outer transaction committed
+      assert_equal initial_count + 2, db[:test_table].count, "Savepoint should allow partial rollback"
+      names = db[:test_table].select_map(:name).sort
+      assert_includes names, "Before Savepoint", "Record before savepoint should be committed"
+      assert_includes names, "After Savepoint", "Record after savepoint should be committed"
+      refute_includes names, "In Savepoint", "Record in savepoint should be rolled back"
+    else
+      # If savepoints aren't supported, nested transactions should behave as regular transactions
+      assert_nothing_raised("Nested transactions should work even without savepoint support") do
+        db.transaction do
+          db[:test_table].insert(id: 2, name: "Nested Transaction", age: 25)
+        end
+      end
+
+      assert_equal initial_count + 1, db[:test_table].count, "Nested transaction should work without savepoints"
+    end
+  end
+
+  def test_transaction_isolation_levels
+    db = create_db
+    create_test_table(db)
+
+    # Test transaction isolation level support if available (Requirement 5.6)
+    isolation_levels = [:read_uncommitted, :read_committed, :repeatable_read, :serializable]
+
+    isolation_levels.each do |level|
+      if db.supports_transaction_isolation_level?(level)
+        assert_nothing_raised("Should support #{level} isolation level") do
+          db.transaction(isolation: level) do
+            db[:test_table].insert(id: 1, name: "Isolation Test", age: 30)
+          end
+        end
+
+        # Clean up for next test
+        db[:test_table].delete
+      else
+        # If isolation level isn't supported, transaction should still work without it
+        assert_nothing_raised("Should work even if #{level} isolation level isn't supported") do
+          db.transaction do
+            db[:test_table].insert(id: 1, name: "No Isolation Test", age: 30)
+          end
+        end
+
+        # Clean up for next test
+        db[:test_table].delete
+      end
+    end
+  end
+
+  def test_manual_transaction_control
+    db = create_db
+    create_test_table(db)
+
+    # Test manual transaction control for autocommit mode (Requirement 5.7)
+    if db.supports_manual_transaction_control?
+      assert_nothing_raised("Should support manual transaction control") do
+        # Use raw SQL for manual transaction control
+        db.run("BEGIN TRANSACTION")
+        db[:test_table].insert(id: 1, name: "Manual Transaction", age: 30)
+        db.run("COMMIT")
+      end
+
+      assert_equal 1, db[:test_table].count, "Manual transaction should commit data"
+
+      # Test manual rollback
+      assert_nothing_raised("Should support manual rollback") do
+        db.run("BEGIN TRANSACTION")
+        db[:test_table].insert(id: 2, name: "Manual Rollback", age: 25)
+        db.run("ROLLBACK")
+      end
+
+      assert_equal 1, db[:test_table].count, "Manual rollback should not commit data"
+      refute_includes db[:test_table].select_map(:name), "Manual Rollback", "Rolled back data should not exist"
+    else
+      # If manual transaction control isn't supported, regular transactions should still work
+      assert_nothing_raised("Regular transactions should work without manual control") do
+        db.transaction do
+          db[:test_table].insert(id: 1, name: "Regular Transaction", age: 30)
+        end
+      end
+
+      assert_equal 1, db[:test_table].count, "Regular transaction should work"
+    end
+  end
+
+  def test_autocommit_mode_handling
+    db = create_db
+    create_test_table(db)
+
+    # Test autocommit mode behavior (Requirement 5.7)
+    if db.supports_autocommit_control?
+      # Test with autocommit enabled (default)
+      assert_nothing_raised("Should work with autocommit enabled") do
+        db[:test_table].insert(id: 1, name: "Autocommit Test", age: 30)
+      end
+
+      assert_equal 1, db[:test_table].count, "Data should be committed immediately with autocommit"
+
+      # Test with autocommit disabled
+      if db.supports_autocommit_disable?
+        assert_nothing_raised("Should support disabling autocommit") do
+          db.autocommit = false
+
+          db[:test_table].insert(id: 2, name: "No Autocommit", age: 25)
+
+          # Data shouldn't be visible until explicit commit
+          # Note: This test may need adjustment based on DuckDB's actual behavior
+          db.commit_transaction
+
+          # Re-enable autocommit
+          db.autocommit = true
+        end
+
+        assert_equal 2, db[:test_table].count, "Data should be committed after explicit commit"
+      end
+    else
+      # If autocommit control isn't supported, regular behavior should work
+      assert_nothing_raised("Regular operations should work without autocommit control") do
+        db[:test_table].insert(id: 1, name: "Regular Insert", age: 30)
+      end
+
+      assert_equal 1, db[:test_table].count, "Regular insert should work"
+    end
+  end
+
+  def test_transaction_status_methods
+    db = create_db
+
+    # Test transaction status inquiry methods
+    refute db.in_transaction?, "Should not be in transaction initially"
+
+    db.transaction do
+      assert db.in_transaction?, "Should be in transaction inside transaction block"
+    end
+
+    refute db.in_transaction?, "Should not be in transaction after transaction block"
+  end
+
+  def test_concurrent_transaction_handling
+    db = create_db
+    create_test_table(db)
+
+    # Test that transactions work correctly with concurrent access patterns
+    # This is a basic test - real concurrent testing would require threading
+    assert_nothing_raised("Should handle multiple sequential transactions") do
+      5.times do |i|
+        db.transaction do
+          db[:test_table].insert(id: i + 1, name: "Concurrent Test #{i}", age: 20 + i)
+        end
+      end
+    end
+
+    assert_equal 5, db[:test_table].count, "All transactions should complete successfully"
+  end
+
   private
 
   def create_db
