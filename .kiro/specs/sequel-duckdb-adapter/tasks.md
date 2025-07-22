@@ -127,8 +127,8 @@
     - Add proper column default and nullable status reporting
     - _Requirements: 4.7, 4.8_
 
-- [ ] 7. Implement transaction support in DatabaseMethods
-  - [ ] 7.1 Add basic transaction methods
+- [-] 7. Implement transaction support in DatabaseMethods
+  - [x] 7.1 Add basic transaction methods
     - Implement transaction block handling
     - Add automatic commit on successful completion
     - Add automatic rollback on exceptions

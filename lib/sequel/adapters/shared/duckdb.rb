@@ -11,7 +11,7 @@ module Sequel
       # Connect to a DuckDB database
       #
       # @param server [Hash] Server configuration options
-      # @return [::DuckDB::Database] DuckDB database connection
+      # @return [::DuckDB::Connection] DuckDB database connection
       # @raise [Sequel::DatabaseConnectionError] If connection fails
       def connect(server)
         opts = server_opts(server)
@@ -19,11 +19,18 @@ module Sequel
 
         begin
           if database_path == ":memory:" || database_path.nil?
-            # Create in-memory database
-            ::DuckDB::Database.open(":memory:")
+            # Create in-memory database and return connection
+            db = ::DuckDB::Database.open(":memory:")
+            db.connect
           else
-            # Create file-based database (will create file if it doesn't exist)
-            ::DuckDB::Database.open(database_path)
+            # Fix URI parsing issue - add leading slash if missing for absolute paths
+            if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(':')
+              database_path = '/' + database_path
+            end
+
+            # Create file-based database (will create file if it doesn't exist) and return connection
+            db = ::DuckDB::Database.open(database_path)
+            db.connect
           end
         rescue ::DuckDB::Error => e
           raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
@@ -34,7 +41,7 @@ module Sequel
 
       # Disconnect from a DuckDB database connection
       #
-      # @param conn [::DuckDB::Database] The database connection to close
+      # @param conn [::DuckDB::Connection] The database connection to close
       # @return [void]
       def disconnect_connection(conn)
         return unless conn
@@ -48,15 +55,14 @@ module Sequel
 
       # Check if a DuckDB connection is valid and open
       #
-      # @param conn [::DuckDB::Database] The database connection to check
+      # @param conn [::DuckDB::Connection] The database connection to check
       # @return [Boolean] true if connection is valid and open, false otherwise
       def valid_connection?(conn)
         return false unless conn
 
         begin
-          # DuckDB doesn't have a closed? method, so we try a simple operation
-          # to check if the connection is still valid
-          conn.connect
+          # Try a simple query to check if the connection is still valid
+          conn.query("SELECT 1")
           true
         rescue ::DuckDB::Error
           false
@@ -510,19 +516,17 @@ module Sequel
 
       # Execute SQL statement against DuckDB connection
       #
-      # @param conn [::DuckDB::Database] Database connection
+      # @param conn [::DuckDB::Connection] Database connection (already connected)
       # @param sql [String] SQL statement to execute
       # @param params [Array] Parameters for prepared statement
       # @param opts [Hash] Options for execution
       # @return [Object] Result of execution
       def execute_statement(conn, sql, params = [], opts = {}, &block)
         begin
-          db_conn = conn.connect
-
           # Handle parameterized queries
           if params && !params.empty?
             # Prepare statement with ? placeholders
-            stmt = db_conn.prepare(sql)
+            stmt = conn.prepare(sql)
 
             # Bind parameters using 1-based indexing
             params.each_with_index do |param, index|
@@ -533,7 +537,7 @@ module Sequel
             result = stmt.execute
           else
             # Execute directly without parameters
-            result = db_conn.query(sql)
+            result = conn.query(sql)
           end
 
           if block_given?
@@ -556,8 +560,6 @@ module Sequel
           end
         rescue ::DuckDB::Error => e
           raise Sequel::DatabaseError, "DuckDB error: #{e.message}"
-        ensure
-          db_conn&.close if db_conn
         end
       end
     end
