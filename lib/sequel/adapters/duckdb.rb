@@ -36,5 +36,4 @@ module Sequel
 
   # Register the DuckDB adapter with Sequel
   # This allows Sequel.connect("duckdb://...") to work
-  Database.set_shared_adapter_scheme :duckdb, DuckDB
 end

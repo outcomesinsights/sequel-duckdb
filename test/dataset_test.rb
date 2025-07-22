@@ -25,7 +25,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
   def test_mock_dataset_creation
     dataset = mock_dataset(:users)
-    assert_instance_of Sequel::Dataset, dataset,
+    assert_kind_of Sequel::Dataset, dataset,
                        "Mock dataset should be created successfully"
   end
 
@@ -34,25 +34,23 @@ class DatasetTest < SequelDuckDBTest::TestCase
     dataset = mock_dataset(:users)
     expected_sql = "SELECT * FROM users"
 
-    # This test will be implemented when SQL generation is added
-    # For now, we test that the dataset can be created
-    assert_instance_of Sequel::Dataset, dataset
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_columns_sql_generation
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, :email)
 
     # Test selecting specific columns
-    # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, email FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_where_clause_sql_generation
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(active: true)
 
     # Test WHERE clause generation
-    # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE (active IS TRUE)"
+    assert_sql expected_sql, dataset
   end
 
   def test_order_by_sql_generation
@@ -60,7 +58,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test ORDER BY clause generation
     # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    assert_kind_of Sequel::Dataset, dataset
   end
 
   def test_limit_offset_sql_generation
@@ -68,7 +66,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test LIMIT and OFFSET clause generation
     # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    assert_kind_of Sequel::Dataset, dataset
   end
 
   def test_join_sql_generation
@@ -76,7 +74,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test JOIN clause generation
     # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    assert_kind_of Sequel::Dataset, dataset
   end
 
   def test_group_by_sql_generation
@@ -84,7 +82,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test GROUP BY clause generation
     # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    assert_kind_of Sequel::Dataset, dataset
   end
 
   def test_having_clause_sql_generation
@@ -92,31 +90,34 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test HAVING clause generation
     # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    assert_kind_of Sequel::Dataset, dataset
   end
 
   def test_insert_sql_generation
     dataset = mock_dataset(:users)
 
     # Test INSERT statement generation
-    # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')"
+    actual_sql = dataset.insert_sql(name: "John", email: "john@example.com")
+    assert_equal expected_sql, actual_sql
   end
 
   def test_update_sql_generation
     dataset = mock_dataset(:users)
 
     # Test UPDATE statement generation
-    # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "UPDATE users SET name = 'Jane', email = 'jane@example.com'"
+    actual_sql = dataset.update_sql(name: "Jane", email: "jane@example.com")
+    assert_equal expected_sql, actual_sql
   end
 
   def test_delete_sql_generation
     dataset = mock_dataset(:users)
 
     # Test DELETE statement generation
-    # This will be implemented when SQL generation methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "DELETE FROM users"
+    actual_sql = dataset.delete_sql
+    assert_equal expected_sql, actual_sql
   end
 
   # Integration tests with real database

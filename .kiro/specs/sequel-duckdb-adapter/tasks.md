@@ -42,8 +42,8 @@
     - Create test/type_test.rb for data type handling and conversion
     - _Requirements: 11.1, 11.2, 11.4, 11.3_
 
-- [ ] 4. Implement basic SQL generation in shared module (TDD - TESTS FIRST)
-  - [ ] 4.1 Write tests for core SQL generation methods
+- [x] 4. Implement basic SQL generation in shared module (TDD - TESTS FIRST)
+  - [x] 4.1 Write tests for core SQL generation methods
     - Write comprehensive tests for select_sql method using mock database
     - Write tests for insert_sql method with various parameter combinations
     - Write tests for update_sql method with WHERE clauses
@@ -51,7 +51,7 @@
     - Ensure all tests fail initially (Red phase of TDD)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 11.1, 11.2_
 
-  - [ ] 4.2 Implement DatasetMethods module with core SQL generation
+  - [x] 4.2 Implement DatasetMethods module with core SQL generation
     - Implement select_sql method for basic SELECT statements
     - Implement insert_sql method for INSERT operations
     - Implement update_sql method for UPDATE operations
@@ -59,13 +59,13 @@
     - Ensure all tests pass (Green phase of TDD)
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 4.3 Write tests for Dataset class functionality
+  - [x] 4.3 Write tests for Dataset class functionality
     - Write tests for fetch_rows method using real DuckDB in-memory database
     - Write tests for DuckDB capability flags (window functions, CTE support, etc.)
     - Write integration tests for basic query execution
     - _Requirements: 2.1, 6.1, 6.2, 11.3_
 
-  - [ ] 4.4 Implement Dataset class with shared functionality
+  - [x] 4.4 Implement Dataset class with shared functionality
     - Implement fetch_rows method for query execution
     - Add DuckDB capability flags (window functions, CTE support, etc.)
     - Ensure proper integration with DatabaseMethods

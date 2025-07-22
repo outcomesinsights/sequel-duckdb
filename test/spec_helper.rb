@@ -13,8 +13,10 @@ require_relative "../lib/sequel/adapters/duckdb"
 # Test configuration module
 module SequelDuckDBTest
   # Mock database for SQL generation testing (no actual database connection)
-  MOCK_DB = Sequel.mock(host: "duckdb")
-  MOCK_DB.extend_datasets(Sequel::DuckDB::DatasetMethods)
+  MOCK_DB = Sequel.mock(host: "duckdb", quote_identifiers: false)
+  MOCK_DB.extend_datasets do
+    include Sequel::DuckDB::DatasetMethods
+  end
 
   # Create an in-memory DuckDB database for integration testing
   def self.create_test_db
@@ -78,6 +80,7 @@ module SequelDuckDBTest
     # Helper method to insert test data
     def insert_test_data(db, table_name = :test_table)
       db[table_name].insert(
+        id: 1,
         name: "John Doe",
         age: 30,
         birth_date: Date.new(1993, 5, 15),
@@ -86,6 +89,7 @@ module SequelDuckDBTest
         score: 85.5
       )
       db[table_name].insert(
+        id: 2,
         name: "Jane Smith",
         age: 25,
         birth_date: Date.new(1998, 8, 22),

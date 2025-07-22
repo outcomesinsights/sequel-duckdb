@@ -9,27 +9,24 @@ class SqlTest < SequelDuckDBTest::TestCase
     dataset = mock_dataset(:users)
 
     # Basic SELECT * test
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_specific_columns
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, :age)
 
     # SELECT with specific columns
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT name, age FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, age FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_where_clause
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(name: "John")
 
     # SELECT with WHERE clause
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users WHERE (name = 'John')"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE (name = 'John')"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_multiple_where_conditions
@@ -135,9 +132,9 @@ class SqlTest < SequelDuckDBTest::TestCase
     dataset = mock_dataset(:users)
 
     # INSERT statement
-    # This will be implemented when SQL generation methods are added
-    # Expected: "INSERT INTO users (name, age) VALUES ('John', 30)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "INSERT INTO users (name, age) VALUES ('John', 30)"
+    actual_sql = dataset.insert_sql(name: "John", age: 30)
+    assert_equal expected_sql, actual_sql
   end
 
   def test_insert_sql_with_multiple_values
@@ -153,36 +150,36 @@ class SqlTest < SequelDuckDBTest::TestCase
     dataset = mock_dataset(:users)
 
     # UPDATE statement
-    # This will be implemented when SQL generation methods are added
-    # Expected: "UPDATE users SET name = 'John', age = 30"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "UPDATE users SET name = 'John', age = 30"
+    actual_sql = dataset.update_sql(name: "John", age: 30)
+    assert_equal expected_sql, actual_sql
   end
 
   def test_update_sql_with_where
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(id: 1)
 
     # UPDATE with WHERE clause
-    # This will be implemented when SQL generation methods are added
-    # Expected: "UPDATE users SET name = 'John' WHERE (id = 1)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "UPDATE users SET name = 'John' WHERE (id = 1)"
+    actual_sql = dataset.update_sql(name: "John")
+    assert_equal expected_sql, actual_sql
   end
 
   def test_delete_sql_generation
     dataset = mock_dataset(:users)
 
     # DELETE statement
-    # This will be implemented when SQL generation methods are added
-    # Expected: "DELETE FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "DELETE FROM users"
+    actual_sql = dataset.delete_sql
+    assert_equal expected_sql, actual_sql
   end
 
   def test_delete_sql_with_where
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(id: 1)
 
     # DELETE with WHERE clause
-    # This will be implemented when SQL generation methods are added
-    # Expected: "DELETE FROM users WHERE (id = 1)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "DELETE FROM users WHERE (id = 1)"
+    actual_sql = dataset.delete_sql
+    assert_equal expected_sql, actual_sql
   end
 
   def test_string_literal_escaping
