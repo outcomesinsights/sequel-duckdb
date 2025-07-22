@@ -451,7 +451,7 @@ module Sequel
       end
 
       def literal_date(date)
-        "'#{date}'"
+        "'#{date.strftime('%Y-%m-%d')}'"
       end
 
       def literal_datetime(datetime)
@@ -459,12 +459,7 @@ module Sequel
       end
 
       def literal_time(time)
-        # For Time objects with date information, format as datetime
-        if time.respond_to?(:year) && time.year != 2000
-          "'#{time.strftime('%Y-%m-%d %H:%M:%S')}'"
-        else
-          "'#{time.strftime('%H:%M:%S')}'"
-        end
+        "'#{time.strftime('%H:%M:%S')}'"
       end
 
       def literal_boolean(value)
@@ -477,6 +472,40 @@ module Sequel
 
       def literal_false
         "FALSE"
+      end
+
+      # Override literal_append to handle Time objects and binary data properly
+      def literal_append(sql, v)
+        case v
+        when Time
+          literal_datetime_append(sql, v)
+        when DateTime
+          literal_datetime_append(sql, v)
+        when String
+          if v.encoding == Encoding::ASCII_8BIT
+            literal_blob_append(sql, v)
+          else
+            literal_string_append(sql, v)
+          end
+        else
+          super
+        end
+      end
+
+      # Helper method for datetime literal appending
+      def literal_datetime_append(sql, datetime)
+        sql << "'#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'"
+      end
+
+      # Helper method for binary data literal appending
+      def literal_blob_append(sql, blob)
+        # DuckDB expects BLOB literals in hex format without \x prefix
+        sql << "'#{blob.unpack1('H*')}'"
+      end
+
+      # Literal conversion for binary data (BLOB type)
+      def literal_blob(blob)
+        "'#{blob.unpack1('H*')}'"
       end
     end
   end

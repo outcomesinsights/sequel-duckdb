@@ -71,28 +71,28 @@
     - Ensure proper integration with DatabaseMethods
     - _Requirements: 2.1, 6.1, 6.2_
 
-- [ ] 5. Implement data type handling and literal conversion (TDD - TESTS FIRST)
-  - [ ] 5.1 Write tests for literal conversion methods
+- [x] 5. Implement data type handling and literal conversion (TDD - TESTS FIRST)
+  - [x] 5.1 Write tests for literal conversion methods
     - Write tests for literal_string_append with string escaping scenarios
     - Write tests for literal_date, literal_datetime, literal_time methods
     - Write tests for literal_boolean method with true/false values
     - Write tests for NULL value handling and edge cases
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.8, 11.4_
 
-  - [ ] 5.2 Add literal conversion methods to DatasetMethods
+  - [x] 5.2 Add literal conversion methods to DatasetMethods
     - Implement literal_string_append for string escaping
     - Implement literal_date, literal_datetime, literal_time methods
     - Implement literal_boolean method for boolean values
     - Add support for NULL value handling
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.8_
 
-  - [ ] 5.3 Write tests for binary data and numeric type support
+  - [x] 5.3 Write tests for binary data and numeric type support
     - Write tests for BLOB type mapping for binary data
     - Write tests for integer and float type handling
     - Write tests for Ruby to DuckDB type conversion edge cases
     - _Requirements: 3.2, 3.3, 3.9, 11.4_
 
-  - [ ] 5.4 Add binary data and numeric type support
+  - [x] 5.4 Add binary data and numeric type support
     - Implement BLOB type mapping for binary data
     - Add proper integer and float type handling
     - Ensure proper Ruby to DuckDB type conversion
