@@ -71,11 +71,19 @@ module Sequel
       # Execute SQL statement
       #
       # @param sql [String] SQL statement to execute
-      # @param opts [Hash] Options for execution
+      # @param opts [Hash, Array] Options for execution or parameters array
       # @return [Object] Result of execution
       def execute(sql, opts = {}, &block)
+        # Handle both old-style (sql, opts) and new-style (sql, params) calls
+        if opts.is_a?(Array)
+          params = opts
+          opts = {}
+        else
+          params = opts[:params] || []
+        end
+
         synchronize(opts[:server]) do |conn|
-          return execute_statement(conn, sql, opts, &block)
+          return execute_statement(conn, sql, params, opts, &block)
         end
       end
 
@@ -126,6 +134,302 @@ module Sequel
       # @return [Boolean] true if SQL states should be used
       def database_exception_use_sqlstates?
         false
+      end
+
+      # Schema introspection methods
+
+      # Parse table list from database
+      #
+      # @param opts [Hash] Options for table parsing
+      # @return [Array<Symbol>] Array of table names as symbols
+      def schema_parse_tables(opts = {})
+        schema_name = opts[:schema] || 'main'
+
+        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'"
+
+        tables = []
+        execute(sql, [schema_name]) do |row|
+          tables << row[:table_name].to_sym
+        end
+
+        tables
+      end
+
+      # Parse table schema information
+      #
+      # @param table_name [Symbol, String] Name of the table
+      # @param opts [Hash] Options for schema parsing
+      # @return [Array<Array>] Array of [column_name, column_info] pairs
+      def schema_parse_table(table_name, opts = {})
+        schema_name = opts[:schema] || 'main'
+
+        # First check if table exists
+        unless table_exists?(table_name, opts)
+          raise Sequel::DatabaseError, "Table '#{table_name}' does not exist"
+        end
+
+        # Use information_schema.columns for detailed column information
+        sql = <<~SQL
+          SELECT
+            column_name,
+            ordinal_position,
+            column_default,
+            is_nullable,
+            data_type,
+            character_maximum_length,
+            numeric_precision,
+            numeric_scale
+          FROM information_schema.columns
+          WHERE table_schema = ? AND table_name = ?
+          ORDER BY ordinal_position
+        SQL
+
+        columns = []
+        execute(sql, [schema_name, table_name.to_s]) do |row|
+          column_name = row[:column_name].to_sym
+
+          # Map DuckDB types to Sequel types
+          sequel_type = map_duckdb_type_to_sequel(row[:data_type])
+
+          # Parse nullable flag
+          allow_null = row[:is_nullable] == 'YES'
+
+          # Parse default value
+          default_value = parse_default_value(row[:column_default])
+
+          column_info = {
+            type: sequel_type,
+            db_type: row[:data_type],
+            allow_null: allow_null,
+            default: default_value,
+            primary_key: false  # Will be updated below
+          }
+
+          # Add size information for string types
+          if row[:character_maximum_length]
+            column_info[:max_length] = row[:character_maximum_length]
+          end
+
+          # Add precision/scale for numeric types
+          if row[:numeric_precision]
+            column_info[:precision] = row[:numeric_precision]
+          end
+          if row[:numeric_scale]
+            column_info[:scale] = row[:numeric_scale]
+          end
+
+          columns << [column_name, column_info]
+        end
+
+        # Update primary key information
+        update_primary_key_info(table_name, columns, opts)
+
+        columns
+      end
+
+      # Parse index information for a table
+      #
+      # @param table_name [Symbol, String] Name of the table
+      # @param opts [Hash] Options for index parsing
+      # @return [Hash] Hash of index_name => index_info
+      def schema_parse_indexes(table_name, opts = {})
+        schema_name = opts[:schema] || 'main'
+
+        # First check if table exists
+        unless table_exists?(table_name, opts)
+          raise Sequel::DatabaseError, "Table '#{table_name}' does not exist"
+        end
+
+        # Use duckdb_indexes() function to get index information
+        sql = <<~SQL
+          SELECT
+            index_name,
+            is_unique,
+            is_primary,
+            expressions,
+            sql
+          FROM duckdb_indexes()
+          WHERE schema_name = ? AND table_name = ?
+        SQL
+
+        indexes = {}
+        execute(sql, [schema_name, table_name.to_s]) do |row|
+          index_name = row[:index_name].to_sym
+
+          # Parse column expressions - DuckDB returns them as JSON array strings
+          columns = parse_index_columns(row[:expressions])
+
+          index_info = {
+            columns: columns,
+            unique: row[:is_unique],
+            primary: row[:is_primary]
+          }
+
+          indexes[index_name] = index_info
+        end
+
+        indexes
+      end
+
+      public
+
+      # Check if table exists
+      #
+      # @param table_name [Symbol, String] Name of the table
+      # @param opts [Hash] Options
+      # @return [Boolean] true if table exists
+      def table_exists?(table_name, opts = {})
+        schema_name = opts[:schema] || 'main'
+
+        sql = "SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ? LIMIT 1"
+
+        result = nil
+        execute(sql, [schema_name, table_name.to_s]) do |row|
+          result = true
+        end
+
+        !!result
+      end
+
+      # Get list of tables
+      #
+      # @param opts [Hash] Options
+      # @return [Array<Symbol>] Array of table names
+      def tables(opts = {})
+        schema_parse_tables(opts)
+      end
+
+      # Get schema information for a table
+      #
+      # @param table_name [Symbol, String] Name of the table
+      # @param opts [Hash] Options
+      # @return [Array<Array>] Schema information
+      def schema(table_name, opts = {})
+        schema_parse_table(table_name, opts)
+      end
+
+      # Get index information for a table
+      #
+      # @param table_name [Symbol, String] Name of the table
+      # @param opts [Hash] Options
+      # @return [Hash] Index information
+      def indexes(table_name, opts = {})
+        schema_parse_indexes(table_name, opts)
+      end
+
+      private
+
+      # Map DuckDB data types to Sequel types
+      #
+      # @param duckdb_type [String] DuckDB data type
+      # @return [Symbol] Sequel type symbol
+      def map_duckdb_type_to_sequel(duckdb_type)
+        case duckdb_type.upcase
+        when 'INTEGER', 'INT', 'INT4'
+          :integer
+        when 'BIGINT', 'INT8'
+          :bigint
+        when 'SMALLINT', 'INT2'
+          :integer
+        when 'TINYINT', 'INT1'
+          :integer
+        when 'REAL', 'FLOAT4'
+          :float
+        when 'DOUBLE', 'FLOAT8'
+          :float
+        when 'DECIMAL', 'NUMERIC'
+          :decimal
+        when 'VARCHAR', 'TEXT', 'STRING'
+          :string
+        when 'BOOLEAN', 'BOOL'
+          :boolean
+        when 'DATE'
+          :date
+        when 'TIMESTAMP', 'DATETIME'
+          :datetime
+        when 'TIME'
+          :time
+        when 'BLOB', 'BYTEA'
+          :blob
+        when 'UUID'
+          :uuid
+        else
+          :string  # Default fallback
+        end
+      end
+
+      # Parse default value from DuckDB format
+      #
+      # @param default_str [String, nil] Default value string from DuckDB
+      # @return [Object, nil] Parsed default value
+      def parse_default_value(default_str)
+        return nil if default_str.nil? || default_str.empty?
+
+        # Handle common DuckDB default formats
+        case default_str
+        when /^CAST\('(.+)' AS BOOLEAN\)$/
+          $1 == 't'
+        when /^'(.+)'$/
+          $1  # String literal
+        when /^\d+$/
+          default_str.to_i  # Integer literal
+        when /^\d+\.\d+$/
+          default_str.to_f  # Float literal
+        when 'NULL'
+          nil
+        else
+          default_str  # Return as-is for complex expressions
+        end
+      end
+
+      # Update primary key information in column schema
+      #
+      # @param table_name [Symbol, String] Table name
+      # @param columns [Array] Array of column information
+      # @param opts [Hash] Options
+      def update_primary_key_info(table_name, columns, opts = {})
+        schema_name = opts[:schema] || 'main'
+
+        # Query for primary key constraints
+        sql = <<~SQL
+          SELECT column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+            AND tc.table_name = kcu.table_name
+          WHERE tc.constraint_type = 'PRIMARY KEY'
+            AND tc.table_schema = ?
+            AND tc.table_name = ?
+        SQL
+
+        primary_key_columns = []
+        execute(sql, [schema_name, table_name.to_s]) do |row|
+          primary_key_columns << row[:column_name].to_sym
+        end
+
+        # Update primary key flag for matching columns
+        columns.each do |column_name, column_info|
+          if primary_key_columns.include?(column_name)
+            column_info[:primary_key] = true
+            column_info[:allow_null] = false  # Primary keys cannot be null
+          end
+        end
+      end
+
+      # Parse index column expressions from DuckDB format
+      #
+      # @param expressions_str [String] JSON array string of column expressions
+      # @return [Array<Symbol>] Array of column names
+      def parse_index_columns(expressions_str)
+        return [] if expressions_str.nil? || expressions_str.empty?
+
+        # DuckDB returns expressions as JSON array like "[column_name]" or "['\"column_name\"']"
+        # Remove brackets and quotes, split by comma
+        cleaned = expressions_str.gsub(/^\[|\]$/, '').gsub(/['"]/, '')
+        columns = cleaned.split(',').map(&:strip).map(&:to_sym)
+
+        columns
       end
 
       # DuckDB-specific schema generation methods
@@ -208,12 +512,29 @@ module Sequel
       #
       # @param conn [::DuckDB::Database] Database connection
       # @param sql [String] SQL statement to execute
+      # @param params [Array] Parameters for prepared statement
       # @param opts [Hash] Options for execution
       # @return [Object] Result of execution
-      def execute_statement(conn, sql, opts, &block)
+      def execute_statement(conn, sql, params = [], opts = {}, &block)
         begin
           db_conn = conn.connect
-          result = db_conn.query(sql)
+
+          # Handle parameterized queries
+          if params && !params.empty?
+            # Prepare statement with ? placeholders
+            stmt = db_conn.prepare(sql)
+
+            # Bind parameters using 1-based indexing
+            params.each_with_index do |param, index|
+              stmt.bind(index + 1, param)
+            end
+
+            # Execute the prepared statement
+            result = stmt.execute
+          else
+            # Execute directly without parameters
+            result = db_conn.query(sql)
+          end
 
           if block_given?
             # Get column names from the result

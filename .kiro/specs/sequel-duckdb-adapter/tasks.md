@@ -98,29 +98,29 @@
     - Ensure proper Ruby to DuckDB type conversion
     - _Requirements: 3.2, 3.3, 3.9_
 
-- [ ] 6. Implement schema introspection in DatabaseMethods (TDD - TESTS FIRST)
-  - [ ] 6.1 Write tests for schema introspection methods
+- [-] 6. Implement schema introspection in DatabaseMethods (TDD - TESTS FIRST)
+  - [x] 6.1 Write tests for schema introspection methods
     - Write tests for schema_parse_tables method for table listing
     - Write tests for schema_parse_table method for column information
     - Write tests for schema_parse_indexes method for index introspection
     - Write tests for views and foreign key detection
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 11.5_
 
-  - [ ] 6.2 Add table and schema discovery methods
+  - [x] 6.2 Add table and schema discovery methods
     - Implement schema_parse_tables method for table listing
     - Implement schema_parse_table method for column information
     - Implement schema_parse_indexes method for index introspection
     - Add support for views and foreign key detection
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 6.3 Write tests for schema metadata methods
+  - [x] 6.3 Write tests for schema metadata methods
     - Write tests for tables method using schema_parse_tables
     - Write tests for schema method using schema_parse_table
     - Write tests for indexes method using schema_parse_indexes
     - Write tests for column default and nullable status reporting
     - _Requirements: 4.7, 4.8, 11.5_
 
-  - [ ] 6.4 Add schema metadata methods
+  - [x] 6.4 Add schema metadata methods
     - Implement tables method using schema_parse_tables
     - Implement schema method using schema_parse_table
     - Implement indexes method using schema_parse_indexes
