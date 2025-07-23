@@ -142,6 +142,98 @@ module Sequel
         false
       end
 
+      # Map DuckDB errors to appropriate Sequel exception types (Requirements 8.1, 8.2, 8.3, 8.7)
+      #
+      # @param exception [::DuckDB::Error] The DuckDB exception
+      # @param opts [Hash] Additional options
+      # @return [Class] Sequel exception class to use
+      def database_exception_class(exception, opts)
+        message = exception.message.to_s
+
+        # Map specific DuckDB error patterns to appropriate Sequel exceptions
+        case message
+        when /connection/i, /database.*not.*found/i, /cannot.*open/i
+          # Connection-related errors (Requirement 8.1)
+          Sequel::DatabaseConnectionError
+        when /violates.*not.*null/i, /not.*null.*constraint/i, /null.*value.*not.*allowed/i
+          # NOT NULL constraint violations (Requirement 8.3) - moved up for priority
+          Sequel::NotNullConstraintViolation
+        when /unique.*constraint/i, /duplicate.*key/i, /already.*exists/i
+          # UNIQUE constraint violations (Requirement 8.3)
+          Sequel::UniqueConstraintViolation
+        when /foreign.*key.*constraint/i, /violates.*foreign.*key/i
+          # Foreign key constraint violations (Requirement 8.3)
+          Sequel::ForeignKeyConstraintViolation
+        when /check.*constraint/i, /violates.*check/i
+          # CHECK constraint violations (Requirement 8.3)
+          Sequel::CheckConstraintViolation
+        when /primary.*key.*constraint/i, /duplicate.*primary.*key/i
+          # Primary key constraint violations (Requirement 8.3)
+          Sequel::UniqueConstraintViolation  # Primary key violations are a type of unique constraint
+        when /constraint.*violation/i, /violates.*constraint/i
+          # Generic constraint violations (Requirement 8.3) - moved to end for lower priority
+          Sequel::ConstraintViolation
+        when /syntax.*error/i, /parse.*error/i, /unexpected.*token/i
+          # SQL syntax errors (Requirement 8.2)
+          Sequel::DatabaseError
+        when /table.*does.*not.*exist/i, /relation.*does.*not.*exist/i, /no.*such.*table/i
+          # Table not found errors (Requirement 8.7)
+          Sequel::DatabaseError
+        when /column.*does.*not.*exist/i, /no.*such.*column/i, /unknown.*column/i, /referenced.*column.*not.*found/i, /does.*not.*have.*a.*column/i
+          # Column not found errors (Requirement 8.7)
+          Sequel::DatabaseError
+        when /schema.*does.*not.*exist/i, /no.*such.*schema/i
+          # Schema not found errors (Requirement 8.7)
+          Sequel::DatabaseError
+        when /function.*does.*not.*exist/i, /no.*such.*function/i, /unknown.*function/i
+          # Function not found errors (Requirement 8.7)
+          Sequel::DatabaseError
+        when /type.*error/i, /cannot.*cast/i, /invalid.*type/i
+          # Type conversion errors (Requirement 8.7)
+          Sequel::DatabaseError
+        when /permission.*denied/i, /access.*denied/i, /insufficient.*privileges/i
+          # Permission/access errors (Requirement 8.7)
+          Sequel::DatabaseError
+        else
+          # Default to generic DatabaseError for all other DuckDB errors (Requirement 8.2)
+          Sequel::DatabaseError
+        end
+      end
+
+      # Enhanced error message formatting for better debugging (Requirements 8.2, 8.7)
+      #
+      # @param exception [::DuckDB::Error] The DuckDB exception
+      # @param opts [Hash] Additional options including SQL and parameters
+      # @return [String] Enhanced error message
+      def database_exception_message(exception, opts)
+        message = "DuckDB error: #{exception.message}"
+
+        # Add SQL context if available for better debugging
+        if opts[:sql]
+          message += " -- SQL: #{opts[:sql]}"
+        end
+
+        # Add parameter context if available
+        if opts[:params] && !opts[:params].empty?
+          message += " -- Parameters: #{opts[:params].inspect}"
+        end
+
+        message
+      end
+
+      # Handle constraint violation errors with specific categorization (Requirement 8.3)
+      #
+      # @param exception [::DuckDB::Error] The DuckDB exception
+      # @param opts [Hash] Additional options
+      # @return [Exception] Appropriate Sequel constraint exception
+      def handle_constraint_violation(exception, opts = {})
+        message = database_exception_message(exception, opts)
+        exception_class = database_exception_class(exception, opts)
+
+        # Create the appropriate exception with enhanced message
+        exception_class.new(message)
+      end
+
       # Schema introspection methods
 
       # Parse table list from database
@@ -771,7 +863,13 @@ module Sequel
           end_time = Time.now
           execution_time = end_time - start_time
           log_sql_error(sql, params, e, execution_time)
-          raise Sequel::DatabaseError, "DuckDB error: #{e.message}"
+
+          # Use enhanced error mapping for better exception categorization (Requirements 8.1, 8.2, 8.3, 8.7)
+          error_opts = { sql: sql, params: params }
+          exception_class = database_exception_class(e, error_opts)
+          enhanced_message = database_exception_message(e, error_opts)
+
+          raise exception_class, enhanced_message
         rescue StandardError => e
           # Log unexpected errors
           end_time = Time.now

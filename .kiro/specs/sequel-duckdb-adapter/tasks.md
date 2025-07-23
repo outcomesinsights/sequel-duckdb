@@ -170,8 +170,8 @@
     - Implement streaming result support where possible
     - _Requirements: 6.1, 6.2, 6.3, 9.5_
 
-- [ ] 10. Implement error handling and logging
-  - [ ] 10.1 Add error mapping in DatabaseMethods
+- [-] 10. Implement error handling and logging
+  - [x] 10.1 Add error mapping in DatabaseMethods
     - Implement database_error_classes method
     - Add database_exception_sqlstate method for SQL state extraction
     - Map DuckDB errors to appropriate Sequel exceptions
