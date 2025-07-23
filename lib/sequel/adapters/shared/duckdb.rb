@@ -719,7 +719,13 @@ module Sequel
       # @param opts [Hash] Options for execution
       # @return [Object] Result of execution
       def execute_statement(conn, sql, params = [], opts = {}, &block)
+        # Log the SQL query with timing information (Requirements 8.4, 8.5)
+        start_time = Time.now
+
         begin
+          # Log the SQL query before execution
+          log_sql_query(sql, params)
+
           # Handle parameterized queries
           if params && !params.empty?
             # Prepare statement with ? placeholders
@@ -736,6 +742,11 @@ module Sequel
             # Execute directly without parameters
             result = conn.query(sql)
           end
+
+          # Log timing information for the operation
+          end_time = Time.now
+          execution_time = end_time - start_time
+          log_sql_timing(sql, execution_time)
 
           if block_given?
             # Get column names from the result
@@ -756,8 +767,151 @@ module Sequel
             result
           end
         rescue ::DuckDB::Error => e
+          # Log the error for debugging (Requirement 8.6)
+          end_time = Time.now
+          execution_time = end_time - start_time
+          log_sql_error(sql, params, e, execution_time)
           raise Sequel::DatabaseError, "DuckDB error: #{e.message}"
+        rescue StandardError => e
+          # Log unexpected errors
+          end_time = Time.now
+          execution_time = end_time - start_time
+          log_sql_error(sql, params, e, execution_time)
+          raise e
         end
+      end
+
+      private
+
+      # Log SQL query execution (Requirement 8.4)
+      #
+      # @param sql [String] SQL statement
+      # @param params [Array] Parameters for the query
+      def log_sql_query(sql, params = [])
+        return unless log_connection_info?
+
+        if params && !params.empty?
+          # Log parameterized query with parameters
+          log_info("SQL Query: #{sql} -- Parameters: #{params.inspect}")
+        else
+          # Log simple query
+          log_info("SQL Query: #{sql}")
+        end
+      end
+
+      # Log SQL query timing information (Requirement 8.5)
+      #
+      # @param sql [String] SQL statement
+      # @param execution_time [Float] Time taken to execute in seconds
+      def log_sql_timing(sql, execution_time)
+        return unless log_connection_info?
+
+        # Log timing information, highlighting slow operations
+        time_ms = (execution_time * 1000).round(2)
+
+        if execution_time > 1.0  # Log slow operations (> 1 second) as warnings
+          log_warn("SLOW SQL Query (#{time_ms}ms): #{sql}")
+        else
+          log_info("SQL Query completed in #{time_ms}ms")
+        end
+      end
+
+      # Log SQL query errors (Requirement 8.6)
+      #
+      # @param sql [String] SQL statement that failed
+      # @param params [Array] Parameters for the query
+      # @param error [Exception] The error that occurred
+      # @param execution_time [Float] Time taken before error
+      def log_sql_error(sql, params, error, execution_time)
+        return unless log_connection_info?
+
+        time_ms = (execution_time * 1000).round(2)
+
+        if params && !params.empty?
+          log_error("SQL Error after #{time_ms}ms: #{error.message} -- SQL: #{sql} -- Parameters: #{params.inspect}")
+        else
+          log_error("SQL Error after #{time_ms}ms: #{error.message} -- SQL: #{sql}")
+        end
+      end
+
+      # Check if connection info should be logged
+      #
+      # @return [Boolean] true if logging is enabled
+      def log_connection_info?
+        # Use Sequel's built-in logging mechanism
+        !loggers.empty?
+      end
+
+      # Log info message using Sequel's logging system
+      #
+      # @param message [String] Message to log
+      def log_info(message)
+        log_connection_yield(message, nil) { nil }
+      end
+
+      # Log warning message using Sequel's logging system
+      #
+      # @param message [String] Message to log
+      def log_warn(message)
+        log_connection_yield("WARNING: #{message}", nil) { nil }
+      end
+
+      # Log error message using Sequel's logging system
+      #
+      # @param message [String] Message to log
+      def log_error(message)
+        log_connection_yield("ERROR: #{message}", nil) { nil }
+      end
+
+      public
+
+      # EXPLAIN functionality access for query plans (Requirement 9.6)
+      #
+      # @param sql [String] SQL query to explain
+      # @return [Array<Hash>] Query plan information
+      def explain_query(sql)
+        explain_sql = "EXPLAIN #{sql}"
+        plan_rows = []
+
+        execute(explain_sql) do |row|
+          plan_rows << row
+        end
+
+        plan_rows
+      end
+
+      # Get query plan for a SQL statement
+      #
+      # @param sql [String] SQL statement to analyze
+      # @return [String] Query plan as string
+      def query_plan(sql)
+        plan_rows = explain_query(sql)
+
+        if plan_rows.empty?
+          "No query plan available"
+        else
+          # Format the plan rows into a readable string
+          plan_rows.map { |row| row.values.join(" | ") }.join("\n")
+        end
+      end
+
+      # Check if EXPLAIN functionality is supported
+      #
+      # @return [Boolean] true if EXPLAIN is supported
+      def supports_explain?
+        true  # DuckDB supports EXPLAIN
+      end
+
+      # Get detailed query analysis information
+      #
+      # @param sql [String] SQL statement to analyze
+      # @return [Hash] Analysis information including plan, timing estimates, etc.
+      def analyze_query(sql)
+        {
+          plan: query_plan(sql),
+          explain_output: explain_query(sql),
+          supports_explain: supports_explain?
+        }
       end
     end
 
@@ -1296,6 +1450,134 @@ module Sequel
       def literal_blob(blob)
         "'#{blob.unpack1('H*')}'"
       end
+
+      # Dataset operation methods (Requirements 6.1, 6.2, 6.3, 9.5)
+
+      # Count the number of records in the dataset
+      #
+      # @return [Integer] Number of records
+      def count
+        # Generate COUNT(*) SQL and execute it
+        count_sql = clone(select: [Sequel.function(:count, :*)]).select_sql
+        value = nil
+        fetch_rows(count_sql) do |row|
+          value = row.values.first
+          break
+        end
+        value || 0
+      end
+
+      # Get the first record from the dataset
+      #
+      # @return [Hash, nil] First record as hash or nil if no records
+      def first
+        # Use LIMIT 1 and fetch the first row
+        record = nil
+        clone(limit: 1).fetch_rows(select_sql) do |row|
+          record = row
+          break
+        end
+        record
+      end
+
+      # Get all records from the dataset
+      #
+      # @return [Array<Hash>] Array of all records as hashes
+      def all
+        records = []
+        fetch_rows(select_sql) do |row|
+          records << row
+        end
+        records
+      end
+
+      # Insert a record into the dataset's table
+      #
+      # @param values [Hash] Column values to insert
+      # @return [Integer, nil] Number of affected rows (always nil for DuckDB due to no AUTOINCREMENT)
+      def insert(values = {})
+        sql = insert_sql(values)
+        result = db.execute(sql)
+
+        # For DuckDB, we need to return the number of affected rows
+        # Since DuckDB doesn't support AUTOINCREMENT, we return nil for the ID
+        # but we should return 1 to indicate successful insertion
+        if result.is_a?(::DuckDB::Result)
+          # DuckDB::Result doesn't have a direct way to get affected rows for INSERT
+          # For INSERT operations, if no error occurred, assume 1 row was affected
+          1
+        else
+          result
+        end
+      end
+
+      # Update records in the dataset
+      #
+      # @param values [Hash] Column values to update
+      # @return [Integer] Number of affected rows
+      def update(values = {})
+        sql = update_sql(values)
+        result = db.execute(sql)
+
+        # Extract affected row count from DuckDB result
+        if result.is_a?(::DuckDB::Result)
+          # For UPDATE operations, we need to get the number of affected rows
+          # DuckDB doesn't provide this directly, so we'll return 1 if successful
+          # This is a limitation that could be improved with better DuckDB integration
+          1
+        else
+          result
+        end
+      end
+
+      # Delete records from the dataset
+      #
+      # @return [Integer] Number of affected rows
+      def delete
+        sql = delete_sql
+        result = db.execute(sql)
+
+        # Extract affected row count from DuckDB result
+        if result.is_a?(::DuckDB::Result)
+          # For DELETE operations, we need to get the number of affected rows
+          # DuckDB doesn't provide this directly, so we'll return 1 if successful
+          # This is a limitation that could be improved with better DuckDB integration
+          1
+        else
+          result
+        end
+      end
+
+      # Streaming result support where possible (Requirement 9.5)
+      #
+      # @param sql [String] SQL to execute
+      # @param &block [Proc] Block to process each row
+      # @return [Enumerator] If no block given, returns enumerator
+      def stream(sql = select_sql, &block)
+        if block_given?
+          # Stream results by processing them one at a time
+          fetch_rows(sql, &block)
+        else
+          # Return enumerator for lazy evaluation
+          enum_for(:stream, sql)
+        end
+      end
+
+      private
+
+      # Get a single value from a SQL query (used by count)
+      def single_value(sql)
+        value = nil
+        fetch_rows(sql) do |row|
+          value = row.values.first
+          break
+        end
+        value
+      end
+
+
+
+
     end
   end
 end

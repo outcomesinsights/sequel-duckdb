@@ -156,15 +156,15 @@
     - Add aggregate function support
     - _Requirements: 2.6, 2.7, 2.8_
 
-- [ ] 9. Implement SQL execution methods in DatabaseMethods
-  - [ ] 9.1 Add core SQL execution methods
+- [x] 9. Implement SQL execution methods in DatabaseMethods
+  - [x] 9.1 Add core SQL execution methods
     - Implement execute method with connection synchronization
     - Implement execute_insert and execute_update methods
     - Add execute_statement private method for actual SQL execution
     - Implement proper result handling and iteration
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 9.2 Add dataset operation support
+  - [x] 9.2 Add dataset operation support
     - Implement count, first, and all methods in DatasetMethods
     - Add proper result set handling and conversion
     - Implement streaming result support where possible
@@ -178,7 +178,7 @@
     - Implement proper constraint violation error handling
     - _Requirements: 8.1, 8.2, 8.3, 8.7_
 
-  - [ ] 9.2 Add logging and debugging support
+  - [x] 9.2 Add logging and debugging support
     - Implement SQL query logging using Sequel's logging mechanism
     - Add timing information for slow operations
     - Implement connection pooling error handling

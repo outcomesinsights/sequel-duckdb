@@ -552,6 +552,562 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 5, db[:test_table].count, "All transactions should complete successfully"
   end
 
+  # SQL Execution Methods Tests (Requirements 2.1, 2.2, 2.3, 2.4)
+
+  def test_execute_method_with_connection_synchronization
+    db = create_db
+    create_test_table(db)
+
+    # Test basic execute method with connection synchronization (Requirement 2.1)
+    result = nil
+    assert_nothing_raised("execute method should work with connection synchronization") do
+      result = db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Execute Test', 30)")
+    end
+
+    # Verify the insert worked
+    count = db[:test_table].count
+    assert_equal 1, count, "Execute should insert record"
+
+    # Test execute with SELECT query
+    rows = []
+    assert_nothing_raised("execute method should work with SELECT queries") do
+      db.execute("SELECT * FROM test_table WHERE id = 1") do |row|
+        rows << row
+      end
+    end
+
+    assert_equal 1, rows.length, "Execute should return one row"
+    assert_equal "Execute Test", rows.first[:name], "Execute should return correct data"
+  end
+
+  def test_execute_method_with_parameters
+    db = create_db
+    create_test_table(db)
+
+    # Test execute method with parameterized queries
+    assert_nothing_raised("execute method should support parameterized queries") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Param Test", 25])
+    end
+
+    # Verify the parameterized insert worked
+    rows = []
+    db.execute("SELECT * FROM test_table WHERE id = ?", [1]) do |row|
+      rows << row
+    end
+
+    assert_equal 1, rows.length, "Parameterized execute should work"
+    assert_equal "Param Test", rows.first[:name], "Parameterized execute should insert correct data"
+    assert_equal 25, rows.first[:age], "Parameterized execute should handle integer parameters"
+  end
+
+  def test_execute_method_error_handling
+    db = create_db
+
+    # Test execute method error handling
+    assert_database_error("execute should raise DatabaseError for invalid SQL") do
+      db.execute("INVALID SQL SYNTAX")
+    end
+
+    # Test execute with invalid table
+    assert_database_error("execute should raise DatabaseError for invalid table") do
+      db.execute("SELECT * FROM nonexistent_table")
+    end
+  end
+
+  def test_execute_method_with_block
+    db = create_db
+    create_test_table(db)
+
+    # Insert test data
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Block Test 1', 20)")
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (2, 'Block Test 2', 30)")
+
+    # Test execute method with block for result processing
+    collected_rows = []
+    result = nil
+    assert_nothing_raised("execute method should work with block") do
+      result = db.execute("SELECT * FROM test_table ORDER BY id") do |row|
+        collected_rows << row
+      end
+    end
+
+    assert_equal 2, collected_rows.length, "Block should receive all rows"
+    assert_equal "Block Test 1", collected_rows.first[:name], "Block should receive correct first row"
+    assert_equal "Block Test 2", collected_rows.last[:name], "Block should receive correct second row"
+  end
+
+  def test_execute_method_without_block
+    db = create_db
+    create_test_table(db)
+
+    # Insert test data
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'No Block Test', 25)")
+
+    # Test execute method without block (should return result object)
+    result = nil
+    assert_nothing_raised("execute method should work without block") do
+      result = db.execute("SELECT * FROM test_table WHERE id = 1")
+    end
+
+    refute_nil result, "Execute without block should return result object"
+  end
+
+  def test_execute_insert_method
+    db = create_db
+    create_test_table(db)
+
+    # Test execute_insert method (Requirement 2.2)
+    result = nil
+    assert_nothing_raised("execute_insert should work") do
+      result = db.execute_insert("INSERT INTO test_table (id, name, age) VALUES (1, 'Insert Test', 35)")
+    end
+
+    # For DuckDB, execute_insert should return nil since AUTOINCREMENT isn't supported
+    # This matches the expected behavior for databases without auto-increment
+    assert_nil result, "execute_insert should return nil for DuckDB (no AUTOINCREMENT support)"
+
+    # Verify the insert worked
+    count = db[:test_table].count
+    assert_equal 1, count, "execute_insert should insert record"
+
+    # Verify the data
+    row = db[:test_table].first
+    assert_equal "Insert Test", row[:name], "execute_insert should insert correct data"
+    assert_equal 35, row[:age], "execute_insert should insert correct age"
+  end
+
+  def test_execute_insert_with_parameters
+    db = create_db
+    create_test_table(db)
+
+    # Test execute_insert with parameters
+    result = nil
+    assert_nothing_raised("execute_insert should work with parameters") do
+      result = db.execute_insert("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)",
+                                 params: [2, "Param Insert", 40])
+    end
+
+    assert_nil result, "execute_insert should return nil for parameterized queries"
+
+    # Verify the insert worked
+    row = db[:test_table].where(id: 2).first
+    refute_nil row, "Parameterized execute_insert should insert record"
+    assert_equal "Param Insert", row[:name], "Parameterized execute_insert should insert correct data"
+  end
+
+  def test_execute_update_method
+    db = create_db
+    create_test_table(db)
+
+    # Insert initial data
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Update Test', 25)")
+
+    # Test execute_update method (Requirement 2.3)
+    result = nil
+    assert_nothing_raised("execute_update should work") do
+      result = db.execute_update("UPDATE test_table SET age = 30 WHERE id = 1")
+    end
+
+    # Verify the update worked
+    row = db[:test_table].where(id: 1).first
+    assert_equal 30, row[:age], "execute_update should update record"
+    assert_equal "Update Test", row[:name], "execute_update should preserve other fields"
+  end
+
+  def test_execute_update_with_parameters
+    db = create_db
+    create_test_table(db)
+
+    # Insert initial data
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Param Update', 25)")
+
+    # Test execute_update with parameters
+    assert_nothing_raised("execute_update should work with parameters") do
+      db.execute_update("UPDATE test_table SET name = ?, age = ? WHERE id = ?",
+                        params: ["Updated Name", 35, 1])
+    end
+
+    # Verify the update worked
+    row = db[:test_table].where(id: 1).first
+    assert_equal "Updated Name", row[:name], "Parameterized execute_update should update name"
+    assert_equal 35, row[:age], "Parameterized execute_update should update age"
+  end
+
+  def test_execute_update_error_handling
+    db = create_db
+
+    # Test execute_update error handling
+    assert_database_error("execute_update should raise DatabaseError for invalid SQL") do
+      db.execute_update("UPDATE nonexistent_table SET column = 'value'")
+    end
+  end
+
+  def test_execute_statement_private_method
+    db = create_db
+    create_test_table(db)
+
+    # Test that execute_statement is properly used internally
+    # We can't test it directly since it's private, but we can verify it works through public methods
+
+    # Test with simple SQL
+    assert_nothing_raised("execute_statement should handle simple SQL") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Statement Test', 28)")
+    end
+
+    # Test with parameterized SQL
+    assert_nothing_raised("execute_statement should handle parameterized SQL") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [2, "Param Statement", 32])
+    end
+
+    # Verify both inserts worked
+    assert_equal 2, db[:test_table].count, "execute_statement should handle both simple and parameterized SQL"
+  end
+
+  def test_result_handling_and_iteration
+    db = create_db
+    create_test_table(db)
+
+    # Insert test data with various data types
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Result Test 1', 25)")
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (2, 'Result Test 2', 30)")
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (3, 'Result Test 3', 35)")
+
+    # Test proper result handling and iteration (Requirement 2.4)
+    collected_results = []
+    assert_nothing_raised("Result handling should work properly") do
+      db.execute("SELECT * FROM test_table ORDER BY id") do |row|
+        collected_results << row
+      end
+    end
+
+    # Verify result structure and content
+    assert_equal 3, collected_results.length, "Should collect all rows"
+
+    # Verify first row
+    first_row = collected_results[0]
+    assert_instance_of Hash, first_row, "Each row should be a hash"
+    assert_equal 1, first_row[:id], "First row should have correct id"
+    assert_equal "Result Test 1", first_row[:name], "First row should have correct name"
+    assert_equal 25, first_row[:age], "First row should have correct age"
+
+    # Verify all rows have expected keys
+    collected_results.each_with_index do |row, index|
+      assert_includes row.keys, :id, "Row #{index} should have :id key"
+      assert_includes row.keys, :name, "Row #{index} should have :name key"
+      assert_includes row.keys, :age, "Row #{index} should have :age key"
+    end
+
+    # Verify data types are preserved
+    assert_instance_of Integer, first_row[:id], "ID should be integer"
+    assert_instance_of String, first_row[:name], "Name should be string"
+    assert_instance_of Integer, first_row[:age], "Age should be integer"
+  end
+
+  def test_sql_execution_with_various_data_types
+    db = create_db
+
+    # Create table with various data types
+    db.run <<~SQL
+      CREATE TABLE type_test_table (
+        id INTEGER PRIMARY KEY,
+        name VARCHAR(100),
+        age INTEGER,
+        salary DOUBLE,
+        is_active BOOLEAN,
+        birth_date DATE,
+        created_at TIMESTAMP,
+        notes TEXT
+      )
+    SQL
+
+    # Insert data with various types
+    assert_nothing_raised("Should handle various data types in SQL execution") do
+      db.execute(<<~SQL, [1, "John Doe", 30, 50000.50, true, "1993-05-15", "2023-01-01 10:30:00", "Test notes"])
+        INSERT INTO type_test_table
+        (id, name, age, salary, is_active, birth_date, created_at, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      SQL
+    end
+
+    # Retrieve and verify data types
+    row = nil
+    db.execute("SELECT * FROM type_test_table WHERE id = 1") do |r|
+      row = r
+    end
+
+    refute_nil row, "Should retrieve inserted row"
+    assert_equal 1, row[:id], "Integer should be preserved"
+    assert_equal "John Doe", row[:name], "String should be preserved"
+    assert_equal 30, row[:age], "Integer should be preserved"
+    assert_equal 50000.5, row[:salary], "Double should be preserved"
+    assert_equal true, row[:is_active], "Boolean should be preserved"
+    assert_equal "Test notes", row[:notes], "Text should be preserved"
+
+    # Date and timestamp handling may vary by DuckDB version, so we'll just check they're not nil
+    refute_nil row[:birth_date], "Date should not be nil"
+    refute_nil row[:created_at], "Timestamp should not be nil"
+  end
+
+  def test_sql_execution_connection_synchronization
+    db = create_db
+    create_test_table(db)
+
+    # Test that multiple SQL executions work properly with connection synchronization
+    # This tests that the connection is properly managed across multiple operations
+    assert_nothing_raised("Multiple SQL executions should work with proper connection synchronization") do
+      # Multiple inserts
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Sync Test 1', 20)")
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (2, 'Sync Test 2', 25)")
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (3, 'Sync Test 3', 30)")
+
+      # Mixed operations
+      count = 0
+      db.execute("SELECT COUNT(*) as count FROM test_table") do |row|
+        count = row[:count]
+      end
+      assert_equal 3, count, "Count should be correct after multiple inserts"
+
+      # Update operation
+      db.execute("UPDATE test_table SET age = age + 5 WHERE id = 2")
+
+      # Verify update
+      updated_age = nil
+      db.execute("SELECT age FROM test_table WHERE id = 2") do |row|
+        updated_age = row[:age]
+      end
+      assert_equal 30, updated_age, "Update should work correctly"
+
+      # Delete operation
+      db.execute("DELETE FROM test_table WHERE id = 1")
+
+      # Verify delete
+      final_count = 0
+      db.execute("SELECT COUNT(*) as count FROM test_table") do |row|
+        final_count = row[:count]
+      end
+      assert_equal 2, final_count, "Delete should work correctly"
+    end
+  end
+
+  # Logging and Debugging Support Tests (Requirements 8.4, 8.5, 8.6, 9.6)
+
+  def test_sql_query_logging
+    db = create_db
+    create_test_table(db)
+
+    # Test SQL query logging using Sequel's logging mechanism (Requirement 8.4)
+    logged_queries = []
+
+    # Set up a custom logger to capture log messages
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+
+    # Enable logging on the database
+    db.loggers = [logger]
+
+    # Execute some queries that should be logged
+    assert_nothing_raised("Should be able to execute queries with logging enabled") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Log Test', 25)")
+      db[:test_table].count
+      db[:test_table].where(id: 1).first
+    end
+
+    # Check that queries were logged
+    log_output = string_io.string
+    refute_empty log_output, "Queries should be logged when logging is enabled"
+
+    # Should contain SQL statements
+    assert_includes log_output, "INSERT", "INSERT query should be logged"
+    assert_includes log_output, "SELECT", "SELECT query should be logged"
+  end
+
+  def test_timing_information_for_operations
+    db = create_db
+    create_test_table(db)
+
+    # Test timing information for operations (Requirement 8.5)
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+    db.loggers = [logger]
+
+    # Execute a query and check for timing information
+    start_time = Time.now
+    assert_nothing_raised("Should execute query with timing") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Timing Test', 30)")
+    end
+    end_time = Time.now
+
+    # Check that timing information is included in logs
+    log_output = string_io.string
+
+    # Sequel typically includes timing information in its logs
+    # The exact format may vary, but it should include some timing data
+    refute_empty log_output, "Operations should be logged with timing information"
+  end
+
+  def test_connection_pooling_error_handling
+    # Test connection pooling error handling (Requirement 8.6)
+
+    # Test with invalid connection parameters
+    assert_connection_error do
+      invalid_db = Sequel.connect("duckdb:///invalid/path/that/cannot/be/created/database.db")
+      invalid_db.test_connection
+    end
+  end
+
+  def test_explain_functionality_access
+    db = create_db
+    create_test_table(db)
+
+    # Insert some test data
+    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Explain Test', 25)")
+
+    # Test EXPLAIN functionality access for query plans (Requirement 9.6)
+    explain_result = nil
+    assert_nothing_raised("Should be able to access EXPLAIN functionality") do
+      db.execute("EXPLAIN SELECT * FROM test_table WHERE id = 1") do |row|
+        explain_result = row
+      end
+    end
+
+    refute_nil explain_result, "EXPLAIN should return query plan information"
+
+    # The exact structure of EXPLAIN output varies by DuckDB version
+    # but it should contain some plan information
+    assert_instance_of Hash, explain_result, "EXPLAIN result should be a hash"
+    refute_empty explain_result, "EXPLAIN result should not be empty"
+  end
+
+  def test_database_logging_configuration
+    db = create_db
+
+    # Test that logging can be enabled and disabled
+    assert_respond_to db, :loggers, "Database should support loggers configuration"
+    assert_respond_to db, :loggers=, "Database should support setting loggers"
+
+    # Test initial state
+    initial_loggers = db.loggers
+    assert_instance_of Array, initial_loggers, "Loggers should be an array"
+
+    # Test adding a logger
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+
+    assert_nothing_raised("Should be able to add logger") do
+      db.loggers = [logger]
+    end
+
+    assert_equal [logger], db.loggers, "Logger should be set correctly"
+
+    # Test removing loggers
+    assert_nothing_raised("Should be able to remove loggers") do
+      db.loggers = []
+    end
+
+    assert_empty db.loggers, "Loggers should be empty after removal"
+  end
+
+  def test_sql_logging_with_parameters
+    db = create_db
+    create_test_table(db)
+
+    # Test SQL logging with parameterized queries
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+    db.loggers = [logger]
+
+    # Execute parameterized query
+    assert_nothing_raised("Should log parameterized queries") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Param Log Test", 28])
+    end
+
+    log_output = string_io.string
+    refute_empty log_output, "Parameterized queries should be logged"
+
+    # Should contain the SQL with parameters
+    assert_includes log_output, "INSERT", "Parameterized INSERT should be logged"
+  end
+
+  def test_error_logging_and_debugging
+    db = create_db
+
+    # Test error logging and debugging support
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+    db.loggers = [logger]
+
+    # Execute invalid SQL to trigger error logging
+    assert_database_error("Should raise error for invalid SQL") do
+      db.execute("INVALID SQL SYNTAX FOR LOGGING TEST")
+    end
+
+    log_output = string_io.string
+
+    # Error should be logged (exact format may vary)
+    # At minimum, the failed SQL should appear in logs
+    assert_includes log_output, "INVALID SQL", "Failed SQL should be logged"
+  end
+
+  def test_performance_logging_for_slow_operations
+    db = create_db
+    create_test_table(db)
+
+    # Test performance logging for operations (Requirement 8.5)
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+    db.loggers = [logger]
+
+    # Execute multiple operations to test performance logging
+    assert_nothing_raised("Should log performance information") do
+      # Insert multiple records
+      (1..5).each do |i|
+        db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "Perf Test #{i}", 20 + i])
+      end
+
+      # Execute a more complex query
+      db.execute("SELECT * FROM test_table WHERE age > 22 ORDER BY name")
+    end
+
+    log_output = string_io.string
+    refute_empty log_output, "Performance information should be logged"
+
+    # Should contain multiple SQL operations
+    insert_count = log_output.scan(/INSERT/).length
+    assert insert_count >= 5, "Multiple INSERT operations should be logged"
+    assert_includes log_output, "SELECT", "SELECT operation should be logged"
+  end
+
+  def test_debug_information_availability
+    db = create_db
+    create_test_table(db)
+
+    # Test that debug information is available when needed
+    require 'logger'
+    string_io = StringIO.new
+    logger = Logger.new(string_io)
+    logger.level = Logger::DEBUG  # Set to debug level
+    db.loggers = [logger]
+
+    # Execute operations with debug logging
+    assert_nothing_raised("Should provide debug information") do
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Debug Test', 30)")
+      db[:test_table].count
+    end
+
+    log_output = string_io.string
+    refute_empty log_output, "Debug information should be available"
+
+    # Debug logs should contain detailed information
+    # The exact format depends on Sequel's logging implementation
+    assert_includes log_output, "INSERT", "Debug logs should contain SQL statements"
+  end
+
   private
 
   def create_db

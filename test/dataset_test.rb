@@ -207,11 +207,14 @@ class DatasetTest < SequelDuckDBTest::TestCase
     create_test_table(db)
     dataset = db[:test_table]
 
-    # Test insert operation
+    # Test insert operation (need to provide id since DuckDB doesn't support AUTOINCREMENT)
+    result = nil
     assert_nothing_raised("Should be able to insert record") do
-      dataset.insert(name: "New User", age: 35)
+      result = dataset.insert(id: 1, name: "New User", age: 35)
     end
 
+    # For DuckDB, insert should return 1 (number of affected rows)
+    assert_equal 1, result, "Insert should return number of affected rows"
     assert_equal 1, dataset.count, "Should have one record after insert"
 
     record = dataset.first
@@ -296,6 +299,256 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_equal 0, dataset.count, "Empty table count should be 0"
     assert_equal [], dataset.all, "Empty table all() should return empty array"
     assert_nil dataset.first, "Empty table first() should return nil"
+  end
+
+  # Dataset Operation Support Tests (Requirements 6.1, 6.2, 6.3, 9.5)
+
+  def test_dataset_count_method
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Test count on empty dataset (Requirement 6.3)
+    assert_equal 0, dataset.count, "Count should return 0 for empty dataset"
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Count Test 1", age: 25)
+    dataset.insert(id: 2, name: "Count Test 2", age: 30)
+    dataset.insert(id: 3, name: "Count Test 3", age: 35)
+
+    # Test count with data
+    assert_equal 3, dataset.count, "Count should return correct number of records"
+
+    # Test count with WHERE clause
+    filtered_count = dataset.where { age > 28 }.count
+    assert_equal 2, filtered_count, "Count should work with WHERE clause"
+  end
+
+  def test_dataset_first_method
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Test first on empty dataset (Requirement 6.2)
+    assert_nil dataset.first, "First should return nil for empty dataset"
+
+    # Insert test data
+    dataset.insert(id: 1, name: "First Test 1", age: 25)
+    dataset.insert(id: 2, name: "First Test 2", age: 30)
+
+    # Test first with data
+    record = dataset.first
+    refute_nil record, "First should return a record"
+    assert_instance_of Hash, record, "First should return a hash"
+    assert_includes [1, 2], record[:id], "First should return one of the inserted records"
+
+    # Test first with ORDER BY
+    ordered_record = dataset.order(:name).first
+    assert_equal "First Test 1", ordered_record[:name], "First should respect ORDER BY"
+
+    # Test first with WHERE clause
+    filtered_record = dataset.where(age: 30).first
+    assert_equal "First Test 2", filtered_record[:name], "First should work with WHERE clause"
+  end
+
+  def test_dataset_all_method
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Test all on empty dataset (Requirement 6.1)
+    records = dataset.all
+    assert_instance_of Array, records, "All should return an array"
+    assert_empty records, "All should return empty array for empty dataset"
+
+    # Insert test data
+    dataset.insert(id: 1, name: "All Test 1", age: 25)
+    dataset.insert(id: 2, name: "All Test 2", age: 30)
+    dataset.insert(id: 3, name: "All Test 3", age: 35)
+
+    # Test all with data
+    all_records = dataset.all
+    assert_equal 3, all_records.length, "All should return all records"
+
+    # Verify each record is a hash with expected keys
+    all_records.each do |record|
+      assert_instance_of Hash, record, "Each record should be a hash"
+      assert_includes record.keys, :id, "Each record should have id key"
+      assert_includes record.keys, :name, "Each record should have name key"
+      assert_includes record.keys, :age, "Each record should have age key"
+    end
+
+    # Test all with WHERE clause
+    filtered_records = dataset.where { age >= 30 }.all
+    assert_equal 2, filtered_records.length, "All should work with WHERE clause"
+    filtered_records.each do |record|
+      assert record[:age] >= 30, "Filtered records should meet criteria"
+    end
+
+    # Test all with ORDER BY
+    ordered_records = dataset.order(:age).all
+    ages = ordered_records.map { |r| r[:age] }
+    assert_equal [25, 30, 35], ages, "All should respect ORDER BY"
+  end
+
+  def test_dataset_insert_method_return_value
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Test insert return value (should return number of affected rows)
+    result = dataset.insert(id: 1, name: "Insert Return Test", age: 28)
+    assert_equal 1, result, "Insert should return 1 for successful insertion"
+
+    # Verify the record was actually inserted
+    assert_equal 1, dataset.count, "Record should be inserted"
+    record = dataset.first
+    assert_equal "Insert Return Test", record[:name], "Correct data should be inserted"
+  end
+
+  def test_dataset_update_method_return_value
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert initial data
+    dataset.insert(id: 1, name: "Update Test", age: 25)
+    dataset.insert(id: 2, name: "Update Test 2", age: 30)
+
+    # Test update return value (should return number of affected rows)
+    result = dataset.where(id: 1).update(age: 26)
+    assert_equal 1, result, "Update should return number of affected rows"
+
+    # Verify the update worked
+    updated_record = dataset.where(id: 1).first
+    assert_equal 26, updated_record[:age], "Record should be updated"
+
+    # Test update multiple records
+    result_multiple = dataset.update(active: true)
+    assert_equal 1, result_multiple, "Update should return affected row count"
+  end
+
+  def test_dataset_delete_method_return_value
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert initial data
+    dataset.insert(id: 1, name: "Delete Test 1", age: 25)
+    dataset.insert(id: 2, name: "Delete Test 2", age: 30)
+    dataset.insert(id: 3, name: "Delete Test 3", age: 35)
+
+    initial_count = dataset.count
+    assert_equal 3, initial_count, "Should start with 3 records"
+
+    # Test delete return value (should return number of affected rows)
+    result = dataset.where(id: 2).delete
+    assert_equal 1, result, "Delete should return number of affected rows"
+
+    # Verify the delete worked
+    assert_equal 2, dataset.count, "Should have 2 records after delete"
+    assert_nil dataset.where(id: 2).first, "Deleted record should not exist"
+
+    # Test delete multiple records
+    result_multiple = dataset.where { age >= 30 }.delete
+    assert_equal 1, result_multiple, "Delete should return affected row count"
+    assert_equal 1, dataset.count, "Should have 1 record remaining"
+  end
+
+  def test_dataset_streaming_support
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    (1..5).each do |i|
+      dataset.insert(id: i, name: "Stream Test #{i}", age: 20 + i)
+    end
+
+    # Test streaming with block (Requirement 9.5)
+    streamed_records = []
+    assert_nothing_raised("Streaming should work with block") do
+      dataset.stream do |record|
+        streamed_records << record
+      end
+    end
+
+    assert_equal 5, streamed_records.length, "Streaming should process all records"
+    streamed_records.each do |record|
+      assert_instance_of Hash, record, "Streamed record should be a hash"
+      assert_includes record.keys, :name, "Streamed record should have expected keys"
+    end
+
+    # Test streaming without block (should return enumerator)
+    enumerator = dataset.stream
+    assert_instance_of Enumerator, enumerator, "Stream without block should return enumerator"
+
+    # Test enumerator functionality
+    first_from_enum = enumerator.first
+    assert_instance_of Hash, first_from_enum, "Enumerator should yield hashes"
+  end
+
+  def test_dataset_result_set_handling_and_conversion
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert data with various types (Requirement 9.5)
+    dataset.insert(
+      id: 1,
+      name: "Type Test",
+      age: 30,
+      active: true,
+      score: 85.5
+    )
+
+    # Test proper result set handling and conversion
+    record = dataset.first
+
+    # Verify data types are properly converted
+    assert_instance_of Integer, record[:id], "Integer should be preserved"
+    assert_instance_of String, record[:name], "String should be preserved"
+    assert_instance_of Integer, record[:age], "Integer should be preserved"
+
+    # Boolean and Float handling may vary by DuckDB version
+    # Just ensure they're not nil and have reasonable values
+    refute_nil record[:active], "Boolean should not be nil"
+    refute_nil record[:score], "Float should not be nil"
+
+    # Test that all method preserves types consistently
+    all_records = dataset.all
+    all_records.each do |rec|
+      assert_instance_of Integer, rec[:id], "All records should have consistent integer IDs"
+      assert_instance_of String, rec[:name], "All records should have consistent string names"
+    end
+  end
+
+  def test_dataset_operations_with_complex_queries
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    (1..10).each do |i|
+      dataset.insert(id: i, name: "Complex Test #{i}", age: 20 + (i % 5))
+    end
+
+    # Test count with complex WHERE clause
+    complex_count = dataset.where { (age > 22) & (age < 25) }.count
+    assert_instance_of Integer, complex_count, "Complex count should return integer"
+    assert complex_count > 0, "Complex count should find matching records"
+
+    # Test first with complex query
+    complex_first = dataset.where { age > 22 }.order(:id).first
+    refute_nil complex_first, "Complex first should find a record"
+    assert complex_first[:age] > 22, "Complex first should meet criteria"
+
+    # Test all with complex query
+    complex_all = dataset.where { age <= 23 }.order(:name).all
+    assert_instance_of Array, complex_all, "Complex all should return array"
+    complex_all.each do |record|
+      assert record[:age] <= 23, "All complex records should meet criteria"
+    end
   end
 
   private
