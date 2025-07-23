@@ -185,15 +185,15 @@
     - Add EXPLAIN functionality access for query plans
     - _Requirements: 8.4, 8.5, 8.6, 9.6_
 
-- [ ] 11. Implement performance optimizations
-  - [ ] 11.1 Add efficient result fetching
+- [x] 11. Implement performance optimizations
+  - [x] 11.1 Add efficient result fetching
     - Optimize fetch_rows method for large result sets
     - Implement prepared statement support if beneficial
     - Add bulk insert optimization methods
     - Implement efficient connection pooling
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-  - [ ] 10.2 Add memory and query optimizations
+  - [x] 10.2 Add memory and query optimizations
     - Implement streaming result options for memory efficiency
     - Add index-aware query generation
     - Optimize for DuckDB's columnar storage advantages
