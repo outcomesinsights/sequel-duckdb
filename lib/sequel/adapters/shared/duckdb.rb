@@ -962,6 +962,275 @@ module Sequel
           if offset = @opts[:offset]
             sql << " OFFSET #{literal(offset)}"
           end
+        elsif offset = @opts[:offset]
+          # DuckDB supports OFFSET without LIMIT
+          sql << " OFFSET #{literal(offset)}"
+        end
+      end
+
+      # Add JOIN clauses to SQL (Requirement 6.9)
+      def select_join_sql(sql)
+        return unless @opts[:join]
+
+        @opts[:join].each do |join|
+          # Handle different join clause types
+          case join
+          when Sequel::SQL::JoinOnClause
+            join_type = join.join_type || :inner
+            table = join.table
+            conditions = join.on
+
+            # Format join type
+            join_clause = case join_type
+                         when :inner
+                           "INNER JOIN"
+                         when :left, :left_outer
+                           "LEFT JOIN"
+                         when :right, :right_outer
+                           "RIGHT JOIN"
+                         when :full, :full_outer
+                           "FULL JOIN"
+                         else
+                           "INNER JOIN"
+                         end
+
+            sql << " #{join_clause} "
+
+            # Add table name
+            if table.is_a?(Sequel::Dataset)
+              sql << "(#{table.sql}) AS #{quote_identifier(join.table_alias || 'subquery')}"
+            else
+              sql << literal(table)
+            end
+
+            # Add ON conditions
+            if conditions
+              sql << " ON "
+              literal_append(sql, conditions)
+            end
+
+          when Sequel::SQL::JoinUsingClause
+            join_type = join.join_type || :inner
+            table = join.table
+            using_columns = join.using
+
+            join_clause = case join_type
+                         when :inner
+                           "INNER JOIN"
+                         when :left, :left_outer
+                           "LEFT JOIN"
+                         when :right, :right_outer
+                           "RIGHT JOIN"
+                         when :full, :full_outer
+                           "FULL JOIN"
+                         else
+                           "INNER JOIN"
+                         end
+
+            sql << " #{join_clause} "
+            sql << literal(table)
+
+            if using_columns
+              sql << " USING (#{Array(using_columns).map { |col| quote_identifier(col) }.join(', ')})"
+            end
+
+          when Sequel::SQL::JoinClause
+            join_type = join.join_type || :inner
+            table = join.table
+
+            join_clause = case join_type
+                         when :cross
+                           "CROSS JOIN"
+                         when :natural
+                           "NATURAL JOIN"
+                         else
+                           "INNER JOIN"
+                         end
+
+            sql << " #{join_clause} "
+            sql << literal(table)
+          end
+        end
+      end
+
+      # Add WHERE clause to SQL (enhanced for complex conditions - Requirement 6.4)
+      def select_where_sql(sql)
+        return unless @opts[:where]
+        sql << " WHERE "
+        literal_append(sql, @opts[:where])
+      end
+
+      # Add GROUP BY clause to SQL (Requirement 6.7)
+      def select_group_sql(sql)
+        return unless @opts[:group]
+        sql << " GROUP BY "
+        if @opts[:group].is_a?(Array)
+          sql << @opts[:group].map { |col| literal(col) }.join(", ")
+        else
+          literal_append(sql, @opts[:group])
+        end
+      end
+
+      # Add HAVING clause to SQL (Requirement 6.8)
+      def select_having_sql(sql)
+        return unless @opts[:having]
+        sql << " HAVING "
+        literal_append(sql, @opts[:having])
+      end
+
+      # Add ORDER BY clause to SQL (enhanced - Requirement 6.5)
+      def select_order_sql(sql)
+        return unless @opts[:order]
+        sql << " ORDER BY "
+        if @opts[:order].is_a?(Array)
+          sql << @opts[:order].map { |col| order_column_sql(col) }.join(", ")
+        else
+          sql << order_column_sql(@opts[:order])
+        end
+      end
+
+      # Format individual ORDER BY column
+      def order_column_sql(column)
+        case column
+        when Sequel::SQL::OrderedExpression
+          col_sql = literal(column.expression)
+          col_sql << (column.descending ? " DESC" : " ASC")
+          # Check if nulls option exists (may not be available in all Sequel versions)
+          if column.respond_to?(:nulls) && column.nulls
+            col_sql << (column.nulls == :first ? " NULLS FIRST" : " NULLS LAST")
+          end
+          col_sql
+        else
+          literal(column)
+        end
+      end
+
+      # Enhanced literal handling for complex expressions
+      def literal_append(sql, v)
+        case v
+        when Time
+          literal_datetime_append(sql, v)
+        when DateTime
+          literal_datetime_append(sql, v)
+        when String
+          if v.encoding == Encoding::ASCII_8BIT
+            literal_blob_append(sql, v)
+          else
+            literal_string_append(sql, v)
+          end
+        else
+          super
+        end
+      end
+
+      # DuckDB-specific SQL generation enhancements
+
+      # Override complex_expression_sql_append for DuckDB-specific handling
+      public
+
+      def complex_expression_sql_append(sql, op, args)
+        case op
+        when :ILIKE
+          # DuckDB doesn't have ILIKE, use UPPER() workaround
+          sql << "UPPER("
+          literal_append(sql, args.first)
+          sql << ") LIKE UPPER("
+          literal_append(sql, args.last)
+          sql << ")"
+        when :~
+          # Regular expression matching for DuckDB
+          literal_append(sql, args.first)
+          sql << " ~ "
+          literal_append(sql, args.last)
+        else
+          super
+        end
+      end
+
+
+
+      # Override select_sql to include enhanced SQL generation
+      def select_sql
+        return @opts[:sql] if @opts[:sql]
+
+        sql = "SELECT ".dup
+
+        # Add column selection
+        if @opts[:select]
+          sql << select_columns_sql
+        else
+          sql << "*"
+        end
+
+        # Add FROM clause
+        sql << " FROM #{table_name_sql}"
+
+        # Add JOIN clauses
+        select_join_sql(sql) if @opts[:join]
+
+        # Add WHERE clause
+        select_where_sql(sql) if @opts[:where]
+
+        # Add GROUP BY clause
+        select_group_sql(sql) if @opts[:group]
+
+        # Add HAVING clause
+        select_having_sql(sql) if @opts[:having]
+
+        # Add ORDER BY clause
+        select_order_sql(sql) if @opts[:order]
+
+        # Add LIMIT and OFFSET clauses
+        select_limit_sql(sql) if @opts[:limit] || @opts[:offset]
+
+        sql
+      end
+
+      # Support for UNION, INTERSECT, EXCEPT operations
+      def union(dataset, opts = {})
+        compound_clone(:union, dataset, opts)
+      end
+
+      def intersect(dataset, opts = {})
+        compound_clone(:intersect, dataset, opts)
+      end
+
+      def except(dataset, opts = {})
+        compound_clone(:except, dataset, opts)
+      end
+
+      private
+
+      def compound_clone(type, dataset, opts)
+        clone(compound: type, compound_dataset: dataset, compound_all: opts[:all])
+      end
+
+      def compound_dataset_sql
+        return super unless @opts[:compound]
+
+        case @opts[:compound]
+        when :union
+          if @opts[:compound_all]
+            "#{select_sql} UNION ALL #{@opts[:compound_dataset].select_sql}"
+          else
+            "#{select_sql} UNION #{@opts[:compound_dataset].select_sql}"
+          end
+        when :intersect
+          "#{select_sql} INTERSECT #{@opts[:compound_dataset].select_sql}"
+        when :except
+          "#{select_sql} EXCEPT #{@opts[:compound_dataset].select_sql}"
+        else
+          super
+        end
+      end
+
+      public
+
+      def sql
+        if @opts[:compound]
+          compound_dataset_sql
+        else
+          super
         end
       end
 

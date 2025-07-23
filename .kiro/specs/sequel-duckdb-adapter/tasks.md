@@ -141,15 +141,15 @@
     - Implement manual transaction control for autocommit mode
     - _Requirements: 5.5, 5.6, 5.7_
 
-- [ ] 8. Implement advanced SQL generation features
-  - [ ] 8.1 Add complex query support to DatasetMethods
+- [x] 8. Implement advanced SQL generation features
+  - [x] 8.1 Add complex query support to DatasetMethods
     - Implement proper WHERE clause generation
     - Add ORDER BY, LIMIT, and OFFSET support
     - Implement GROUP BY and HAVING clause generation
     - Add JOIN statement generation
     - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9_
 
-  - [ ] 8.2 Add DuckDB-specific SQL features
+  - [x] 8.2 Add DuckDB-specific SQL features
     - Implement window function support
     - Add Common Table Expression (CTE) support
     - Implement subquery generation
