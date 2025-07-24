@@ -10,16 +10,16 @@ The core issue is that the current adapter implementation doesn't properly handl
 
 ### Current Problem
 
-The existing `literal_append` method in the DuckDB adapter lacks proper type discrimination for SQL expression objects. All objects are being processed through a generic string handling path that applies SQL string quoting, breaking the intended behavior of SQL expressions and functions.
+The existing `literal_append` method in the DuckDB adapter handles `String` objects without first checking if they are `Sequel::LiteralString` objects. This causes `LiteralString` objects (created by `Sequel.lit()`) to be treated as regular strings and quoted inappropriately. The method correctly handles `Time` and `DateTime` objects but falls through to `literal_string_append` for all `String` objects, including `LiteralString`.
 
 ### Solution Architecture
 
-The solution implements a type-aware `literal_append` method that:
+The solution follows Sequel core's established pattern by checking for `LiteralString` as a special case of `String` before applying string quoting:
 
-1. **Type Detection**: Identifies the specific type of SQL object being processed
-2. **Delegated Handling**: Routes each type to appropriate handling logic
-3. **Raw SQL Preservation**: Ensures SQL expressions maintain their unquoted form
-4. **Backward Compatibility**: Preserves existing behavior for regular data types
+1. **Sequel Core Pattern Compliance**: Follows the exact pattern used in Sequel core's `literal_append` method
+2. **LiteralString Special Handling**: Checks for `LiteralString` before regular `String` processing
+3. **Minimal Change**: Only adds the missing `LiteralString` check to existing logic
+4. **Parent Delegation**: Continues to delegate `SQL::Function` and other expressions to parent class
 
 ### Design Pattern
 
@@ -33,14 +33,25 @@ Following Sequel's adapter pattern, the fix will be implemented in the `DatasetM
 
 **Interface**:
 ```ruby
-def literal_append(sql, value)
-  case value
-  when Sequel::LiteralString
-    # Handle raw SQL expressions
-  when Sequel::SQL::Function
-    # Handle function calls
+def literal_append(sql, v)
+  case v
+  when Time
+    literal_datetime_append(sql, v)
+  when DateTime
+    literal_datetime_append(sql, v)
+  when String
+    case v
+    when LiteralString
+      sql << v  # Append directly without quoting
+    else
+      if v.encoding == Encoding::ASCII_8BIT
+        literal_blob_append(sql, v)
+      else
+        literal_string_append(sql, v)
+      end
+    end
   else
-    # Delegate to parent class for other types
+    super
   end
 end
 ```
@@ -48,22 +59,22 @@ end
 ### Type Handling Components
 
 #### 1. LiteralString Handler
-- **Purpose**: Process `Sequel.lit()` expressions as raw SQL
-- **Behavior**: Append string content directly without quoting
-- **Input**: `Sequel::LiteralString` objects
+- **Purpose**: Process `Sequel.lit()` expressions as raw SQL following Sequel core pattern
+- **Behavior**: Append string content directly without quoting (`sql << v`)
+- **Input**: `Sequel::LiteralString` objects (subclass of `String`)
 - **Output**: Raw SQL string appended to query
 
-#### 2. Function Handler
-- **Purpose**: Process `Sequel.function()` calls
-- **Behavior**: Delegate to Sequel's built-in function rendering
-- **Input**: `Sequel::SQL::Function` objects
-- **Output**: Properly formatted function calls (e.g., `count(*)`, `sum(amount)`)
+#### 2. Regular String Handler
+- **Purpose**: Process regular Ruby strings with appropriate encoding handling
+- **Behavior**: Apply existing binary/text string logic
+- **Input**: Regular `String` objects (excluding `LiteralString`)
+- **Output**: Properly quoted and escaped string literals
 
-#### 3. Fallback Handler
-- **Purpose**: Handle all other data types
-- **Behavior**: Delegate to parent class implementation
-- **Input**: All other Ruby/Sequel objects
-- **Output**: Appropriately formatted literals (quoted strings, numbers, etc.)
+#### 3. Parent Class Delegation
+- **Purpose**: Handle all other data types including `SQL::Function`
+- **Behavior**: Delegate to parent class implementation (which already works correctly)
+- **Input**: All other Ruby/Sequel objects including `SQL::Expression` subclasses
+- **Output**: Appropriately formatted literals using Sequel core logic
 
 ### Integration Points
 
@@ -138,17 +149,28 @@ The enhanced `literal_append` method integrates with:
 ### Error Handling Strategy
 
 ```ruby
-def literal_append(sql, value)
-  case value
-  when Sequel::LiteralString
-    sql << value
-  when Sequel::SQL::Function
-    super
+def literal_append(sql, v)
+  case v
+  when Time
+    literal_datetime_append(sql, v)
+  when DateTime
+    literal_datetime_append(sql, v)
+  when String
+    case v
+    when LiteralString
+      sql << v
+    else
+      if v.encoding == Encoding::ASCII_8BIT
+        literal_blob_append(sql, v)
+      else
+        literal_string_append(sql, v)
+      end
+    end
   else
     super
   end
 rescue => e
-  raise Sequel::DatabaseError, "Failed to render SQL expression: #{e.message}"
+  raise Sequel::DatabaseError, "Failed to render SQL literal: #{e.message}"
 end
 ```
 
@@ -189,10 +211,16 @@ def test_literal_string_handling
   assert_equal "SELECT YEAR(created_at) FROM users", dataset.sql
 end
 
-def test_function_handling
-  # Test Sequel.function() calls
+def test_function_handling_still_works
+  # Test that Sequel.function() calls continue to work (already working)
   dataset = @db[:users].select(Sequel.function(:count, :*))
   assert_equal "SELECT count(*) FROM users", dataset.sql
+end
+
+def test_regular_string_still_quoted
+  # Test that regular strings are still properly quoted
+  dataset = @db[:users].where(name: "John's")
+  assert_equal "SELECT * FROM users WHERE (name = 'John''s')", dataset.sql
 end
 ```
 
@@ -204,35 +232,43 @@ end
 
 ## Design Decisions and Rationales
 
-### Decision 1: Override literal_append Method
-**Rationale**: This is the core method responsible for converting Ruby objects to SQL literals in Sequel. Overriding it provides the most direct and comprehensive solution.
+### Decision 1: Follow Sequel Core Pattern Exactly
+**Rationale**: Sequel core already has the correct pattern for handling `LiteralString` as a special case of `String`. Following this established pattern ensures compatibility and maintainability.
+
+**Evidence**: Sequel core's `literal_append` method in `/sequel/dataset/sql.rb` shows the exact pattern:
+```ruby
+when String
+  case v
+  when LiteralString
+    sql << v
+  when SQL::Blob
+    literal_blob_append(sql, v)
+  else
+    literal_string_append(sql, v)
+  end
+```
+
+### Decision 2: Minimal Modification Approach
+**Rationale**: The current implementation already works correctly for most types. Only the `LiteralString` handling is missing, so we add the minimal necessary check.
 
 **Alternatives Considered**:
-- Overriding specific SQL generation methods (rejected - too many methods to override)
-- Preprocessing expressions before SQL generation (rejected - complex and error-prone)
+- Complete rewrite of literal_append (rejected - unnecessary and risky)
+- Separate method for LiteralString (rejected - doesn't follow Sequel patterns)
 
-### Decision 2: Case-Based Type Discrimination
-**Rationale**: Ruby's case statement provides clear, readable type checking that's easy to extend and maintain.
+### Decision 3: No Changes to Function Handling
+**Rationale**: Testing revealed that `SQL::Function` objects already work correctly through parent class delegation. The issue is specifically with `LiteralString` objects being treated as regular strings.
 
-**Alternatives Considered**:
-- Method dispatch based on object type (rejected - more complex setup)
-- Hash-based type mapping (rejected - less readable)
+**Evidence**:
+- `db[:test].select(Sequel.function(:count, :*)).sql` produces correct `"SELECT count(*) FROM test"`
+- `db[:test].select(Sequel.lit('YEAR(created_at)')).sql` incorrectly produces `"SELECT 'YEAR(created_at)' FROM test"`
 
-### Decision 3: Minimal Implementation Approach
-**Rationale**: Only handle the specific problematic types (`LiteralString`, `Function`) and delegate everything else to the parent class to maintain compatibility.
-
-**Alternatives Considered**:
-- Complete reimplementation of literal handling (rejected - high risk of breaking existing functionality)
-- Monkey-patching Sequel core (rejected - not maintainable)
-
-### Decision 4: Preserve Parent Class Delegation
-**Rationale**: Sequel's existing literal handling is robust and well-tested. We only need to fix the specific expression handling issues.
+### Decision 4: Preserve Existing Time/DateTime/Binary Handling
+**Rationale**: The current implementation correctly handles `Time`, `DateTime`, and binary string encoding. These should remain unchanged.
 
 **Benefits**:
-- Maintains backward compatibility
-- Leverages existing Sequel functionality
-- Reduces implementation complexity
-- Minimizes risk of introducing new bugs
+- Maintains backward compatibility for existing functionality
+- Focuses fix on the specific problem area
+- Reduces risk of regression in working features
 
 ### Decision 5: Integration in DatasetMethods Module
 **Rationale**: Following the established sequel-duckdb pattern where shared functionality is implemented in modules and included in main classes.
@@ -244,24 +280,19 @@ end
 
 ## Implementation Phases
 
-### Phase 1: Core Expression Handling
-- Implement basic `literal_append` override
-- Handle `Sequel::LiteralString` objects
-- Add comprehensive unit tests
+### Phase 1: Fix LiteralString Handling
+- Modify existing `literal_append` method to check for `LiteralString` before regular `String`
+- Add comprehensive unit tests for `LiteralString` handling
+- Verify existing functionality remains intact
 
-### Phase 2: Function Support
-- Add `Sequel::SQL::Function` handling
-- Test function call generation
-- Verify nested function support
+### Phase 2: Comprehensive Testing
+- Add integration tests with real database operations
+- Test all SQL clause contexts (SELECT, WHERE, ORDER BY, etc.)
+- Add regression tests to ensure no existing functionality breaks
 
-### Phase 3: Integration and Testing
-- Add integration tests with real database
-- Test all SQL clause contexts
-- Verify backward compatibility
-
-### Phase 4: Error Handling and Edge Cases
-- Implement comprehensive error handling
-- Add edge case tests
-- Performance verification
+### Phase 3: Edge Cases and Error Handling
+- Test complex nested expressions
+- Verify error handling for malformed expressions
+- Performance verification with existing benchmarks
 
 This design provides a focused, low-risk solution that addresses the core SQL expression handling issues while maintaining full backward compatibility and following established Sequel adapter patterns.
