@@ -59,11 +59,11 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     end
 
     assert_raises(Sequel::DatabaseError, "Invalid SELECT syntax should raise DatabaseError") do
-      db.execute("SELECT * FROM")  # Incomplete SQL
+      db.execute("SELECT * FROM") # Incomplete SQL
     end
 
     assert_raises(Sequel::DatabaseError, "Invalid INSERT syntax should raise DatabaseError") do
-      db.execute("INSERT INTO VALUES")  # Incomplete SQL
+      db.execute("INSERT INTO VALUES") # Incomplete SQL
     end
   end
 
@@ -143,7 +143,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
       error = assert_raises(Sequel::DatabaseError, "Foreign key constraint violation should raise DatabaseError") do
         db.execute("INSERT INTO child_table (id, parent_id, name) VALUES (1, 999, 'Child')")
       end
-      assert_match(/(FOREIGN KEY|reference)/i, error.message, "Error message should indicate foreign key constraint violation")
+      assert_match(/(FOREIGN KEY|reference)/i, error.message,
+                   "Error message should indicate foreign key constraint violation")
     rescue Sequel::DatabaseError
       # DuckDB may not support foreign keys in all versions, so we'll skip this test if it fails
       skip "DuckDB version doesn't support foreign key constraints"
@@ -219,7 +220,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     assert_raises(Sequel::DatabaseError, "Database error in transaction should raise DatabaseError") do
       db.transaction do
         db.execute("INSERT INTO test_table (id, name, age) VALUES (2, 'Valid', 30)")
-        db.execute("INVALID SQL SYNTAX")  # This should cause rollback
+        db.execute("INVALID SQL SYNTAX") # This should cause rollback
       end
     end
 
@@ -240,7 +241,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
     # Test parameter mismatch error
     assert_raises(Sequel::DatabaseError, "Parameter mismatch should raise DatabaseError") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Test"])  # Missing parameter
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Test"]) # Missing parameter
     end
   end
 
@@ -345,7 +346,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
       error = assert_raises(Sequel::DatabaseError, "#{test_case[:description]} should raise DatabaseError") do
         db.execute(test_case[:sql])
       end
-      assert_match(/(not found|does not exist|unknown)/i, error.message, "#{test_case[:description]} should have descriptive message")
+      assert_match(/(not found|does not exist|unknown)/i, error.message,
+                   "#{test_case[:description]} should have descriptive message")
     end
 
     # Test syntax errors with specific patterns
@@ -364,7 +366,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
       error = assert_raises(Sequel::DatabaseError, "#{test_case[:description]} should raise DatabaseError") do
         db.execute(test_case[:sql])
       end
-      assert_match(/(syntax|parse|unexpected)/i, error.message, "#{test_case[:description]} should indicate syntax error")
+      assert_match(/(syntax|parse|unexpected)/i, error.message,
+                   "#{test_case[:description]} should indicate syntax error")
     end
   end
 
@@ -400,16 +403,14 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     # Time operations with error handling (catching and ignoring errors)
     start_time = Time.now
     100.times do |i|
-      begin
-        if i % 10 == 0
-          # Cause an error every 10th operation
-          db.execute("SELECT * FROM nonexistent_table")
-        else
-          db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "User #{i}", 20 + i])
-        end
-      rescue Sequel::DatabaseError
-        # Ignore errors for timing test
+      if (i % 10).zero?
+        # Cause an error every 10th operation
+        db.execute("SELECT * FROM nonexistent_table")
+      else
+        db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "User #{i}", 20 + i])
       end
+    rescue Sequel::DatabaseError
+      # Ignore errors for timing test
     end
     error_time = Time.now - start_time
 

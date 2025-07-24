@@ -26,7 +26,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
   def test_mock_dataset_creation
     dataset = mock_dataset(:users)
     assert_kind_of Sequel::Dataset, dataset,
-                       "Mock dataset should be created successfully"
+                   "Mock dataset should be created successfully"
   end
 
   # Basic SQL generation tests (using mock database)
@@ -262,10 +262,10 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test complex query combining multiple clauses
     records = db[:test_table]
-                .where { age > 20 }
-                .order(:age)
-                .limit(10)
-                .all
+              .where { age > 20 }
+              .order(:age)
+              .limit(10)
+              .all
 
     assert_instance_of Array, records, "Should return array of records"
     refute_empty records, "Should find matching records"
@@ -536,7 +536,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     # Test count with complex WHERE clause
     complex_count = dataset.where { (age > 22) & (age < 25) }.count
     assert_instance_of Integer, complex_count, "Complex count should return integer"
-    assert complex_count > 0, "Complex count should find matching records"
+    assert complex_count.positive?, "Complex count should find matching records"
 
     # Test first with complex query
     complex_first = dataset.where { age > 22 }.order(:id).first

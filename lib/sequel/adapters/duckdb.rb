@@ -156,15 +156,15 @@ module Sequel
       include Sequel::DuckDB::DatasetMethods
     end
   end
-
-  # Register the DuckDB adapter with Sequel
-  # This registration allows Sequel.connect("duckdb://...") to automatically
-  # use the DuckDB adapter and create DuckDB::Database instances.
-  #
-  # @example Connection string usage
-  #   db = Sequel.connect('duckdb::memory:')
-  #   db = Sequel.connect('duckdb:///path/to/database.duckdb')
-  #
-  # @see Database
-  Database.adapter_scheme :duckdb, DuckDB::Database
 end
+
+# Register the DuckDB adapter with Sequel
+# This registration allows Sequel.connect("duckdb://...") to automatically
+# use the DuckDB adapter and create DuckDB::Database instances.
+#
+# @example Connection string usage
+#   db = Sequel.connect('duckdb::memory:')
+#   db = Sequel.connect('duckdb:///path/to/database.duckdb')
+#
+# @see Sequel::DuckDB::Database
+Sequel::Database.set_shared_adapter_scheme :duckdb, Sequel::DuckDB

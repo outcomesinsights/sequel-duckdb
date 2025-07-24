@@ -23,7 +23,9 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     assert_instance_of Array, tables, "schema_parse_tables should return an array"
     # Empty database should have no user tables (may have system tables)
-    user_tables = tables.reject { |table| table.to_s.start_with?('information_schema') || table.to_s.start_with?('pg_') }
+    user_tables = tables.reject do |table|
+      table.to_s.start_with?("information_schema") || table.to_s.start_with?("pg_")
+    end
     assert_empty user_tables, "Empty database should have no user tables"
   end
 
@@ -83,8 +85,8 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert_includes tables, :user_table, "Should include user table"
 
     # Should not include system tables (if any exist)
-    system_table_patterns = ['information_schema', 'pg_', 'sqlite_', 'sys_']
-    system_tables = tables.select do |table|
+    system_table_patterns = %w[information_schema pg_ sqlite_ sys_]
+    tables.select do |table|
       system_table_patterns.any? { |pattern| table.to_s.start_with?(pattern) }
     end
 
@@ -107,7 +109,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert_includes tables, :schema_test, "Should find table in default schema"
 
     # Test with explicit schema option (may not be supported yet)
-    tables_with_schema = @db.send(:schema_parse_tables, { schema: 'main' })
+    tables_with_schema = @db.send(:schema_parse_tables, { schema: "main" })
     assert_instance_of Array, tables_with_schema, "Should return array even with schema option"
   end
 
@@ -229,11 +231,11 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
       column_info = column[1]
       assert_equal expected_type, column_info[:type],
-        "#{column_name} should have type #{expected_type}"
+                   "#{column_name} should have type #{expected_type}"
 
       # DB type should be a string
       assert_instance_of String, column_info[:db_type],
-        "#{column_name} should have string db_type"
+                         "#{column_name} should have string db_type"
     end
   end
 
@@ -265,7 +267,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       primary_key :id
       String :required_field, null: false
       String :optional_field, null: true
-      String :default_nullable_field  # Should default to nullable
+      String :default_nullable_field # Should default to nullable
     end
 
     schema = @db.send(:schema_parse_table, :null_test_table, {})
@@ -296,7 +298,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       String :name
       Boolean :active, default: true
       Integer :count, default: 0
-      String :status, default: 'pending'
+      String :status, default: "pending"
       Float :score, default: 0.0
     end
 
@@ -306,11 +308,11 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     default_tests = {
       active: true,
       count: 0,
-      status: 'pending',
+      status: "pending",
       score: 0.0
     }
 
-    default_tests.each do |column_name, expected_default|
+    default_tests.each_key do |column_name|
       column = schema.find { |col| col[0] == column_name }
       refute_nil column, "#{column_name} column should exist"
 
@@ -323,7 +325,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     end
 
     # Test columns without defaults
-    no_default_columns = [:id, :name]
+    no_default_columns = %i[id name]
     no_default_columns.each do |column_name|
       column = schema.find { |col| col[0] == column_name }
       refute_nil column, "#{column_name} column should exist"
@@ -352,7 +354,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert_instance_of Array, schema1, "Should work with empty options"
 
     # Test with schema option (if supported)
-    schema2 = @db.send(:schema_parse_table, :options_test, { schema: 'main' })
+    schema2 = @db.send(:schema_parse_table, :options_test, { schema: "main" })
     assert_instance_of Array, schema2, "Should work with schema option"
 
     # Results should be similar (exact comparison depends on implementation)
@@ -411,7 +413,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     end
 
     # Create a multi-column index
-    @db.add_index(:multi_index_table, [:first_name, :last_name], name: :name_index)
+    @db.add_index(:multi_index_table, %i[first_name last_name], name: :name_index)
 
     indexes = @db.send(:schema_parse_indexes, :multi_index_table, {})
 
@@ -419,8 +421,8 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert indexes.key?(:name_index), "Should have name_index"
 
     index_info = indexes[:name_index]
-    assert_equal [:first_name, :last_name], index_info[:columns],
-      "Multi-column index should have correct columns"
+    assert_equal %i[first_name last_name], index_info[:columns],
+                 "Multi-column index should have correct columns"
   end
 
   def test_schema_parse_indexes_with_unique_index
@@ -472,8 +474,8 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       assert index_info.key?(:unique), "Index should have unique flag"
 
       assert_instance_of Array, index_info[:columns], "Columns should be an array"
-      assert_instance_of TrueClass, index_info[:unique] || FalseClass === index_info[:unique],
-        "Unique should be boolean"
+      assert_instance_of TrueClass, index_info[:unique] || index_info[:unique].is_a?(FalseClass),
+                         "Unique should be boolean"
     end
   end
 
@@ -497,7 +499,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert_instance_of Hash, indexes1, "Should work with empty options"
 
     # Test with schema option
-    indexes2 = @db.send(:schema_parse_indexes, :index_options_test, { schema: 'main' })
+    indexes2 = @db.send(:schema_parse_indexes, :index_options_test, { schema: "main" })
     assert_instance_of Hash, indexes2, "Should work with schema option"
   end
 
@@ -522,7 +524,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
       # The exact behavior (whether views are included) depends on implementation
       # For now, just verify the method doesn't break
-
     rescue Sequel::DatabaseError
       # If views are not supported, skip this test
       skip "DuckDB views not supported or not implemented yet"
@@ -552,7 +553,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       assert_includes column_names, :name, "View should have name column"
       refute_includes column_names, :value, "View should not have value column"
       refute_includes column_names, :active, "View should not have active column"
-
     rescue Sequel::DatabaseError
       skip "DuckDB views not supported or not implemented yet"
     end
@@ -586,7 +586,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       # Foreign key information might be in column info or handled separately
       # This test verifies the method handles foreign keys appropriately
       assert_required_column_properties(column_info)
-
     rescue Sequel::DatabaseError
       skip "DuckDB foreign keys not supported or not implemented yet"
     end
@@ -614,7 +613,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
         fk_list = @db.foreign_key_list(:fk_child)
         assert_instance_of Array, fk_list, "Foreign key list should be an array"
       end
-
     rescue NoMethodError
       # Methods not implemented yet, which is expected
       assert true, "Foreign key methods not implemented yet"
@@ -625,7 +623,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
   # Helper method to assert required column properties
   def assert_required_column_properties(column_info)
-    required_keys = [:type, :db_type, :allow_null, :primary_key]
+    required_keys = %i[type db_type allow_null primary_key]
 
     required_keys.each do |key|
       assert column_info.key?(key), "Column info should have #{key} key"

@@ -21,7 +21,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Create indexes for index-aware query testing
     @db.add_index(:columnar_test, :category, name: :idx_category)
-    @db.add_index(:columnar_test, [:transaction_date, :processed], name: :idx_date_processed)
+    @db.add_index(:columnar_test, %i[transaction_date processed], name: :idx_date_processed)
     @db.add_index(:columnar_test, :amount, name: :idx_amount)
 
     # Insert test data optimized for columnar storage patterns
@@ -56,7 +56,8 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
       memory_growth = memory_after - memory_before
 
       assert_equal 5000, processed_count, "Should process all rows with batch size #{batch_size}"
-      assert memory_growth < 200_000_000, "Memory growth should be controlled with batch size #{batch_size} (growth: #{memory_growth} bytes)"
+      assert memory_growth < 200_000_000,
+             "Memory growth should be controlled with batch size #{batch_size} (growth: #{memory_growth} bytes)"
     end
   end
 
@@ -107,8 +108,8 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
   def test_index_aware_query_generation_composite_index
     # Test composite index usage
     dataset = @db[:columnar_test]
-      .where(transaction_date: Date.today)
-      .where(processed: true)
+              .where(transaction_date: Date.today)
+              .where(processed: true)
 
     plan = dataset.explain
 
@@ -139,7 +140,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     # Test that ORDER BY uses indexes when possible
     dataset = @db[:columnar_test].order(:amount)
 
-    plan = dataset.explain
+    dataset.explain
 
     # Should optimize ORDER BY using amount index
     results = dataset.limit(10).all
@@ -157,15 +158,15 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Query selecting only specific columns (should be faster in columnar storage)
     results = @db[:columnar_test]
-      .select(:category, :amount)
-      .where(processed: true)
-      .all
+              .select(:category, :amount)
+              .where(processed: true)
+              .all
 
     projection_time = Time.now - start_time
 
     # Compare with SELECT * query
     start_time = Time.now
-    full_results = @db[:columnar_test]
+    @db[:columnar_test]
       .where(processed: true)
       .all
 
@@ -187,14 +188,14 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Aggregation queries should be fast on columnar data
     stats = @db[:columnar_test]
-      .select(
-        Sequel.function(:count, :*).as(:total_count),
-        Sequel.function(:sum, :amount).as(:total_amount),
-        Sequel.function(:avg, :amount).as(:avg_amount),
-        Sequel.function(:max, :amount).as(:max_amount),
-        Sequel.function(:min, :amount).as(:min_amount)
-      )
-      .first
+            .select(
+              Sequel.function(:count, :*).as(:total_count),
+              Sequel.function(:sum, :amount).as(:total_amount),
+              Sequel.function(:avg, :amount).as(:avg_amount),
+              Sequel.function(:max, :amount).as(:max_amount),
+              Sequel.function(:min, :amount).as(:min_amount)
+            )
+            .first
 
     aggregation_time = Time.now - start_time
 
@@ -202,8 +203,8 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Verify aggregation results
     assert_equal 5000, stats[:total_count], "Should count all rows"
-    assert stats[:total_amount] > 0, "Should sum amounts"
-    assert stats[:avg_amount] > 0, "Should calculate average"
+    assert stats[:total_amount].positive?, "Should sum amounts"
+    assert stats[:avg_amount].positive?, "Should calculate average"
     assert stats[:max_amount] >= stats[:min_amount], "Max should be >= min"
   end
 
@@ -213,19 +214,19 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # GROUP BY should be efficient on columnar data
     category_stats = @db[:columnar_test]
-      .select(:category)
-      .select_append(Sequel.function(:count, :*).as(:count))
-      .select_append(Sequel.function(:sum, :amount).as(:total))
-      .group(:category)
-      .all
+                     .select(:category)
+                     .select_append(Sequel.function(:count, :*).as(:count))
+                     .select_append(Sequel.function(:sum, :amount).as(:total))
+                     .group(:category)
+                     .all
 
     group_by_time = Time.now - start_time
 
     assert group_by_time < 1.0, "GROUP BY should be fast on columnar data (took #{group_by_time}s)"
 
     # Verify GROUP BY results
-    assert category_stats.length > 0, "Should have grouped results"
-    assert category_stats.all? { |r| r[:count] > 0 }, "Each group should have count > 0"
+    assert category_stats.length.positive?, "Should have grouped results"
+    assert category_stats.all? { |r| r[:count].positive? }, "Each group should have count > 0"
 
     # Verify total count matches
     total_count = category_stats.sum { |r| r[:count] }
@@ -238,11 +239,11 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Complex filter that should benefit from columnar storage
     filtered_results = @db[:columnar_test]
-      .where(amount: (2000..8000))
-      .where(processed: true)
-      .where(Sequel.like(:category, "%Electronics%"))
-      .select(:id, :category, :amount)
-      .all
+                       .where(amount: (2000..8000))
+                       .where(processed: true)
+                       .where(Sequel.like(:category, "%Electronics%"))
+                       .select(:id, :category, :amount)
+                       .all
 
     filter_time = Time.now - start_time
 
@@ -262,13 +263,13 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Large aggregation that should benefit from parallelization
     result = @db[:columnar_test]
-      .select(
-        Sequel.function(:count, :*).as(:total_rows),
-        Sequel.function(:count, :category).as(:category_count),
-        Sequel.function(:sum, :amount).as(:total_amount),
-        Sequel.function(:avg, :amount).as(:avg_amount)
-      )
-      .first
+             .select(
+               Sequel.function(:count, :*).as(:total_rows),
+               Sequel.function(:count, :category).as(:category_count),
+               Sequel.function(:sum, :amount).as(:total_amount),
+               Sequel.function(:avg, :amount).as(:avg_amount)
+             )
+             .first
 
     parallel_time = Time.now - start_time
 
@@ -277,7 +278,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Verify results
     assert_equal 5000, result[:total_rows], "Should count all rows"
-    assert result[:total_amount] > 0, "Should calculate sum"
+    assert result[:total_amount].positive?, "Should calculate sum"
   end
 
   def test_parallel_query_execution_complex_joins
@@ -301,21 +302,21 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Complex join that should benefit from parallel execution
     join_results = @db[:columnar_test]
-      .join(:join_test, Sequel[:columnar_test][:category] => Sequel[:join_test][:category_name])
-      .select(
-        Sequel[:columnar_test][:id],
-        Sequel[:columnar_test][:amount],
-        Sequel[:join_test][:department]
-      )
-      .where(Sequel[:columnar_test][:amount] > 3000)
-      .all
+                   .join(:join_test, Sequel[:columnar_test][:category] => Sequel[:join_test][:category_name])
+                   .select(
+                     Sequel[:columnar_test][:id],
+                     Sequel[:columnar_test][:amount],
+                     Sequel[:join_test][:department]
+                   )
+                   .where(Sequel[:columnar_test][:amount] > 3000)
+                   .all
 
     join_time = Time.now - start_time
 
     assert join_time < 2.0, "Complex join should complete efficiently (took #{join_time}s)"
 
     # Verify join results
-    assert join_results.length > 0, "Should have join results"
+    assert join_results.length.positive?, "Should have join results"
     assert join_results.all? { |r| r[:amount] > 3000 }, "Should respect WHERE clause"
     assert join_results.all? { |r| r.key?(:department) }, "Should have joined columns"
 
@@ -328,24 +329,24 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Window function query that should benefit from parallelization
     window_results = @db[:columnar_test]
-      .select(
-        :id,
-        :category,
-        :amount,
-        Sequel.function(:row_number).over(partition: :category, order: :amount).as(:row_num),
-        Sequel.function(:rank).over(partition: :category, order: :amount).as(:rank)
-      )
-      .limit(100)
-      .all
+                     .select(
+                       :id,
+                       :category,
+                       :amount,
+                       Sequel.function(:row_number).over(partition: :category, order: :amount).as(:row_num),
+                       Sequel.function(:rank).over(partition: :category, order: :amount).as(:rank)
+                     )
+                     .limit(100)
+                     .all
 
     window_time = Time.now - start_time
 
     assert window_time < 2.0, "Window functions should execute efficiently (took #{window_time}s)"
 
     # Verify window function results
-    assert window_results.length > 0, "Should have window function results"
-    assert window_results.all? { |r| r[:row_num] > 0 }, "Should have row numbers"
-    assert window_results.all? { |r| r[:rank] > 0 }, "Should have ranks"
+    assert window_results.length.positive?, "Should have window function results"
+    assert window_results.all? { |r| r[:row_num].positive? }, "Should have row numbers"
+    assert window_results.all? { |r| r[:rank].positive? }, "Should have ranks"
   end
 
   def test_parallel_query_execution_configuration
@@ -353,7 +354,11 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     # This tests the adapter's ability to pass through DuckDB's parallel settings
 
     # Test with different thread configurations
-    original_threads = @db.get_config_value("threads") rescue 1
+    original_threads = begin
+      @db.get_config_value("threads")
+    rescue StandardError
+      1
+    end
 
     begin
       # Try to set thread count (if supported)
@@ -363,18 +368,18 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
       # Query that should use configured parallelism
       result = @db[:columnar_test]
-        .where(amount: (1000..9000))
-        .group(:category)
-        .select(:category)
-        .select_append(Sequel.function(:count, :*).as(:count))
-        .select_append(Sequel.function(:sum, :amount).as(:total))
-        .all
+               .where(amount: (1000..9000))
+               .group(:category)
+               .select(:category)
+               .select_append(Sequel.function(:count, :*).as(:count))
+               .select_append(Sequel.function(:sum, :amount).as(:total))
+               .all
 
       parallel_config_time = Time.now - start_time
 
-      assert parallel_config_time < 2.0, "Configured parallel execution should be efficient (took #{parallel_config_time}s)"
-      assert result.length > 0, "Should have grouped results"
-
+      assert parallel_config_time < 2.0,
+             "Configured parallel execution should be efficient (took #{parallel_config_time}s)"
+      assert result.length.positive?, "Should have grouped results"
     ensure
       # Restore original thread setting
       @db.set_config_value("threads", original_threads) if @db.respond_to?(:set_config_value)
@@ -384,13 +389,13 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
   private
 
   def generate_columnar_test_data(count)
-    categories = ["Electronics", "Books", "Clothing", "Home", "Sports"]
+    categories = %w[Electronics Books Clothing Home Sports]
 
     (1..count).map do |i|
       {
         id: i,
         category: categories[i % categories.length],
-        amount: (rand(10000) + 100),
+        amount: rand(100..10_099),
         transaction_date: Date.today - rand(365),
         processed: i.even?,
         description: "Transaction description for record #{i} with some additional text to test columnar efficiency"

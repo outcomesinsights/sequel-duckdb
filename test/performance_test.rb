@@ -55,7 +55,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     execution_time = end_time - start_time
 
     assert_equal 1000, row_count, "Should fetch all 1000 rows"
-    assert execution_time < 5.0, "Large result set should be fetched in reasonable time (< 5 seconds), took #{execution_time}"
+    assert execution_time < 5.0,
+           "Large result set should be fetched in reasonable time (< 5 seconds), took #{execution_time}"
   end
 
   def test_fetch_rows_memory_efficiency_with_streaming
@@ -70,19 +71,18 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     @db[:performance_test].fetch_rows("SELECT * FROM performance_test ORDER BY id") do |row|
       processed_rows << row[:id]
       # Take memory snapshot every 100 rows
-      if processed_rows.length % 100 == 0
-        memory_snapshots << get_memory_usage
-      end
+      memory_snapshots << get_memory_usage if (processed_rows.length % 100).zero?
     end
 
     assert_equal 1000, processed_rows.length, "Should process all rows"
     assert processed_rows.sort == (1..1000).to_a, "Should process rows in correct order"
 
     # Memory usage should not grow significantly (streaming behavior)
-    if memory_snapshots.length > 1
-      memory_growth = memory_snapshots.last - memory_snapshots.first
-      assert memory_growth < 50_000_000, "Memory usage should not grow significantly during streaming (growth: #{memory_growth} bytes)"
-    end
+    return unless memory_snapshots.length > 1
+
+    memory_growth = memory_snapshots.last - memory_snapshots.first
+    assert memory_growth < 50_000_000,
+           "Memory usage should not grow significantly during streaming (growth: #{memory_growth} bytes)"
   end
 
   def test_fetch_rows_with_limit_optimization
@@ -93,7 +93,7 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     start_time = Time.now
     row_count = 0
 
-    @db[:performance_test].limit(10).fetch_rows("SELECT * FROM performance_test LIMIT 10") do |row|
+    @db[:performance_test].limit(10).fetch_rows("SELECT * FROM performance_test LIMIT 10") do |_row|
       row_count += 1
     end
 
@@ -131,20 +131,21 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Time prepared statement execution (if supported)
     prepared_times = []
-    if @db.respond_to?(:prepare) || @db.dataset.respond_to?(:prepare)
-      5.times do
-        start_time = Time.now
-        # Test prepared statement functionality
-        result = @db.fetch(query_sql, 100, true).all
-        prepared_times << Time.now - start_time
-      end
+    return unless @db.respond_to?(:prepare) || @db.dataset.respond_to?(:prepare)
 
-      # Prepared statements should be at least as fast as regular queries
-      avg_regular = regular_times.sum / regular_times.length
-      avg_prepared = prepared_times.sum / prepared_times.length
-
-      assert avg_prepared <= avg_regular * 1.5, "Prepared statements should not be significantly slower than regular queries"
+    5.times do
+      start_time = Time.now
+      # Test prepared statement functionality
+      @db.fetch(query_sql, 100, true).all
+      prepared_times << Time.now - start_time
     end
+
+    # Prepared statements should be at least as fast as regular queries
+    avg_regular = regular_times.sum / regular_times.length
+    avg_prepared = prepared_times.sum / prepared_times.length
+
+    assert avg_prepared <= avg_regular * 1.5,
+           "Prepared statements should not be significantly slower than regular queries"
   end
 
   def test_prepared_statement_parameter_binding
@@ -199,7 +200,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     bulk_time = Time.now - bulk_start
 
     # Bulk insert should be significantly faster
-    assert bulk_time < individual_time * 0.5, "Bulk insert should be at least 2x faster than individual inserts (bulk: #{bulk_time}s, individual: #{individual_time}s)"
+    assert bulk_time < individual_time * 0.5,
+           "Bulk insert should be at least 2x faster than individual inserts (bulk: #{bulk_time}s, individual: #{individual_time}s)"
 
     # Verify all records were inserted
     assert_equal 100, @db[:performance_test].count, "All records should be inserted via bulk insert"
@@ -224,11 +226,13 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     execution_time = end_time - start_time
 
     assert_equal 5000, @db[:performance_test].count, "All 5000 records should be inserted"
-    assert execution_time < 10.0, "Large bulk insert should complete in reasonable time (< 10 seconds), took #{execution_time}"
+    assert execution_time < 10.0,
+           "Large bulk insert should complete in reasonable time (< 10 seconds), took #{execution_time}"
 
     # Test that records per second is reasonable
     records_per_second = 5000 / execution_time
-    assert records_per_second > 100, "Should insert at least 100 records per second, achieved #{records_per_second.round(2)}"
+    assert records_per_second > 100,
+           "Should insert at least 100 records per second, achieved #{records_per_second.round(2)}"
   end
 
   # Test efficient connection pooling (Requirement 9.4)
@@ -238,7 +242,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Perform multiple operations that might create connections
     10.times do |i|
-      @db[:performance_test].insert(id: i + 1000, name: "Pool Test #{i}", value: i, created_at: Date.today, active: true)
+      @db[:performance_test].insert(id: i + 1000, name: "Pool Test #{i}", value: i, created_at: Date.today,
+                                    active: true)
       @db[:performance_test].where(value: i).first
       @db[:performance_test].where(value: i).update(active: false)
     end
@@ -247,7 +252,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Should not create excessive connections
     connection_growth = final_connection_count - initial_connection_count
-    assert connection_growth <= 2, "Should not create excessive connections during operations (growth: #{connection_growth})"
+    assert connection_growth <= 2,
+           "Should not create excessive connections during operations (growth: #{connection_growth})"
   end
 
   def test_connection_reuse_efficiency
@@ -264,7 +270,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Should reuse connections (not create new ones each time)
     unique_connections = connection_ids.uniq.length
-    assert unique_connections <= 2, "Should reuse connections efficiently (used #{unique_connections} unique connections)"
+    assert unique_connections <= 2,
+           "Should reuse connections efficiently (used #{unique_connections} unique connections)"
   end
 
   def test_connection_cleanup_after_errors
@@ -273,11 +280,9 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Cause some errors that might leave connections open
     5.times do
-      begin
-        @db.fetch("SELECT * FROM nonexistent_table").all
-      rescue Sequel::DatabaseError
-        # Expected error, ignore
-      end
+      @db.fetch("SELECT * FROM nonexistent_table").all
+    rescue Sequel::DatabaseError
+      # Expected error, ignore
     end
 
     # Force garbage collection to clean up any leaked connections

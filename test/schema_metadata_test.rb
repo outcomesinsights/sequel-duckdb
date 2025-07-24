@@ -22,7 +22,9 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
 
     assert_instance_of Array, tables, "tables() should return an array"
     # Empty database should have no user tables
-    user_tables = tables.reject { |table| table.to_s.start_with?('information_schema') || table.to_s.start_with?('pg_') }
+    user_tables = tables.reject do |table|
+      table.to_s.start_with?("information_schema") || table.to_s.start_with?("pg_")
+    end
     assert_empty user_tables, "Empty database should have no user tables"
   end
 
@@ -59,7 +61,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_includes tables1, :test_table, "Should include test table"
 
     # Test with schema option
-    tables2 = @db.tables(schema: 'main')
+    tables2 = @db.tables(schema: "main")
     assert_instance_of Array, tables2, "Should work with schema option"
     assert_includes tables2, :test_table, "Should include test table with schema option"
   end
@@ -103,7 +105,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
       assert_instance_of Hash, column_info, "Column info should be a hash"
 
       # Verify required keys
-      required_keys = [:type, :db_type, :allow_null, :primary_key]
+      required_keys = %i[type db_type allow_null primary_key]
       required_keys.each do |key|
         assert column_info.key?(key), "Column info should have #{key} key"
       end
@@ -124,7 +126,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     column_names = schema.map(&:first)
 
     # Verify all expected columns exist
-    expected_columns = [:id, :name, :age, :active, :birth_date, :created_at]
+    expected_columns = %i[id name age active birth_date created_at]
     expected_columns.each do |col|
       assert_includes column_names, col, "Should have #{col} column"
     end
@@ -155,7 +157,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
       String :name
       Boolean :active, default: true
       Integer :count, default: 0
-      String :status, default: 'pending'
+      String :status, default: "pending"
     end
 
     schema = @db.schema(:default_test)
@@ -186,7 +188,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
       primary_key :id
       String :required_field, null: false
       String :optional_field, null: true
-      String :default_field  # Should default to nullable
+      String :default_field # Should default to nullable
     end
 
     schema = @db.schema(:nullable_test)
@@ -219,7 +221,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_instance_of Array, schema1, "Should work with empty options"
 
     # Test with schema option
-    schema2 = @db.schema(:options_test, schema: 'main')
+    schema2 = @db.schema(:options_test, schema: "main")
     assert_instance_of Array, schema2, "Should work with schema option"
 
     # Results should be consistent
@@ -258,7 +260,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     # Create indexes
     @db.add_index(:indexed_table, :name, name: :name_index)
     @db.add_index(:indexed_table, :email, unique: true, name: :unique_email_index)
-    @db.add_index(:indexed_table, [:name, :age], name: :composite_index)
+    @db.add_index(:indexed_table, %i[name age], name: :composite_index)
 
     indexes = @db.indexes(:indexed_table)
 
@@ -282,10 +284,10 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     end
 
     # Test composite index
-    if indexes.key?(:composite_index)
-      composite_index = indexes[:composite_index]
-      assert_equal [:name, :age], composite_index[:columns], "Composite index should be on name and age columns"
-    end
+    return unless indexes.key?(:composite_index)
+
+    composite_index = indexes[:composite_index]
+    assert_equal %i[name age], composite_index[:columns], "Composite index should be on name and age columns"
   end
 
   def test_indexes_method_with_options
@@ -301,7 +303,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_instance_of Hash, indexes1, "Should work with empty options"
 
     # Test with schema option
-    indexes2 = @db.indexes(:index_options_test, schema: 'main')
+    indexes2 = @db.indexes(:index_options_test, schema: "main")
     assert_instance_of Hash, indexes2, "Should work with schema option"
   end
 
@@ -328,7 +330,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
 
     # Add additional indexes
     @db.add_index(:integration_test, :name, name: :name_idx)
-    @db.add_index(:integration_test, [:age, :active], name: :age_active_idx)
+    @db.add_index(:integration_test, %i[age active], name: :age_active_idx)
 
     # Test tables method
     tables = @db.tables
@@ -339,7 +341,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_equal 8, schema.length, "Should have 8 columns"
 
     column_names = schema.map(&:first)
-    expected_columns = [:id, :name, :email, :age, :active, :birth_date, :created_at, :score]
+    expected_columns = %i[id name email age active birth_date created_at score]
     expected_columns.each do |col|
       assert_includes column_names, col, "Should have #{col} column"
     end
@@ -349,13 +351,13 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_instance_of Hash, indexes, "indexes() should return a hash"
 
     # Should have at least the indexes we created (may have additional system indexes)
-    created_index_names = [:name_idx, :age_active_idx]
+    created_index_names = %i[name_idx age_active_idx]
     created_index_names.each do |idx_name|
-      if indexes.key?(idx_name)
-        assert_instance_of Hash, indexes[idx_name], "#{idx_name} should have index info"
-        assert indexes[idx_name].key?(:columns), "#{idx_name} should have columns info"
-        assert indexes[idx_name].key?(:unique), "#{idx_name} should have unique info"
-      end
+      next unless indexes.key?(idx_name)
+
+      assert_instance_of Hash, indexes[idx_name], "#{idx_name} should have index info"
+      assert indexes[idx_name].key?(:columns), "#{idx_name} should have columns info"
+      assert indexes[idx_name].key?(:unique), "#{idx_name} should have unique info"
     end
   end
 

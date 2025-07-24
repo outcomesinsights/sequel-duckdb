@@ -21,8 +21,8 @@ class TypeTest < SequelDuckDBTest::TestCase
       'String with "double quotes"',
       "String with\nnewlines\nand\ttabs",
       "Unicode string: 你好世界 🌍",
-      "",  # Empty string
-      " ",  # Whitespace
+      "", # Empty string
+      " " # Whitespace
     ]
 
     test_strings.each_with_index do |test_string, index|
@@ -53,10 +53,10 @@ class TypeTest < SequelDuckDBTest::TestCase
       -1,
       42,
       -42,
-      1000000,
-      -1000000,
-      2147483647,    # Max 32-bit signed integer
-      -2147483648,   # Min 32-bit signed integer
+      1_000_000,
+      -1_000_000,
+      2_147_483_647, # Max 32-bit signed integer
+      -2_147_483_648 # Min 32-bit signed integer
     ]
 
     test_integers.each_with_index do |test_int, index|
@@ -92,7 +92,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       1e10,
       -1e10,
       1e-10,
-      -1e-10,
+      -1e-10
     ]
 
     test_floats.each_with_index do |test_float, index|
@@ -119,7 +119,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test boolean values
     test_cases = [
       { value: true, expected: true },
-      { value: false, expected: false },
+      { value: false, expected: false }
     ]
 
     test_cases.each_with_index do |test_case, index|
@@ -148,7 +148,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       Date.new(2023, 12, 31),
       Date.new(1990, 6, 15),
       Date.new(2050, 3, 20),
-      Date.today,
+      Date.today
     ]
 
     test_dates.each_with_index do |test_date, index|
@@ -181,7 +181,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       Time.new(2023, 1, 1, 0, 0, 0),
       Time.new(2023, 12, 31, 23, 59, 59),
       Time.new(1990, 6, 15, 12, 30, 45),
-      Time.now,
+      Time.now
     ]
 
     test_datetimes.each_with_index do |test_datetime, index|
@@ -200,7 +200,8 @@ class TypeTest < SequelDuckDBTest::TestCase
 
       # Allow for small differences in precision (1 second tolerance)
       assert_in_delta test_datetime.to_f, retrieved_datetime.to_f, 1.0, "Datetime field should match inserted datetime"
-      assert_in_delta test_datetime.to_f, retrieved_timestamp.to_f, 1.0, "Timestamp field should match inserted datetime"
+      assert_in_delta test_datetime.to_f, retrieved_timestamp.to_f, 1.0,
+                      "Timestamp field should match inserted datetime"
     end
   end
 
@@ -256,7 +257,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     assert_nothing_raised("Should handle very long string") do
-      long_string = "x" * 10000
+      long_string = "x" * 10_000
       db[:edge_case_test].insert(id: 2, string_field: long_string, int_field: 1, float_field: 1.0)
 
       record = db[:edge_case_test].where(id: 2).first
@@ -264,7 +265,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     assert_nothing_raised("Should handle special float values") do
-      # Note: NaN and Infinity handling depends on DuckDB support
+      # NOTE: NaN and Infinity handling depends on DuckDB support
       db[:edge_case_test].insert(id: 3, string_field: "test", int_field: 999, float_field: Float::MAX)
     end
   end
@@ -281,12 +282,12 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test various binary data scenarios
     test_binary_data = [
       "Simple binary data".b,
-      "\x00\x01\x02\x03\x04\x05".b,  # Binary with null bytes
+      "\x00\x01\x02\x03\x04\x05".b, # Binary with null bytes
       "Binary with\nnewlines\nand\ttabs".b,
       "Binary with 'quotes' and \"double quotes\"".b,
-      "\xFF\xFE\xFD\xFC".b,  # High byte values
-      "".b,  # Empty binary data
-      ("A" * 1000).b,  # Large binary data
+      "\xFF\xFE\xFD\xFC".b, # High byte values
+      "".b, # Empty binary data
+      ("A" * 1000).b # Large binary data
     ]
 
     test_binary_data.each_with_index do |binary_data, index|
@@ -302,12 +303,12 @@ class TypeTest < SequelDuckDBTest::TestCase
       # DuckDB returns BLOB data as hex string, so we need to convert it back
       if retrieved_blob.is_a?(String) && retrieved_blob.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_blob.empty?
         # Convert hex string back to binary
-        retrieved_blob = [retrieved_blob].pack('H*').b
+        retrieved_blob = [retrieved_blob].pack("H*").b
       end
 
       if retrieved_binary.is_a?(String) && retrieved_binary.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_binary.empty?
         # Convert hex string back to binary
-        retrieved_binary = [retrieved_binary].pack('H*').b
+        retrieved_binary = [retrieved_binary].pack("H*").b
       end
 
       assert_equal binary_data, retrieved_blob, "BLOB field should match inserted binary data"
@@ -428,7 +429,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test current date
     today = Date.today
     sql = dataset.literal(today)
-    expected = "'#{today.strftime('%Y-%m-%d')}'"
+    expected = "'#{today.strftime("%Y-%m-%d")}'"
     assert_equal expected, sql, "Current date should be formatted correctly"
   end
 
@@ -531,7 +532,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     assert_equal "0", sql, "Zero should be converted as-is"
 
     # Test large integer
-    sql = dataset.literal(2147483647)
+    sql = dataset.literal(2_147_483_647)
     assert_equal "2147483647", sql, "Large integer should be converted as-is"
   end
 
@@ -570,11 +571,11 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test very long string
     long_string = "x" * 1000
     sql = dataset.literal(long_string)
-    expected = "'#{'x' * 1000}'"
+    expected = "'#{"x" * 1000}'"
     assert_equal expected, sql, "Very long string should be handled correctly"
 
     # Test string with only quotes
-    input_string = "''"  # Two single quotes
+    input_string = "''" # Two single quotes
     sql = dataset.literal(input_string)
     # Input: '' (2 quotes)
     # Each quote becomes '' (doubled)
@@ -657,7 +658,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     binary_data = "binary data".b
     sql = dataset.literal(binary_data)
     # Binary data should be converted to hex format for DuckDB (without \x prefix)
-    expected = "'#{binary_data.unpack1('H*')}'"
+    expected = "'#{binary_data.unpack1("H*")}'"
     assert_equal expected, sql, "Binary data should be converted to hex format"
 
     # Test binary data with null bytes
@@ -686,21 +687,23 @@ class TypeTest < SequelDuckDBTest::TestCase
     dataset = db[:test_table]
 
     # Test integer boundary values
-    sql = dataset.literal(2147483647)  # Max 32-bit signed int
+    sql = dataset.literal(2_147_483_647) # Max 32-bit signed int
     assert_equal "2147483647", sql, "Max 32-bit integer should be handled"
 
-    sql = dataset.literal(-2147483648)  # Min 32-bit signed int
+    sql = dataset.literal(-2_147_483_648) # Min 32-bit signed int
     assert_equal "-2147483648", sql, "Min 32-bit integer should be handled"
 
-    sql = dataset.literal(9223372036854775807)  # Max 64-bit signed int
+    sql = dataset.literal(9_223_372_036_854_775_807) # Max 64-bit signed int
     assert_equal "9223372036854775807", sql, "Max 64-bit integer should be handled"
 
     # Test float precision
     sql = dataset.literal(1.7976931348623157e+308)  # Near Float::MAX
-    assert sql.include?("1.797693134862315") || sql.include?("1.797693134862316"), "Large float should preserve precision"
+    assert sql.include?("1.797693134862315") || sql.include?("1.797693134862316"),
+           "Large float should preserve precision"
 
     sql = dataset.literal(2.2250738585072014e-308)  # Near Float::MIN
-    assert sql.include?("2.225073858507201e-308") || sql.include?("2.2250738585072014e-308"), "Small float should preserve precision"
+    assert sql.include?("2.225073858507201e-308") || sql.include?("2.2250738585072014e-308"),
+           "Small float should preserve precision"
 
     # Test decimal precision
     sql = dataset.literal(123.456789012345)
@@ -724,14 +727,14 @@ class TypeTest < SequelDuckDBTest::TestCase
     begin
       sql = dataset.literal(Float::INFINITY)
       assert sql.include?("Infinity") || sql.include?("inf"), "Positive infinity should be handled"
-    rescue
+    rescue StandardError
       # Skip if infinity is not supported
     end
 
     begin
       sql = dataset.literal(-Float::INFINITY)
       assert sql.include?("-Infinity") || sql.include?("-inf"), "Negative infinity should be handled"
-    rescue
+    rescue StandardError
       # Skip if negative infinity is not supported
     end
 
@@ -739,7 +742,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     begin
       sql = dataset.literal(Float::NAN)
       assert sql.include?("NaN") || sql.include?("nan"), "NaN should be handled"
-    rescue
+    rescue StandardError
       # Skip if NaN is not supported
     end
   end
@@ -756,7 +759,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     # Test integer boundary handling
-    large_int = 2147483647  # Max 32-bit signed int (DuckDB INTEGER is INT32)
+    large_int = 2_147_483_647 # Max 32-bit signed int (DuckDB INTEGER is INT32)
     assert_nothing_raised("Should handle large integer") do
       db[:conversion_edge_test].insert(id: 1, int_field: large_int)
     end
@@ -779,7 +782,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     record = db[:conversion_edge_test].where(id: 3).first
-    assert_equal 12345, record[:int_field], "String should be coerced to integer"
+    assert_equal 12_345, record[:int_field], "String should be coerced to integer"
 
     # Test string to float coercion
     assert_nothing_raised("Should coerce string to float") do
@@ -800,7 +803,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # DuckDB returns BLOB data as hex string, so we need to convert it back
     if retrieved_binary.is_a?(String) && retrieved_binary.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_binary.empty?
-      retrieved_binary = [retrieved_binary].pack('H*').b
+      retrieved_binary = [retrieved_binary].pack("H*").b
     end
 
     assert_equal binary_data, retrieved_binary, "Binary data should be preserved"
@@ -812,7 +815,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     db.create_table(:boundary_test) do
       primary_key :id
       Integer :small_int
-      column :big_int, :bigint  # Use BIGINT for 64-bit integers
+      column :big_int, :bigint # Use BIGINT for 64-bit integers
       Float :float_val
       Float :double_val
     end
@@ -824,10 +827,10 @@ class TypeTest < SequelDuckDBTest::TestCase
       -1,
       127,          # Max signed 8-bit
       -128,         # Min signed 8-bit
-      32767,        # Max signed 16-bit
-      -32768,       # Min signed 16-bit
-      2147483647,   # Max signed 32-bit
-      -2147483648,  # Min signed 32-bit
+      32_767,        # Max signed 16-bit
+      -32_768,       # Min signed 16-bit
+      2_147_483_647, # Max signed 32-bit
+      -2_147_483_648 # Min signed 32-bit
     ]
 
     test_integers.each_with_index do |test_int, index|
@@ -850,7 +853,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       1.0e-10,
       -1.0e-10,
       1.0e10,
-      -1.0e10,
+      -1.0e10
     ]
 
     test_floats.each_with_index do |test_float, index|
@@ -873,7 +876,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     binary_data = "test\x00data".b
     dataset = db[:files].where(content: binary_data)
     sql = dataset.sql
-    expected_hex = binary_data.unpack1('H*')
+    expected_hex = binary_data.unpack1("H*")
     assert_match(/content = '#{expected_hex}'/, sql, "Binary data in WHERE should be hex encoded")
 
     # Test binary data in INSERT statements
@@ -894,7 +897,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     assert_match(/value = 123\.456789012345/, sql, "Precise decimal should be preserved in WHERE")
 
     # Test large integer in INSERT
-    large_int = 9223372036854775807
+    large_int = 9_223_372_036_854_775_807
     dataset = db[:counters]
     dataset.insert(count: large_int)
     insert_sql = db.sqls.last

@@ -32,7 +32,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_select_sql_with_where_or_conditions
-    dataset = mock_dataset(:users).where(Sequel.|({name: "John"}, {name: "Jane"}))
+    dataset = mock_dataset(:users).where(Sequel.|({ name: "John" }, { name: "Jane" }))
     expected_sql = "SELECT * FROM users WHERE ((name = 'John') OR (name = 'Jane'))"
     assert_sql expected_sql, dataset
   end
@@ -141,7 +141,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
   def test_insert_sql_with_multiple_values
     dataset = mock_dataset(:users)
     expected_sql = "INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)"
-    actual_sql = dataset.insert_sql([{name: "John", age: 30}, {name: "Jane", age: 25}])
+    actual_sql = dataset.insert_sql([{ name: "John", age: 30 }, { name: "Jane", age: 25 }])
     assert_equal expected_sql, actual_sql
   end
 
@@ -255,7 +255,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_delete_sql_with_or_conditions
-    dataset = mock_dataset(:users).where(Sequel.|({name: "John"}, {name: "Jane"}))
+    dataset = mock_dataset(:users).where(Sequel.|({ name: "John" }, { name: "Jane" }))
     expected_sql = "DELETE FROM users WHERE ((name = 'John') OR (name = 'Jane'))"
     actual_sql = dataset.delete_sql
     assert_equal expected_sql, actual_sql
@@ -290,7 +290,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_delete_sql_with_in_condition
-    dataset = mock_dataset(:users).where(name: ["John", "Jane", "Bob"])
+    dataset = mock_dataset(:users).where(name: %w[John Jane Bob])
     expected_sql = "DELETE FROM users WHERE (name IN ('John', 'Jane', 'Bob'))"
     actual_sql = dataset.delete_sql
     assert_equal expected_sql, actual_sql
@@ -349,7 +349,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_special_characters_in_identifiers
-    dataset = mock_dataset(:"test_table").select(:"column-name", :"column.name", :"column name")
+    dataset = mock_dataset(:test_table).select(:"column-name", :"column.name", :"column name")
     expected_sql = 'SELECT "column-name", "column.name", "column name" FROM test_table'
     assert_sql expected_sql, dataset
   end
@@ -364,7 +364,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
 
   def test_large_integer_handling
     dataset = mock_dataset(:users)
-    large_int = 9223372036854775807  # Max 64-bit signed integer
+    large_int = 9_223_372_036_854_775_807 # Max 64-bit signed integer
     expected_sql = "INSERT INTO users (big_number) VALUES (9223372036854775807)"
     actual_sql = dataset.insert_sql(big_number: large_int)
     assert_equal expected_sql, actual_sql

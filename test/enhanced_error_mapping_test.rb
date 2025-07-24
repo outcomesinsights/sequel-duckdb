@@ -74,7 +74,8 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
       flunk "Should have raised a primary key constraint violation"
     rescue Sequel::UniqueConstraintViolation => e
       # Primary key violations are mapped to UniqueConstraintViolation
-      assert_match(/(PRIMARY KEY|UNIQUE|duplicate)/i, e.message, "PRIMARY KEY constraint error should be properly mapped")
+      assert_match(/(PRIMARY KEY|UNIQUE|duplicate)/i, e.message,
+                   "PRIMARY KEY constraint error should be properly mapped")
     rescue Sequel::DatabaseError => e
       # DuckDB might not always provide specific constraint violation messages
       assert_match(/(PRIMARY KEY|UNIQUE|duplicate)/i, e.message, "Error should indicate PRIMARY KEY constraint issue")
@@ -103,14 +104,12 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     ]
 
     syntax_errors.each do |sql|
-      begin
-        db.execute(sql)
-        flunk "Should have raised a syntax error for: #{sql}"
-      rescue Sequel::DatabaseError => e
-        assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
-        assert_match(/(syntax|parse|unexpected)/i, e.message, "Error should indicate syntax issue")
-        assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
-      end
+      db.execute(sql)
+      flunk "Should have raised a syntax error for: #{sql}"
+    rescue Sequel::DatabaseError => e
+      assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
+      assert_match(/(syntax|parse|unexpected)/i, e.message, "Error should indicate syntax issue")
+      assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
     end
   end
 
@@ -125,14 +124,12 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     ]
 
     table_errors.each do |sql|
-      begin
-        db.execute(sql)
-        flunk "Should have raised a table not found error for: #{sql}"
-      rescue Sequel::DatabaseError => e
-        assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
-        assert_match(/(table.*does.*not.*exist|no.*such.*table)/i, e.message, "Error should indicate table not found")
-        assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
-      end
+      db.execute(sql)
+      flunk "Should have raised a table not found error for: #{sql}"
+    rescue Sequel::DatabaseError => e
+      assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
+      assert_match(/(table.*does.*not.*exist|no.*such.*table)/i, e.message, "Error should indicate table not found")
+      assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
     end
   end
 
@@ -147,14 +144,14 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     ]
 
     column_errors.each do |sql|
-      begin
-        db.execute(sql)
-        flunk "Should have raised a column not found error for: #{sql}"
-      rescue Sequel::DatabaseError => e
-        assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
-        assert_match(/(column.*does.*not.*exist|no.*such.*column|unknown.*column|referenced.*column.*not.*found|does.*not.*have.*a.*column)/i, e.message, "Error should indicate column not found")
-        assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
-      end
+      db.execute(sql)
+      flunk "Should have raised a column not found error for: #{sql}"
+    rescue Sequel::DatabaseError => e
+      assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
+      assert_match(
+        /(column.*does.*not.*exist|no.*such.*column|unknown.*column|referenced.*column.*not.*found|does.*not.*have.*a.*column)/i, e.message, "Error should indicate column not found"
+      )
+      assert_match(/SQL: #{Regexp.escape(sql)}/, e.message, "Error should include the problematic SQL")
     end
   end
 
@@ -174,7 +171,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
     # Test with invalid SQL and parameters
     begin
-      db.execute("INVALID SQL WITH ? PARAMETERS", ["param1", "param2"])
+      db.execute("INVALID SQL WITH ? PARAMETERS", %w[param1 param2])
       flunk "Should have raised a syntax error"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
@@ -185,12 +182,12 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
   def test_connection_error_mapping
     # Test connection errors are properly mapped
-    begin
-      Sequel.connect("duckdb:///invalid/path/that/does/not/exist.db")
-      flunk "Should have raised a connection error"
-    rescue Sequel::DatabaseConnectionError => e
-      assert_match(/Failed to connect to DuckDB database/, e.message, "Connection error should have descriptive message")
-    end
+
+    Sequel.connect("duckdb:///invalid/path/that/does/not/exist.db")
+    flunk "Should have raised a connection error"
+  rescue Sequel::DatabaseConnectionError => e
+    assert_match(/Failed to connect to DuckDB database/, e.message,
+                 "Connection error should have descriptive message")
   end
 
   def test_error_message_enhancement
@@ -276,14 +273,14 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     db = create_db
 
     # Test the handle_constraint_violation method if it exists
-    if db.respond_to?(:handle_constraint_violation, true)
-      exception = ::DuckDB::Error.new("UNIQUE constraint violation")
-      opts = { sql: "INSERT INTO test (id) VALUES (1)", params: [1] }
+    return unless db.respond_to?(:handle_constraint_violation, true)
 
-      result = db.send(:handle_constraint_violation, exception, opts)
+    exception = ::DuckDB::Error.new("UNIQUE constraint violation")
+    opts = { sql: "INSERT INTO test (id) VALUES (1)", params: [1] }
 
-      assert_kind_of Exception, result, "handle_constraint_violation should return an exception"
-      assert_match(/DuckDB error:/, result.message, "Result should have enhanced message")
-    end
+    result = db.send(:handle_constraint_violation, exception, opts)
+
+    assert_kind_of Exception, result, "handle_constraint_violation should return an exception"
+    assert_match(/DuckDB error:/, result.message, "Result should have enhanced message")
   end
 end

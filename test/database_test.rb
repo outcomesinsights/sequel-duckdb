@@ -420,7 +420,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test transaction isolation level support if available (Requirement 5.6)
-    isolation_levels = [:read_uncommitted, :read_committed, :repeatable_read, :serializable]
+    isolation_levels = %i[read_uncommitted read_committed repeatable_read serializable]
 
     isolation_levels.each do |level|
       if db.supports_transaction_isolation_level?(level)
@@ -431,7 +431,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
         end
 
         # Clean up for next test
-        db[:test_table].delete
       else
         # If isolation level isn't supported, transaction should still work without it
         assert_nothing_raised("Should work even if #{level} isolation level isn't supported") do
@@ -441,8 +440,8 @@ class DatabaseTest < SequelDuckDBTest::TestCase
         end
 
         # Clean up for next test
-        db[:test_table].delete
       end
+      db[:test_table].delete
     end
   end
 
@@ -822,7 +821,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Insert data with various types
     assert_nothing_raised("Should handle various data types in SQL execution") do
-      db.execute(<<~SQL, [1, "John Doe", 30, 50000.50, true, "1993-05-15", "2023-01-01 10:30:00", "Test notes"])
+      db.execute(<<~SQL, [1, "John Doe", 30, 50_000.50, true, "1993-05-15", "2023-01-01 10:30:00", "Test notes"])
         INSERT INTO type_test_table
         (id, name, age, salary, is_active, birth_date, created_at, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -839,7 +838,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 1, row[:id], "Integer should be preserved"
     assert_equal "John Doe", row[:name], "String should be preserved"
     assert_equal 30, row[:age], "Integer should be preserved"
-    assert_equal 50000.5, row[:salary], "Double should be preserved"
+    assert_equal 50_000.5, row[:salary], "Double should be preserved"
     assert_equal true, row[:is_active], "Boolean should be preserved"
     assert_equal "Test notes", row[:notes], "Text should be preserved"
 
@@ -896,10 +895,9 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test SQL query logging using Sequel's logging mechanism (Requirement 8.4)
-    logged_queries = []
 
     # Set up a custom logger to capture log messages
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
 
@@ -927,17 +925,17 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test timing information for operations (Requirement 8.5)
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
     db.loggers = [logger]
 
     # Execute a query and check for timing information
-    start_time = Time.now
+    Time.now
     assert_nothing_raised("Should execute query with timing") do
       db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Timing Test', 30)")
     end
-    end_time = Time.now
+    Time.now
 
     # Check that timing information is included in logs
     log_output = string_io.string
@@ -992,7 +990,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_instance_of Array, initial_loggers, "Loggers should be an array"
 
     # Test adding a logger
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
 
@@ -1015,7 +1013,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test SQL logging with parameterized queries
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
     db.loggers = [logger]
@@ -1036,7 +1034,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     db = create_db
 
     # Test error logging and debugging support
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
     db.loggers = [logger]
@@ -1058,7 +1056,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test performance logging for operations (Requirement 8.5)
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
     db.loggers = [logger]
@@ -1088,10 +1086,10 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test that debug information is available when needed
-    require 'logger'
+    require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
-    logger.level = Logger::DEBUG  # Set to debug level
+    logger.level = Logger::DEBUG # Set to debug level
     db.loggers = [logger]
 
     # Execute operations with debug logging

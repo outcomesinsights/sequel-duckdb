@@ -14,13 +14,13 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_where_with_or_conditions
-    dataset = mock_dataset(:users).where(Sequel.|({name: "John"}, {name: "Jane"}))
+    dataset = mock_dataset(:users).where(Sequel.|({ name: "John" }, { name: "Jane" }))
     expected_sql = "SELECT * FROM users WHERE ((name = 'John') OR (name = 'Jane'))"
     assert_sql expected_sql, dataset
   end
 
   def test_where_with_in_conditions
-    dataset = mock_dataset(:users).where(name: ["John", "Jane", "Bob"])
+    dataset = mock_dataset(:users).where(name: %w[John Jane Bob])
     expected_sql = "SELECT * FROM users WHERE (name IN ('John', 'Jane', 'Bob'))"
     assert_sql expected_sql, dataset
   end
@@ -142,7 +142,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_limit_with_large_numbers
-    dataset = mock_dataset(:users).limit(1000000, 5000000)
+    dataset = mock_dataset(:users).limit(1_000_000, 5_000_000)
     expected_sql = "SELECT * FROM users LIMIT 1000000 OFFSET 5000000"
     assert_sql expected_sql, dataset
   end
@@ -161,7 +161,8 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_group_by_with_expressions
-    dataset = mock_dataset(:users).select(Sequel.lit("YEAR(created_at)"), Sequel.function(:count, :*)).group(Sequel.lit("YEAR(created_at)"))
+    dataset = mock_dataset(:users).select(Sequel.lit("YEAR(created_at)"),
+                                          Sequel.function(:count, :*)).group(Sequel.lit("YEAR(created_at)"))
     expected_sql = "SELECT YEAR(created_at), count(*) FROM users GROUP BY YEAR(created_at)"
     assert_sql expected_sql, dataset
   end
@@ -244,7 +245,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_join_with_multiple_conditions
-    dataset = mock_dataset(:users).join(:profiles, {user_id: :id, active: true})
+    dataset = mock_dataset(:users).join(:profiles, { user_id: :id, active: true })
     expected_sql = "SELECT * FROM users INNER JOIN profiles ON ((profiles.user_id = users.id) AND (profiles.active IS TRUE))"
     assert_sql expected_sql, dataset
   end
@@ -264,7 +265,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_join_with_complex_conditions
-    dataset = mock_dataset(:users).join(:profiles) { |j, lj, js| (j[:user_id] =~ lj[:id]) & (j[:active] =~ true) }
+    dataset = mock_dataset(:users).join(:profiles) { |j, lj, _js| (j[:user_id] =~ lj[:id]) & (j[:active] =~ true) }
     expected_sql = "SELECT * FROM users INNER JOIN profiles ON ((profiles.user_id IS users.id) AND (profiles.active IS TRUE))"
     assert_sql expected_sql, dataset
   end
@@ -442,7 +443,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
               .left_join(:orders___o, user_id: :id)
               .where { (u__age > 18) & (u__active =~ true) }
               .group(:u__id, :u__name, :u__age)
-              .having { count(:o__id) > 0 }
+              .having { count(:o__id).positive? }
               .order(Sequel.desc(:order_count), :u__name)
               .limit(10, 5)
 

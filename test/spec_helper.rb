@@ -67,7 +67,7 @@ module SequelDuckDBTest
     # Helper method to create a test table in a database
     def create_test_table(db, table_name = :test_table)
       db.create_table(table_name) do
-        primary_key :id
+        Integer :id, primary_key: true
         String :name, null: false
         Integer :age
         Date :birth_date
@@ -127,7 +127,7 @@ module SequelDuckDBTest
       expected_properties.each do |key, expected_value|
         actual_value = properties[key]
         assert_equal expected_value, actual_value,
-          "Column #{column_name} property #{key} should be #{expected_value}, got #{actual_value}"
+                     "Column #{column_name} property #{key} should be #{expected_value}, got #{actual_value}"
       end
     end
 
@@ -135,7 +135,7 @@ module SequelDuckDBTest
     def assert_record_count(dataset, expected_count)
       actual_count = dataset.count
       assert_equal expected_count, actual_count,
-        "Expected #{expected_count} records, got #{actual_count}"
+                   "Expected #{expected_count} records, got #{actual_count}"
     end
 
     # Helper method to assert record exists with specific attributes
@@ -156,12 +156,10 @@ module SequelDuckDBTest
     end
 
     # Helper method to assert that no exception is raised
-    def assert_nothing_raised(message = nil, &block)
-      begin
-        yield
-      rescue => e
-        flunk "#{message || 'Expected no exception'}, but got #{e.class}: #{e.message}"
-      end
+    def assert_nothing_raised(message = nil)
+      yield
+    rescue StandardError => e
+      flunk "#{message || "Expected no exception"}, but got #{e.class}: #{e.message}"
     end
   end
 end

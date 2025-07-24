@@ -289,7 +289,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     dataset = db[:test_table].limit(1)
 
     count = 0
-    dataset.fetch_rows(dataset.sql) do |row|
+    dataset.fetch_rows(dataset.sql) do |_row|
       count += 1
     end
 

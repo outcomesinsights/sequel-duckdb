@@ -10,5 +10,7 @@ gem "rake", "~> 13.0"
 gem "rubocop", "~> 1.21"
 
 # Development dependencies
-gem "sequel", ">= 5.0"
 gem "duckdb", ">= 1.0.0"
+gem "logger"
+gem "minitest", "~> 5.0"
+gem "sequel", ">= 5.0"

@@ -91,7 +91,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
     it "should work with models that have foreign key relationships" do
       # Define model classes with associations
-      user_class = Class.new(Sequel::Model(@db[:users])) do
+      Class.new(Sequel::Model(@db[:users])) do
         def self.name
           "User"
         end
@@ -159,11 +159,11 @@ describe "Sequel::Model integration with DuckDB adapter" do
       )
 
       # Capture the SQL that will be generated
-      insert_sql = nil
       logger = Object.new
       def logger.info(sql)
         @captured_sql = sql if sql.include?("INSERT")
       end
+
       def logger.captured_sql
         @captured_sql
       end
@@ -491,8 +491,8 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
       # Create multiple users
       user1 = user_class.create(id: next_user_id, name: "User 1", email: "user1@example.com", active: true)
-      user2 = user_class.create(id: next_user_id, name: "User 2", email: "user2@example.com", active: false)
-      user3 = user_class.create(id: next_user_id, name: "User 3", email: "user3@example.com", active: false)
+      user_class.create(id: next_user_id, name: "User 2", email: "user2@example.com", active: false)
+      user_class.create(id: next_user_id, name: "User 3", email: "user3@example.com", active: false)
 
       logger = create_sql_logger("DELETE")
       @db.loggers << logger

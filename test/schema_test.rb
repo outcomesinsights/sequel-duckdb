@@ -33,7 +33,7 @@ class SchemaTest < SequelDuckDBTest::TestCase
         Date :date_col
         DateTime :datetime_col
         Time :time_col
-        # Note: BLOB/binary support will be tested when implemented
+        # NOTE: BLOB/binary support will be tested when implemented
       end
     end
 
@@ -304,8 +304,8 @@ class SchemaTest < SequelDuckDBTest::TestCase
     schema = db.schema(:complex_table)
     column_names = schema.map(&:first)
 
-    expected_columns = [:id, :first_name, :last_name, :email, :age, :active,
-                       :birth_date, :created_at, :updated_at, :score]
+    expected_columns = %i[id first_name last_name email age active
+                          birth_date created_at updated_at score]
 
     expected_columns.each do |col|
       assert_includes column_names, col, "Should have #{col} column"
