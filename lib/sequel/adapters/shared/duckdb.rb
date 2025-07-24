@@ -84,12 +84,24 @@ module Sequel
         if opts.is_a?(Array)
           params = opts
           opts = {}
-        else
+        elsif opts.is_a?(Hash)
           params = opts[:params] || []
+        else
+          # Handle other types (like strings) by treating as empty params
+          params = []
+          opts = {}
         end
 
         synchronize(opts[:server]) do |conn|
-          return execute_statement(conn, sql, params, opts, &block)
+          result = execute_statement(conn, sql, params, opts, &block)
+
+          # For UPDATE/DELETE operations without a block, return the number of affected rows
+          # This is what Sequel models expect
+          if !block && result.is_a?(::DuckDB::Result) && (sql.strip.upcase.start_with?('UPDATE ') || sql.strip.upcase.start_with?('DELETE '))
+            return result.rows_changed
+          end
+
+          return result
         end
       end
 
@@ -112,7 +124,15 @@ module Sequel
       # @param opts [Hash] Options for execution
       # @return [Object] Result of execution
       def execute_update(sql, opts = {})
-        execute(sql, opts)
+        result = execute(sql, opts)
+        # For UPDATE/DELETE statements, return the number of affected rows
+        # DuckDB::Result has a rows_changed method for affected row count
+        if result.respond_to?(:rows_changed)
+          result.rows_changed
+        else
+          # Fallback: try to get row count from result
+          result.is_a?(Integer) ? result : 0
+        end
       end
 
       private
@@ -399,11 +419,31 @@ module Sequel
 
       # Get schema information for a table
       #
-      # @param table_name [Symbol, String] Name of the table
+      # @param table_name [Symbol, String, Dataset] Name of the table or dataset
       # @param opts [Hash] Options
       # @return [Array<Array>] Schema information
       def schema(table_name, opts = {})
-        schema_parse_table(table_name, opts)
+        # Handle case where Sequel passes a Dataset object instead of table name
+        if table_name.is_a?(Sequel::Dataset)
+          # Extract table name from dataset
+          if table_name.opts[:from] && table_name.opts[:from].first
+            actual_table_name = table_name.opts[:from].first
+            # Handle case where table name is wrapped in an identifier
+            actual_table_name = actual_table_name.value if actual_table_name.respond_to?(:value)
+          else
+            # Fallback: try to extract from SQL
+            sql = table_name.sql
+            if sql =~ /FROM\s+(\w+)/i
+              actual_table_name = $1.to_sym
+            else
+              raise Sequel::Error, "Cannot determine table name from dataset: #{table_name}"
+            end
+          end
+        else
+          actual_table_name = table_name
+        end
+
+        schema_parse_table(actual_table_name, opts)
       end
 
       # Get index information for a table
@@ -435,7 +475,7 @@ module Sequel
           :float
         when 'DOUBLE', 'FLOAT8'
           :float
-        when 'DECIMAL', 'NUMERIC'
+        when /^DECIMAL/, /^NUMERIC/
           :decimal
         when 'VARCHAR', 'TEXT', 'STRING'
           :string
@@ -1170,7 +1210,7 @@ module Sequel
         true
       end
 
-      def supports_returning?
+      def supports_returning?(type = nil)
         false
       end
 
@@ -1218,19 +1258,6 @@ module Sequel
       end
 
       private
-
-      # Add LIMIT and OFFSET clauses to SQL
-      def select_limit_sql(sql)
-        if limit = @opts[:limit]
-          sql << " LIMIT #{literal(limit)}"
-          if offset = @opts[:offset]
-            sql << " OFFSET #{literal(offset)}"
-          end
-        elsif offset = @opts[:offset]
-          # DuckDB supports OFFSET without LIMIT
-          sql << " OFFSET #{literal(offset)}"
-        end
-      end
 
       # Add JOIN clauses to SQL (Requirement 6.9)
       def select_join_sql(sql)
@@ -1592,17 +1619,8 @@ module Sequel
       # @return [Integer] Number of affected rows
       def update(values = {})
         sql = update_sql(values)
-        result = db.execute(sql)
-
-        # Extract affected row count from DuckDB result
-        if result.is_a?(::DuckDB::Result)
-          # For UPDATE operations, we need to get the number of affected rows
-          # DuckDB doesn't provide this directly, so we'll return 1 if successful
-          # This is a limitation that could be improved with better DuckDB integration
-          1
-        else
-          result
-        end
+        # Use execute_update which properly returns the row count
+        db.execute_update(sql)
       end
 
       # Delete records from the dataset
@@ -1610,17 +1628,8 @@ module Sequel
       # @return [Integer] Number of affected rows
       def delete
         sql = delete_sql
-        result = db.execute(sql)
-
-        # Extract affected row count from DuckDB result
-        if result.is_a?(::DuckDB::Result)
-          # For DELETE operations, we need to get the number of affected rows
-          # DuckDB doesn't provide this directly, so we'll return 1 if successful
-          # This is a limitation that could be improved with better DuckDB integration
-          1
-        else
-          result
-        end
+        # Use execute_update which properly returns the row count
+        db.execute_update(sql)
       end
 
       # Streaming result support where possible (Requirement 9.5)
@@ -1759,6 +1768,13 @@ module Sequel
         # Use streaming approach to minimize memory usage
         sql = select_sql
 
+        # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
+        if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
+          # SQL already has LIMIT/OFFSET, execute directly without batching
+          fetch_rows(sql, &block)
+          return self
+        end
+
         # Process results in batches to balance memory usage and performance
         batch_size = @opts[:stream_batch_size] || 1000
         offset = 0
@@ -1798,6 +1814,15 @@ module Sequel
       def stream_with_memory_limit(memory_limit, &block)
         return enum_for(:stream_with_memory_limit, memory_limit) unless block_given?
 
+        sql = select_sql
+
+        # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
+        if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
+          # SQL already has LIMIT/OFFSET, execute directly without batching
+          fetch_rows(sql, &block)
+          return self
+        end
+
         initial_memory = get_memory_usage
         batch_size = @opts[:stream_batch_size] || 500
         offset = 0
@@ -1812,7 +1837,7 @@ module Sequel
             batch_size = [batch_size / 2, 100].max
           end
 
-          batch_sql = "#{select_sql} LIMIT #{batch_size} OFFSET #{offset}"
+          batch_sql = "#{sql} LIMIT #{batch_size} OFFSET #{offset}"
           batch_count = 0
 
           fetch_rows(batch_sql) do |row|
@@ -1855,19 +1880,7 @@ module Sequel
         end
       end
 
-      # Enhanced limit method with optimization hints
-      def limit(n, offset = nil)
-        # For small limits, suggest using more efficient query plans
-        if n && n <= 100
-          # Create new options hash to avoid modifying frozen hash
-          new_opts = @opts.dup
-          new_opts[:small_result_set] = true
-          clone(limit: n, offset: offset, opts: new_opts)
-        else
-          # Standard limit behavior
-          clone(limit: n, offset: offset)
-        end
-      end
+
 
       private
 

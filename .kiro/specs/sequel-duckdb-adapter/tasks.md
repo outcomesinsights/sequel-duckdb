@@ -202,15 +202,15 @@
 
 
 
-- [ ] 12. Implement Sequel::Model integration support
-  - [ ] 12.1 Add model compatibility methods
+- [x] 12. Implement Sequel::Model integration support
+  - [x] 12.1 Add model compatibility methods
     - Ensure automatic schema introspection works with models
     - Implement proper INSERT statement generation for model creation
     - Add UPDATE statement generation for model updates
     - Implement DELETE statement generation for model deletion
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 12.2 Add association and validation support
+  - [x] 12.2 Add association and validation support
     - Implement foreign key relationship handling for associations
     - Ensure model validations work correctly with DuckDB constraints
     - Add model callback support during DuckDB operations
