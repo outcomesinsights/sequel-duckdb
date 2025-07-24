@@ -216,15 +216,15 @@
     - Add model callback support during DuckDB operations
     - _Requirements: 7.5, 7.6, 7.7_
 
-- [ ] 13. Create documentation and examples
-  - [ ] 13.1 Write comprehensive README
+- [x] 13. Create documentation and examples
+  - [x] 13.1 Write comprehensive README
     - Create usage examples with connection strings
     - Add sample code for common operations
     - Document DuckDB-specific features and optimizations
     - Include troubleshooting section for common issues
     - _Requirements: 12.1, 12.2, 12.5_
 
-  - [ ] 13.2 Add API documentation and migration examples
+  - [x] 13.2 Add API documentation and migration examples
     - Generate complete YARD documentation for all public methods
     - Create Sequel migration examples for DuckDB
     - Document performance tuning techniques

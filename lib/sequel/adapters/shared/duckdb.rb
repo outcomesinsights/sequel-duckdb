@@ -5,14 +5,76 @@ require "duckdb"
 module Sequel
   module DuckDB
     # DatabaseMethods module provides shared database functionality for DuckDB adapter
+    #
     # This module is included by the main Database class to provide connection management,
-    # schema introspection, and SQL execution capabilities.
+    # schema introspection, and SQL execution capabilities. It implements the core
+    # database operations required by Sequel's adapter interface.
+    #
+    # Key responsibilities:
+    # - Connection management (connect, disconnect, validation)
+    # - SQL execution with proper error handling and logging
+    # - Schema introspection (tables, columns, indexes, constraints)
+    # - Transaction support with commit/rollback capabilities
+    # - Data type mapping between Ruby and DuckDB types
+    # - Performance optimizations for analytical workloads
+    #
+    # @example Connection management
+    #   db = Sequel.connect('duckdb:///path/to/database.duckdb')
+    #   db.test_connection  # => true
+    #   db.disconnect
+    #
+    # @example Schema introspection
+    #   db.tables                    # => [:users, :products, :orders]
+    #   db.schema(:users)            # => [[:id, {...}], [:name, {...}]]
+    #   db.indexes(:users)           # => {:users_email_index => {...}}
+    #   db.table_exists?(:users)     # => true
+    #
+    # @example SQL execution
+    #   db.execute("SELECT COUNT(*) FROM users")
+    #   db.execute("INSERT INTO users (name) VALUES (?)", ["John"])
+    #
+    # @example Transactions
+    #   db.transaction do
+    #     db[:users].insert(name: 'Alice')
+    #     db[:orders].insert(user_id: db[:users].max(:id), total: 100)
+    #   end
+    #
+    # @see Database
+    # @since 0.1.0
     module DatabaseMethods
       # Connect to a DuckDB database
       #
-      # @param server [Hash] Server configuration options
-      # @return [::DuckDB::Connection] DuckDB database connection
-      # @raise [Sequel::DatabaseConnectionError] If connection fails
+      # Creates a connection to either a file-based or in-memory DuckDB database.
+      # This method handles the low-level connection establishment and error handling.
+      #
+      # @param server [Hash] Server configuration options from Sequel
+      # @option server [String] :database Database path or ':memory:' for in-memory database
+      # @option server [Hash] :config DuckDB-specific configuration options
+      # @option server [Boolean] :readonly Whether to open database in read-only mode
+      #
+      # @return [::DuckDB::Connection] Active DuckDB database connection
+      #
+      # @raise [Sequel::DatabaseConnectionError] If connection fails due to:
+      #   - Invalid database path
+      #   - Insufficient permissions
+      #   - DuckDB library errors
+      #   - Configuration errors
+      #
+      # @example Connect to in-memory database
+      #   conn = connect(database: ':memory:')
+      #
+      # @example Connect to file database
+      #   conn = connect(database: '/path/to/database.duckdb')
+      #
+      # @example Connect with configuration
+      #   conn = connect(
+      #     database: '/path/to/database.duckdb',
+      #     config: { memory_limit: '2GB', threads: 4 }
+      #   )
+      #
+      # @see disconnect_connection
+      # @see valid_connection?
+      # @since 0.1.0
       def connect(server)
         opts = server_opts(server)
         database_path = opts[:database]
