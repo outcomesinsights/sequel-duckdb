@@ -1552,10 +1552,15 @@ module Sequel
         when DateTime
           literal_datetime_append(sql, v)
         when String
-          if v.encoding == Encoding::ASCII_8BIT
-            literal_blob_append(sql, v)
+          case v
+          when LiteralString
+            sql << v
           else
-            literal_string_append(sql, v)
+            if v.encoding == Encoding::ASCII_8BIT
+              literal_blob_append(sql, v)
+            else
+              literal_string_append(sql, v)
+            end
           end
         else
           super

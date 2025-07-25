@@ -329,6 +329,153 @@ class SqlTest < SequelDuckDBTest::TestCase
     end
   end
 
+  # Tests for LiteralString handling (Requirements 1.1, 1.2, 4.1, 6.1)
+  def test_literal_string_in_select_clause
+    dataset = mock_dataset(:test).select(Sequel.lit("YEAR(created_at)"))
+
+    # LiteralString should not be quoted in SELECT clause
+    expected_sql = "SELECT YEAR(created_at) FROM test"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_in_where_clause
+    dataset = mock_dataset(:test).where(Sequel.lit("age > 18"))
+
+    # LiteralString should not be quoted in WHERE clause
+    expected_sql = "SELECT * FROM test WHERE (age > 18)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_with_function_call
+    dataset = mock_dataset(:users).select(Sequel.lit("LENGTH(name)"))
+
+    # Function calls in LiteralString should not be quoted
+    expected_sql = "SELECT LENGTH(name) FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_with_complex_expression
+    dataset = mock_dataset(:users).select(Sequel.lit("name || ' ' || email AS full_info"))
+
+    # Complex expressions in LiteralString should not be quoted
+    expected_sql = "SELECT name || ' ' || email AS full_info FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_in_update_clause
+    dataset = mock_dataset(:users).where(id: 1)
+
+    # LiteralString in UPDATE SET clause should not be quoted
+    expected_sql = "UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE (id = 1)"
+    actual_sql = dataset.update_sql(updated_at: Sequel.lit("CURRENT_TIMESTAMP"))
+    assert_equal expected_sql, actual_sql
+  end
+
+  def test_literal_string_in_order_by_clause
+    dataset = mock_dataset(:users).order(Sequel.lit("LENGTH(name) DESC"))
+
+    # LiteralString in ORDER BY should not be quoted
+    expected_sql = "SELECT * FROM users ORDER BY LENGTH(name) DESC"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_in_group_by_clause
+    dataset = mock_dataset(:users).group(Sequel.lit("YEAR(created_at)"))
+
+    # LiteralString in GROUP BY should not be quoted
+    expected_sql = "SELECT * FROM users GROUP BY YEAR(created_at)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_in_having_clause
+    dataset = mock_dataset(:users).group(:name).having(Sequel.lit("COUNT(*) > 1"))
+
+    # LiteralString in HAVING should not be quoted
+    expected_sql = "SELECT * FROM users GROUP BY name HAVING (COUNT(*) > 1)"
+    assert_sql expected_sql, dataset
+  end
+
+  # Regression tests to ensure regular strings are still quoted properly (Requirement 6.1)
+  def test_regular_string_still_quoted_in_where
+    dataset = mock_dataset(:users).where(name: "John's Name")
+
+    # Regular strings should still be properly quoted and escaped
+    expected_sql = "SELECT * FROM users WHERE (name = 'John''s Name')"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regular_string_still_quoted_in_select
+    dataset = mock_dataset(:users).select(Sequel.as("John's Name", :display_name))
+
+    # Regular strings should still be properly quoted and escaped
+    expected_sql = "SELECT 'John''s Name' AS display_name FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regular_string_still_quoted_in_insert
+    dataset = mock_dataset(:users)
+
+    # Regular strings in INSERT should still be quoted
+    expected_sql = "INSERT INTO users (name, description) VALUES ('John', 'A user''s profile')"
+    actual_sql = dataset.insert_sql(name: "John", description: "A user's profile")
+    assert_equal expected_sql, actual_sql
+  end
+
+  def test_regular_string_still_quoted_in_update
+    dataset = mock_dataset(:users).where(id: 1)
+
+    # Regular strings in UPDATE should still be quoted
+    expected_sql = "UPDATE users SET name = 'John''s Name' WHERE (id = 1)"
+    actual_sql = dataset.update_sql(name: "John's Name")
+    assert_equal expected_sql, actual_sql
+  end
+
+  # Test that SQL::Function continues working (should be unchanged)
+  def test_sql_function_still_works
+    dataset = mock_dataset(:users).select(Sequel.function(:count, :*))
+
+    # SQL::Function should continue to work as before
+    expected_sql = "SELECT count(*) FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_sql_function_with_arguments
+    dataset = mock_dataset(:users).select(Sequel.function(:sum, :amount))
+
+    # SQL::Function with arguments should work
+    expected_sql = "SELECT sum(amount) FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_sql_function_nested
+    dataset = mock_dataset(:users).select(Sequel.function(:count, Sequel.function(:distinct, :name)))
+
+    # Nested SQL::Function calls should work
+    expected_sql = "SELECT count(distinct(name)) FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_mixed_literal_string_and_function
+    dataset = mock_dataset(:users).select(
+      Sequel.function(:count, :*).as(:total_count),
+      Sequel.lit("YEAR(created_at)").as(:year)
+    )
+
+    # Mix of SQL::Function and LiteralString should work
+    expected_sql = "SELECT count(*) AS total_count, YEAR(created_at) AS year FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_literal_string_with_parameters_not_supported
+    # Note: LiteralString doesn't support parameterized queries by design
+    # This test documents the expected behavior
+    dataset = mock_dataset(:users).where(Sequel.lit("age > 18"))
+
+    # Parameters in LiteralString are not processed - they're literal
+    expected_sql = "SELECT * FROM users WHERE (age > 18)"
+    assert_sql expected_sql, dataset
+  end
+
   private
 
   def create_db

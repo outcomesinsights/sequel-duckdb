@@ -425,7 +425,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Test update multiple records
     result_multiple = dataset.update(active: true)
-    assert_equal 1, result_multiple, "Update should return affected row count"
+    assert_equal 2, result_multiple, "Update should return affected row count for all records"
   end
 
   def test_dataset_delete_method_return_value
@@ -548,6 +548,224 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_instance_of Array, complex_all, "Complex all should return array"
     complex_all.each do |record|
       assert record[:age] <= 23, "All complex records should meet criteria"
+    end
+  end
+
+  # Integration tests for LiteralString expressions with real database (Requirements 1.2, 5.1, 6.1)
+
+  def test_literal_string_in_select_clause_with_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data with created_at timestamps
+    dataset.insert(id: 1, name: "Test User 1", age: 25, created_at: Time.new(2023, 5, 15, 10, 30, 0))
+    dataset.insert(id: 2, name: "Test User 2", age: 30, created_at: Time.new(2024, 8, 20, 14, 45, 0))
+
+    # Test LiteralString in SELECT clause - extract year from created_at
+    result = dataset.select(Sequel.lit("YEAR(created_at) AS year_created")).all
+    assert_equal 2, result.length, "Should return all records with year extraction"
+
+    # Verify the literal expression was executed correctly
+    years = result.map { |r| r[:year_created] }
+    assert_includes years, 2023, "Should extract year 2023 from first record"
+    assert_includes years, 2024, "Should extract year 2024 from second record"
+  end
+
+  def test_literal_string_in_where_clause_with_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Alice", age: 17)
+    dataset.insert(id: 2, name: "Bob", age: 25)
+    dataset.insert(id: 3, name: "Charlie", age: 30)
+
+    # Test LiteralString in WHERE clause - age comparison
+    adults = dataset.where(Sequel.lit("age >= 18")).all
+    assert_equal 2, adults.length, "Should find 2 adults (age >= 18)"
+
+    adult_names = adults.map { |r| r[:name] }.sort
+    assert_equal %w[Bob Charlie], adult_names, "Should find Bob and Charlie as adults"
+
+    # Test more complex LiteralString expression in WHERE
+    young_adults = dataset.where(Sequel.lit("age BETWEEN 18 AND 29")).all
+    assert_equal 1, young_adults.length, "Should find 1 young adult (age 18-29)"
+    assert_equal "Bob", young_adults.first[:name], "Should find Bob as young adult"
+  end
+
+  def test_literal_string_with_string_functions_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "John Doe", age: 25)
+    dataset.insert(id: 2, name: "Jane Smith", age: 30)
+    dataset.insert(id: 3, name: "Bob", age: 35)
+
+    # Test LiteralString with LENGTH function in WHERE clause
+    long_names = dataset.where(Sequel.lit("LENGTH(name) > 5")).all
+    assert_equal 2, long_names.length, "Should find 2 records with names longer than 5 characters"
+
+    long_name_list = long_names.map { |r| r[:name] }.sort
+    assert_equal ["Jane Smith", "John Doe"], long_name_list, "Should find John Doe and Jane Smith"
+
+    # Test LiteralString with UPPER function in SELECT
+    upper_names = dataset.select(:id, Sequel.lit("UPPER(name) AS upper_name")).order(:id).all
+    assert_equal 3, upper_names.length, "Should return all records with uppercase names"
+    assert_equal "JOHN DOE", upper_names.first[:upper_name], "Should convert name to uppercase"
+    assert_equal "JANE SMITH", upper_names[1][:upper_name], "Should convert name to uppercase"
+    assert_equal "BOB", upper_names.last[:upper_name], "Should convert name to uppercase"
+  end
+
+  def test_literal_string_in_order_by_with_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Charlie", age: 30)
+    dataset.insert(id: 2, name: "Alice", age: 25)
+    dataset.insert(id: 3, name: "Bob", age: 35)
+
+    # Test LiteralString in ORDER BY clause
+    ordered_by_name_length = dataset.order(Sequel.lit("LENGTH(name) DESC")).all
+    assert_equal 3, ordered_by_name_length.length, "Should return all records ordered by name length"
+
+    # Verify ordering by name length (descending)
+    names = ordered_by_name_length.map { |r| r[:name] }
+    expected_order = %w[Charlie Alice Bob] # 7, 5, 3 characters respectively
+    assert_equal expected_order, names, "Should be ordered by name length descending"
+  end
+
+  def test_literal_string_in_update_with_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Test User", age: 25, created_at: Time.now)
+
+    # Test LiteralString in UPDATE SET clause - update created_at to current timestamp
+    updated_count = dataset.where(id: 1).update(created_at: Sequel.lit("CURRENT_TIMESTAMP"))
+    assert_equal 1, updated_count, "Should update one record"
+
+    # Verify the update worked (created_at should be updated to a recent timestamp)
+    updated_record = dataset.where(id: 1).first
+    refute_nil updated_record[:created_at], "created_at should not be nil after update"
+    assert_instance_of Time, updated_record[:created_at], "created_at should be a Time object"
+  end
+
+  def test_literal_string_complex_expressions_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "John", age: 25)
+    dataset.insert(id: 2, name: "Jane", age: 30)
+
+    # Test complex LiteralString expression combining multiple functions
+    result = dataset.select(
+      :id,
+      :name,
+      Sequel.lit("name || ' (age: ' || age || ')' AS full_info")
+    ).order(:id).all
+
+    assert_equal 2, result.length, "Should return all records with concatenated info"
+    assert_equal "John (age: 25)", result.first[:full_info], "Should concatenate name and age correctly"
+    assert_equal "Jane (age: 30)", result.last[:full_info], "Should concatenate name and age correctly"
+  end
+
+  def test_literal_string_with_aggregates_real_database
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Group A User 1", age: 25, score: 85.5)
+    dataset.insert(id: 2, name: "Group A User 2", age: 30, score: 92.0)
+    dataset.insert(id: 3, name: "Group B User 1", age: 35, score: 78.5)
+
+    # Test LiteralString with aggregate functions
+    # Group by first word of name and calculate average score
+    result = dataset.select(
+      Sequel.lit("SUBSTRING(name, 1, 7) AS group_name"),
+      Sequel.lit("AVG(score) AS avg_score"),
+      Sequel.lit("COUNT(*) AS user_count")
+    ).group(Sequel.lit("SUBSTRING(name, 1, 7)")).order(Sequel.lit("group_name")).all
+
+    assert_equal 2, result.length, "Should return 2 groups"
+
+    group_a = result.find { |r| r[:group_name] == "Group A" }
+    group_b = result.find { |r| r[:group_name] == "Group B" }
+
+    refute_nil group_a, "Should find Group A"
+    refute_nil group_b, "Should find Group B"
+
+    assert_equal 2, group_a[:user_count], "Group A should have 2 users"
+    assert_equal 1, group_b[:user_count], "Group B should have 1 user"
+
+    # Check average scores (allowing for floating point precision)
+    assert_in_delta 88.75, group_a[:avg_score], 0.01, "Group A average score should be ~88.75"
+    assert_in_delta 78.5, group_b[:avg_score], 0.01, "Group B average score should be 78.5"
+  end
+
+  def test_literal_string_no_regression_with_regular_strings
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Test User", age: 25)
+
+    # Test that regular strings are still properly quoted and handled
+    # This should work exactly as before (no regression)
+    result = dataset.where(name: "Test User").all
+    assert_equal 1, result.length, "Should find record with regular string comparison"
+    assert_equal "Test User", result.first[:name], "Should match exact string"
+
+    # Test with string containing special characters that need quoting
+    dataset.insert(id: 2, name: "User's Name", age: 30)
+    result_with_quotes = dataset.where(name: "User's Name").all
+    assert_equal 1, result_with_quotes.length, "Should handle strings with quotes correctly"
+    assert_equal "User's Name", result_with_quotes.first[:name], "Should match string with apostrophe"
+
+    # Test regular string in INSERT (should be quoted properly)
+    dataset.insert(id: 3, name: "Another 'quoted' string", age: 35)
+    quoted_result = dataset.where(name: "Another 'quoted' string").first
+    refute_nil quoted_result, "Should insert and find string with quotes"
+    assert_equal "Another 'quoted' string", quoted_result[:name], "Should preserve quoted string exactly"
+  end
+
+  def test_literal_string_vs_sequel_function_comparison
+    db = create_db
+    create_test_table(db)
+    dataset = db[:test_table]
+
+    # Insert test data
+    dataset.insert(id: 1, name: "Test", age: 25)
+    dataset.insert(id: 2, name: "Another", age: 30)
+
+    # Test that Sequel.function still works (should be unchanged)
+    function_result = dataset.select(Sequel.function(:count, :*).as(:total_count)).first
+    assert_equal 2, function_result[:total_count], "Sequel.function should still work correctly"
+
+    # Test that LiteralString produces the same result for equivalent expressions
+    literal_result = dataset.select(Sequel.lit("COUNT(*) AS total_count")).first
+    assert_equal 2, literal_result[:total_count], "Sequel.lit should produce same result as Sequel.function"
+
+    # Test both approaches with LENGTH function
+    function_length = dataset.select(:name, Sequel.function(:length, :name).as(:name_length)).order(:id).all
+    literal_length = dataset.select(:name, Sequel.lit("LENGTH(name) AS name_length")).order(:id).all
+
+    assert_equal function_length.length, literal_length.length, "Both approaches should return same number of records"
+    function_length.each_with_index do |func_record, index|
+      lit_record = literal_length[index]
+      assert_equal func_record[:name_length], lit_record[:name_length],
+                   "Function and literal approaches should produce same length for #{func_record[:name]}"
     end
   end
 
