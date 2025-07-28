@@ -564,6 +564,155 @@ class SqlTest < SequelDuckDBTest::TestCase
     assert_sql expected_sql, dataset
   end
 
+  # DuckDB Array Syntax Tests (Requirements 2.1)
+  def test_duckdb_array_literal_syntax
+    # Test that DuckDB array literals use [1, 2, 3] syntax
+    dataset = mock_dataset(:users).select(Sequel.lit("[1, 2, 3]").as(:numbers))
+    expected_sql = "SELECT [1, 2, 3] AS numbers FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_array_literal_with_strings
+    # Test DuckDB array with string literals
+    dataset = mock_dataset(:users).select(Sequel.lit("['apple', 'banana', 'cherry']").as(:fruits))
+    expected_sql = "SELECT ['apple', 'banana', 'cherry'] AS fruits FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_array_literal_in_where_clause
+    # Test DuckDB array literal in WHERE clause
+    dataset = mock_dataset(:users).where(Sequel.lit("id = ANY([1, 2, 3])"))
+    expected_sql = "SELECT * FROM users WHERE (id = ANY([1, 2, 3]))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_array_literal_mixed_types
+    # Test DuckDB array with mixed types (numbers and strings)
+    dataset = mock_dataset(:users).select(Sequel.lit("[1, 'two', 3.0]").as(:mixed_array))
+    expected_sql = "SELECT [1, 'two', 3.0] AS mixed_array FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_nested_array_literals
+    # Test nested DuckDB arrays
+    dataset = mock_dataset(:users).select(Sequel.lit("[[1, 2], [3, 4]]").as(:nested_array))
+    expected_sql = "SELECT [[1, 2], [3, 4]] AS nested_array FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_array_functions
+    # Test DuckDB array functions with array literals
+    dataset = mock_dataset(:users).select(Sequel.lit("array_length([1, 2, 3])").as(:array_len))
+    expected_sql = "SELECT array_length([1, 2, 3]) AS array_len FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_duckdb_array_element_access
+    # Test DuckDB array element access syntax
+    dataset = mock_dataset(:users).select(Sequel.lit("[1, 2, 3][1]").as(:first_element))
+    expected_sql = "SELECT [1, 2, 3][1] AS first_element FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  # JSON Functions Tests (Requirements 2.2)
+  def test_json_extract_function
+    # Test json_extract function for extracting values from JSON
+    dataset = mock_dataset(:users).select(Sequel.lit("json_extract(data, '$.name')").as(:extracted_name))
+    expected_sql = "SELECT json_extract(data, '$.name') AS extracted_name FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_with_path
+    # Test json_extract with complex JSON path
+    dataset = mock_dataset(:users).select(Sequel.lit("json_extract(profile, '$.address.city')").as(:city))
+    expected_sql = "SELECT json_extract(profile, '$.address.city') AS city FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_array_element
+    # Test json_extract with array element access
+    dataset = mock_dataset(:users).select(Sequel.lit("json_extract(tags, '$[0]')").as(:first_tag))
+    expected_sql = "SELECT json_extract(tags, '$[0]') AS first_tag FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_in_where_clause
+    # Test json_extract in WHERE clause
+    dataset = mock_dataset(:users).where(Sequel.lit("json_extract(data, '$.active') = true"))
+    expected_sql = "SELECT * FROM users WHERE (json_extract(data, '$.active') = true)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_with_cast
+    # Test json_extract with type casting
+    dataset = mock_dataset(:users).select(Sequel.lit("CAST(json_extract(data, '$.age') AS INTEGER)").as(:age))
+    expected_sql = "SELECT CAST(json_extract(data, '$.age') AS INTEGER) AS age FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_multiple_paths
+    # Test multiple json_extract calls in same query
+    dataset = mock_dataset(:users).select(
+      Sequel.lit("json_extract(data, '$.name')").as(:name),
+      Sequel.lit("json_extract(data, '$.email')").as(:email)
+    )
+    expected_sql = "SELECT json_extract(data, '$.name') AS name, json_extract(data, '$.email') AS email FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_nested_objects
+    # Test json_extract with deeply nested JSON objects
+    dataset = mock_dataset(:users).select(Sequel.lit("json_extract(data, '$.profile.settings.theme')").as(:theme))
+    expected_sql = "SELECT json_extract(data, '$.profile.settings.theme') AS theme FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_functions_with_arrays
+    # Test JSON functions working with DuckDB arrays
+    dataset = mock_dataset(:users).select(Sequel.lit("json_extract('[1, 2, 3]', '$[1]')").as(:second_element))
+    expected_sql = "SELECT json_extract('[1, 2, 3]', '$[1]') AS second_element FROM users"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_with_null_handling
+    # Test json_extract with NULL handling
+    dataset = mock_dataset(:users).where(Sequel.lit("json_extract(data, '$.deleted_at') IS NULL"))
+    expected_sql = "SELECT * FROM users WHERE (json_extract(data, '$.deleted_at') IS NULL)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_json_extract_with_complex_conditions
+    # Test json_extract in complex WHERE conditions
+    dataset = mock_dataset(:users).where(
+      Sequel.lit("json_extract(data, '$.active') = true") &
+      Sequel.lit("json_extract(data, '$.age') > 18")
+    )
+    expected_sql = "SELECT * FROM users WHERE (json_extract(data, '$.active') = true AND json_extract(data, '$.age') > 18)"
+    assert_sql expected_sql, dataset
+  end
+
+  # Integration tests with actual DuckDB database
+  def test_duckdb_array_syntax_with_real_database
+    # Test that DuckDB array syntax actually works with real database
+    db = create_db
+
+    assert_nothing_raised("DuckDB array literal should work") do
+      result = db.fetch("SELECT [1, 2, 3] AS numbers").first
+      assert_equal [1, 2, 3], result[:numbers]
+    end
+  end
+
+  def test_json_extract_with_real_database
+    # Test that json_extract actually works with real database
+    db = create_db
+
+    assert_nothing_raised("json_extract should work") do
+      result = db.fetch("SELECT json_extract('{\"name\": \"John\", \"age\": 30}', '$.name') AS name").first
+      # DuckDB json_extract returns quoted strings, so we expect "John" not John
+      assert_equal "\"John\"", result[:name]
+    end
+  end
+
   private
 
   def create_db

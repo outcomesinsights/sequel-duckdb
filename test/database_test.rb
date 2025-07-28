@@ -847,6 +847,99 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     refute_nil row[:created_at], "Timestamp should not be nil"
   end
 
+  # Configuration convenience methods tests (Requirements 3.1, 3.2)
+
+  def test_set_pragma_method
+    db = create_db
+
+    # Test set_pragma method (Requirement 3.1)
+    assert_nothing_raised("set_pragma should work") do
+      db.set_pragma("memory_limit", "1GB")
+    end
+
+    # Test with different pragma settings
+    assert_nothing_raised("set_pragma should work with different settings") do
+      db.set_pragma("threads", 4)
+      db.set_pragma("enable_progress_bar", true)
+    end
+
+    # Test with string values
+    assert_nothing_raised("set_pragma should work with string values") do
+      db.set_pragma("default_order", "ASC")
+    end
+
+    # Test with boolean values (using a pragma that accepts boolean)
+    assert_nothing_raised("set_pragma should work with boolean values") do
+      db.set_pragma("enable_progress_bar", false)
+    end
+  end
+
+  def test_set_pragma_error_handling
+    db = create_db
+
+    # Test error handling for invalid pragma
+    assert_database_error("set_pragma should raise error for invalid pragma") do
+      db.set_pragma("invalid_pragma_name", "value")
+    end
+  end
+
+  def test_configure_duckdb_method
+    db = create_db
+
+    # Test configure_duckdb method for batch configuration (Requirement 3.2)
+    options = {
+      memory_limit: "2GB",
+      threads: 8,
+      enable_progress_bar: true
+    }
+
+    assert_nothing_raised("configure_duckdb should work with multiple options") do
+      db.configure_duckdb(options)
+    end
+
+    # Test with empty options
+    assert_nothing_raised("configure_duckdb should work with empty options") do
+      db.configure_duckdb({})
+    end
+
+    # Test with single option
+    assert_nothing_raised("configure_duckdb should work with single option") do
+      db.configure_duckdb(memory_limit: "512MB")
+    end
+  end
+
+  def test_configure_duckdb_error_handling
+    db = create_db
+
+    # Test error handling for invalid options
+    invalid_options = {
+      memory_limit: "1GB",
+      invalid_pragma_name: "value",
+      threads: 4
+    }
+
+    # Should handle partial success/failure gracefully
+    # The exact behavior depends on DuckDB's pragma handling
+    assert_raises(Sequel::DatabaseError, "configure_duckdb should raise error for invalid options") do
+      db.configure_duckdb(invalid_options)
+    end
+  end
+
+  def test_configure_duckdb_with_various_types
+    db = create_db
+
+    # Test configure_duckdb with various value types
+    mixed_options = {
+      memory_limit: "1GB",        # String
+      threads: 4,                 # Integer
+      enable_progress_bar: true   # Boolean
+    }
+
+    assert_nothing_raised("configure_duckdb should handle various value types") do
+      db.configure_duckdb(mixed_options)
+    end
+  end
+
   def test_sql_execution_connection_synchronization
     db = create_db
     create_test_table(db)

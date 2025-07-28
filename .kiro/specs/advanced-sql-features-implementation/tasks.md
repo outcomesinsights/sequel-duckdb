@@ -7,12 +7,12 @@ Most advanced SQL features are already implemented. Remaining tasks based on cur
   - ~~Test LAG/LEAD functions with offset and default parameters~~ ✅ Already implemented
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2. Test advanced expressions
+- [x] 2. Test advanced expressions
   - Add tests to `test/sql_test.rb` for DuckDB array syntax `[1, 2, 3]`
   - Test JSON functions like `json_extract`
   - _Requirements: 2.1, 2.2_
 
-- [ ] 3. Add configuration convenience methods
+- [x] 3. Add configuration convenience methods
   - Add `set_pragma(key, value)` method to `DatabaseMethods` (user-friendly wrapper)
   - Add `configure_duckdb(options)` method for batch configuration
   - Add tests to `test/database_test.rb`

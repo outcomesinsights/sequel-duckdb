@@ -436,6 +436,93 @@ module Sequel
 
       public
 
+      # Configuration convenience methods (Requirements 3.1, 3.2)
+
+      # Set a DuckDB PRAGMA setting
+      #
+      # This method provides a user-friendly wrapper around DuckDB's PRAGMA statements.
+      # PRAGMA statements are used to configure various DuckDB settings and behaviors.
+      #
+      # @param key [String, Symbol] The pragma setting name
+      # @param value [Object] The value to set (will be converted to appropriate format)
+      # @return [void]
+      #
+      # @raise [Sequel::DatabaseError] If the pragma setting is invalid or fails
+      #
+      # @example Set memory limit
+      #   db.set_pragma("memory_limit", "2GB")
+      #   db.set_pragma(:memory_limit, "1GB")
+      #
+      # @example Set thread count
+      #   db.set_pragma("threads", 4)
+      #
+      # @example Enable/disable features
+      #   db.set_pragma("enable_progress_bar", true)
+      #   db.set_pragma("enable_profiling", false)
+      #
+      # @see configure_duckdb
+      # @since 0.1.0
+      def set_pragma(key, value)
+        # Convert key to string for consistency
+        pragma_key = key.to_s
+
+        # Format value appropriately for SQL
+        formatted_value = case value
+                          when String
+                            "'#{value.gsub("'", "''")}'" # Escape single quotes
+                          when TrueClass, FalseClass
+                            value.to_s
+                          when Numeric
+                            value.to_s
+                          else
+                            "'#{value}'"
+                          end
+
+        # Execute PRAGMA statement
+        pragma_sql = "PRAGMA #{pragma_key} = #{formatted_value}"
+
+        begin
+          execute(pragma_sql)
+        rescue StandardError => e
+          raise Sequel::DatabaseError, "Failed to set pragma #{pragma_key}: #{e.message}"
+        end
+      end
+
+      # Configure multiple DuckDB settings at once
+      #
+      # This method allows batch configuration of multiple DuckDB PRAGMA settings
+      # in a single method call. It's a convenience wrapper around multiple set_pragma calls.
+      #
+      # @param options [Hash] Hash of pragma_name => value pairs
+      # @return [void]
+      #
+      # @raise [Sequel::DatabaseError] If any pragma setting fails
+      #
+      # @example Configure multiple settings
+      #   db.configure_duckdb(
+      #     memory_limit: "2GB",
+      #     threads: 8,
+      #     enable_progress_bar: true,
+      #     default_order: "ASC"
+      #   )
+      #
+      # @example Configure with string keys
+      #   db.configure_duckdb(
+      #     "memory_limit" => "1GB",
+      #     "threads" => 4
+      #   )
+      #
+      # @see set_pragma
+      # @since 0.1.0
+      def configure_duckdb(options = {})
+        return if options.empty?
+
+        # Apply each configuration option
+        options.each do |key, value|
+          set_pragma(key, value)
+        end
+      end
+
       # Check if table exists
       #
       # @param table_name [Symbol, String] Name of the table
