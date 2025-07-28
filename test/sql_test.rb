@@ -30,102 +30,91 @@ class SqlTest < SequelDuckDBTest::TestCase
   end
 
   def test_select_with_multiple_where_conditions
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(name: "John").where { age > 25 }
 
     # SELECT with multiple WHERE conditions
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users WHERE ((name = 'John') AND (age > 25))"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE ((name = 'John') AND (age > 25))"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_or_conditions
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(Sequel.|({ name: "John" }, { name: "Jane" }))
 
     # SELECT with OR conditions
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users WHERE ((name = 'John') OR (name = 'Jane'))"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE ((name = 'John') OR (name = 'Jane'))"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_order_by
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).order(:name)
 
     # SELECT with ORDER BY
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users ORDER BY name"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users ORDER BY name"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_order_by_desc
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).order(Sequel.desc(:name))
 
     # SELECT with ORDER BY DESC
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users ORDER BY name DESC"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users ORDER BY name DESC"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_multiple_order_columns
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).order(:name, Sequel.desc(:age))
 
     # SELECT with multiple ORDER BY columns
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users ORDER BY name, age DESC"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users ORDER BY name, age DESC"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_limit
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).limit(10)
 
     # SELECT with LIMIT
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users LIMIT 10"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users LIMIT 10"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_limit_and_offset
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).limit(10, 20)
 
     # SELECT with LIMIT and OFFSET
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users LIMIT 10 OFFSET 20"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users LIMIT 10 OFFSET 20"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_group_by
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, Sequel.function(:count, :*)).group(:name)
 
     # SELECT with GROUP BY
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT name, COUNT(*) FROM users GROUP BY name"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, count(*) FROM users GROUP BY name"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_having
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, Sequel.function(:count, :*)).group(:name).having { count(:*) > 1 }
 
     # SELECT with HAVING
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT name, COUNT(*) FROM users GROUP BY name HAVING (COUNT(*) > 1)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, count(*) FROM users GROUP BY name HAVING (count(*) > 1)"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_join
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).join(:profiles, user_id: :id)
 
     # SELECT with JOIN
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id)"
+    assert_sql expected_sql, dataset
   end
 
   def test_select_with_left_join
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).left_join(:profiles, user_id: :id)
 
     # SELECT with LEFT JOIN
-    # This will be implemented when SQL generation methods are added
-    # Expected: "SELECT * FROM users LEFT JOIN profiles ON (profiles.user_id = users.id)"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users LEFT JOIN profiles ON (profiles.user_id = users.id)"
+    assert_sql expected_sql, dataset
   end
 
   def test_insert_sql_generation
@@ -140,10 +129,21 @@ class SqlTest < SequelDuckDBTest::TestCase
   def test_insert_sql_with_multiple_values
     dataset = mock_dataset(:users)
 
-    # INSERT with multiple value sets
-    # This will be implemented when SQL generation methods are added
-    # Expected: "INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)"
-    assert_instance_of Sequel::Dataset, dataset
+    # INSERT with multiple value sets - test the SQL generation for multi_insert
+    columns = %i[name age]
+    values = [["John", 30], ["Jane", 25]]
+
+    # For multi_insert, we test that it generates proper INSERT statements
+    sql_statements = dataset.multi_insert_sql(columns, values)
+
+    # Verify that we get SQL statements for inserting the data
+    assert_kind_of Array, sql_statements
+    assert sql_statements.length > 0, "Should generate at least one SQL statement"
+
+    # Each statement should be an INSERT statement
+    sql_statements.each do |sql|
+      assert_match(/^INSERT INTO users/, sql, "Each statement should be an INSERT")
+    end
   end
 
   def test_update_sql_generation
@@ -183,118 +183,124 @@ class SqlTest < SequelDuckDBTest::TestCase
   end
 
   def test_string_literal_escaping
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(name: "John's Name")
 
-    # Test string literal escaping
-    # This will be implemented when literal methods are added
-    # Should properly escape single quotes and other special characters
-    assert_instance_of Sequel::Dataset, dataset
+    # Test string literal escaping - should properly escape single quotes
+    expected_sql = "SELECT * FROM users WHERE (name = 'John''s Name')"
+    assert_sql expected_sql, dataset
   end
 
   def test_identifier_quoting
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, :order)
 
     # Test identifier quoting for reserved words and special characters
-    # This will be implemented when identifier quoting is added
-    assert_instance_of Sequel::Dataset, dataset
+    # DuckDB should quote reserved words like 'order'
+    expected_sql = "SELECT name, \"order\" FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_date_literal_formatting
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(birth_date: Date.new(2023, 5, 15))
 
-    # Test date literal formatting
-    # This will be implemented when date literal methods are added
-    # Expected format for DuckDB date literals
-    assert_instance_of Sequel::Dataset, dataset
+    # Test date literal formatting - DuckDB uses string format for dates
+    expected_sql = "SELECT * FROM users WHERE (birth_date = '2023-05-15')"
+    assert_sql expected_sql, dataset
   end
 
   def test_datetime_literal_formatting
-    dataset = mock_dataset(:users)
+    datetime = Time.new(2023, 5, 15, 14, 30, 0)
+    dataset = mock_dataset(:users).where(created_at: datetime)
 
-    # Test datetime literal formatting
-    # This will be implemented when datetime literal methods are added
-    # Expected format for DuckDB timestamp literals
-    assert_instance_of Sequel::Dataset, dataset
+    # Test datetime literal formatting - DuckDB uses string format for timestamps
+    expected_sql = "SELECT * FROM users WHERE (created_at = '2023-05-15 14:30:00')"
+    assert_sql expected_sql, dataset
   end
 
   def test_boolean_literal_formatting
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(active: true)
 
-    # Test boolean literal formatting
-    # This will be implemented when boolean literal methods are added
-    # Expected: TRUE/FALSE for DuckDB
-    assert_instance_of Sequel::Dataset, dataset
+    # Test boolean literal formatting - DuckDB uses IS TRUE for boolean comparisons
+    expected_sql = "SELECT * FROM users WHERE (active IS TRUE)"
+    assert_sql expected_sql, dataset
   end
 
   def test_null_literal_formatting
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(deleted_at: nil)
 
     # Test NULL literal formatting
-    # This will be implemented when NULL handling is added
-    # Expected: NULL
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE (deleted_at IS NULL)"
+    assert_sql expected_sql, dataset
   end
 
   def test_numeric_literal_formatting
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).where(age: 25, score: 85.5)
 
     # Test numeric literal formatting (integers, floats)
-    # This will be implemented when numeric literal methods are added
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE ((age = 25) AND (score = 85.5))"
+    assert_sql expected_sql, dataset
   end
 
   def test_subquery_generation
-    dataset = mock_dataset(:users)
+    subquery = mock_dataset(:profiles).select(:user_id)
+    dataset = mock_dataset(:users).where(id: subquery)
 
     # Test subquery generation
-    # This will be implemented when subquery support is added
-    # Expected: "SELECT * FROM users WHERE (id IN (SELECT user_id FROM profiles))"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT * FROM users WHERE (id IN (SELECT user_id FROM profiles))"
+    assert_sql expected_sql, dataset
   end
 
   def test_complex_query_generation
     dataset = mock_dataset(:users)
+              .select(:name, Sequel.function(:count, :*).as(:order_count))
+              .join(:orders, user_id: :id)
+              .where { created_at > Date.today - 30 }
+              .group(:name)
+              .having { count(:*) > 5 }
+              .order(Sequel.desc(:order_count))
+              .limit(10)
 
     # Test complex query with multiple clauses
-    # This will be implemented when all SQL generation methods are added
-    # Expected: Complex SELECT with JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, count(*) AS order_count FROM users INNER JOIN orders ON (orders.user_id = users.id) WHERE (created_at > '#{Date.today - 30}') GROUP BY name HAVING (count(*) > 5) ORDER BY order_count DESC LIMIT 10"
+    assert_sql expected_sql, dataset
   end
 
   def test_window_function_support
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(:name, Sequel.function(:row_number).over(order: :name))
 
     # Test window function generation (DuckDB supports window functions)
-    # This will be implemented when window function support is added
-    # Expected: "SELECT name, ROW_NUMBER() OVER (ORDER BY name) FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT name, row_number() OVER (ORDER BY name) FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_cte_support
-    dataset = mock_dataset(:users)
+    cte = mock_dataset(:users).select(:id, :name).where { age > 18 }
+    dataset = mock_dataset.with(:adults, cte).from(:adults)
 
     # Test Common Table Expression (CTE) support
-    # This will be implemented when CTE support is added
-    # Expected: "WITH user_stats AS (SELECT ...) SELECT * FROM user_stats"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "WITH adults AS (SELECT id, name FROM users WHERE (age > 18)) SELECT * FROM adults"
+    assert_sql expected_sql, dataset
   end
 
   def test_case_expression_generation
-    dataset = mock_dataset(:users)
+    case_expr = Sequel.case({ { age: (18..65) } => "adult" }, "other")
+    dataset = mock_dataset(:users).select(:name, case_expr.as(:category))
 
-    # Test CASE expression generation
-    # This will be implemented when CASE expression support is added
-    # Expected: "SELECT CASE WHEN age > 18 THEN 'adult' ELSE 'minor' END FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    # Test CASE expression generation - DuckDB wraps CASE in parentheses
+    expected_sql = "SELECT name, (CASE WHEN ((age >= 18) AND (age <= 65)) THEN 'adult' ELSE 'other' END) AS category FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_aggregate_function_generation
-    dataset = mock_dataset(:users)
+    dataset = mock_dataset(:users).select(
+      Sequel.function(:count, :*).as(:total_count),
+      Sequel.function(:avg, :age).as(:avg_age),
+      Sequel.function(:max, :age).as(:max_age),
+      Sequel.function(:min, :age).as(:min_age)
+    )
 
     # Test aggregate function generation
-    # This will be implemented when aggregate function support is added
-    # Expected: "SELECT COUNT(*), AVG(age), MAX(age), MIN(age) FROM users"
-    assert_instance_of Sequel::Dataset, dataset
+    expected_sql = "SELECT count(*) AS total_count, avg(age) AS avg_age, max(age) AS max_age, min(age) AS min_age FROM users"
+    assert_sql expected_sql, dataset
   end
 
   def test_sql_syntax_validation_with_real_database
@@ -308,7 +314,7 @@ class SqlTest < SequelDuckDBTest::TestCase
     end
 
     assert_nothing_raised("INSERT should work") do
-      db[:test_table].insert(name: "Test User", age: 25)
+      db[:test_table].insert(id: 1, name: "Test User", age: 25)
     end
 
     assert_nothing_raised("UPDATE should work") do
@@ -467,12 +473,94 @@ class SqlTest < SequelDuckDBTest::TestCase
   end
 
   def test_literal_string_with_parameters_not_supported
-    # Note: LiteralString doesn't support parameterized queries by design
+    # NOTE: LiteralString doesn't support parameterized queries by design
     # This test documents the expected behavior
     dataset = mock_dataset(:users).where(Sequel.lit("age > 18"))
 
     # Parameters in LiteralString are not processed - they're literal
     expected_sql = "SELECT * FROM users WHERE (age > 18)"
+    assert_sql expected_sql, dataset
+  end
+
+  # LIKE clause SQL generation tests (Requirements 1.1, 1.2, 1.3, 1.4)
+  def test_like_clause_sql_generation
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "%John%"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE '%John%')"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_not_like_clause_sql_generation
+    dataset = mock_dataset(:users).exclude(Sequel.like(:name, "%John%"))
+    expected_sql = "SELECT * FROM users WHERE (name NOT LIKE '%John%')"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_ilike_clause_sql_generation
+    dataset = mock_dataset(:users).where(Sequel.ilike(:name, "%john%"))
+    expected_sql = "SELECT * FROM users WHERE (UPPER(name) LIKE UPPER('%john%'))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_not_ilike_clause_sql_generation
+    dataset = mock_dataset(:users).exclude(Sequel.ilike(:name, "%john%"))
+    expected_sql = "SELECT * FROM users WHERE (UPPER(name) NOT LIKE UPPER('%john%'))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_like_with_various_patterns
+    # Test with prefix pattern
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "John%"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE 'John%')"
+    assert_sql expected_sql, dataset
+
+    # Test with suffix pattern
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "%Doe"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE '%Doe')"
+    assert_sql expected_sql, dataset
+
+    # Test with exact match
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "John Doe"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE 'John Doe')"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_like_with_special_characters
+    # Test with underscore (single character wildcard)
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "J_hn"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE 'J_hn')"
+    assert_sql expected_sql, dataset
+
+    # Test with mixed wildcards
+    dataset = mock_dataset(:users).where(Sequel.like(:name, "%J_hn%"))
+    expected_sql = "SELECT * FROM users WHERE (name LIKE '%J_hn%')"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_like_in_complex_conditions
+    dataset = mock_dataset(:users).where(
+      Sequel.like(:name, "%John%") & (Sequel[:age] > 25)
+    )
+    expected_sql = "SELECT * FROM users WHERE ((name LIKE '%John%') AND (age > 25))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_like_with_or_conditions
+    dataset = mock_dataset(:users).where(
+      Sequel.like(:name, "%John%") | Sequel.like(:email, "%@example.com")
+    )
+    expected_sql = "SELECT * FROM users WHERE ((name LIKE '%John%') OR (email LIKE '%@example.com'))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regex_expression_sql_generation
+    dataset = mock_dataset(:users).where(name: /^John/)
+    expected_sql = "SELECT * FROM users WHERE (regexp_matches(name, '^John'))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regex_with_complex_pattern
+    dataset = mock_dataset(:users).where(name: /^John.*Doe$/)
+    expected_sql = "SELECT * FROM users WHERE (regexp_matches(name, '^John.*Doe$'))"
     assert_sql expected_sql, dataset
   end
 

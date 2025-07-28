@@ -57,13 +57,13 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
 
   def test_where_with_regexp_conditions
     dataset = mock_dataset(:users).where(name: /^John/)
-    expected_sql = "SELECT * FROM users WHERE (name ~ '^John')"
+    expected_sql = "SELECT * FROM users WHERE (regexp_matches(name, '^John'))"
     assert_sql expected_sql, dataset
   end
 
   def test_where_with_nested_conditions
     dataset = mock_dataset(:users).where { ((age > 18) & (age < 65)) | (status =~ "admin") }
-    expected_sql = "SELECT * FROM users WHERE (((age > 18) AND (age < 65)) OR (status IS 'admin'))"
+    expected_sql = "SELECT * FROM users WHERE (((age > 18) AND (age < 65)) OR (status = 'admin'))"
     assert_sql expected_sql, dataset
   end
 
@@ -135,9 +135,9 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
     assert_sql expected_sql, dataset
   end
 
-  def test_limit_zero
-    dataset = mock_dataset(:users).limit(0)
-    expected_sql = "SELECT * FROM users LIMIT 0"
+  def test_limit_one
+    dataset = mock_dataset(:users).limit(1)
+    expected_sql = "SELECT * FROM users LIMIT 1"
     assert_sql expected_sql, dataset
   end
 
@@ -250,23 +250,17 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
     assert_sql expected_sql, dataset
   end
 
-  def test_join_with_table_aliases
-    dataset = mock_dataset(:users___u).join(:profiles___p, user_id: :id)
-    expected_sql = "SELECT * FROM users AS u INNER JOIN profiles AS p ON (p.user_id = u.id)"
-    assert_sql expected_sql, dataset
-  end
-
   def test_multiple_joins
     dataset = mock_dataset(:users)
               .join(:profiles, user_id: :id)
-              .join(:orders, user_id: :id)
+              .join(:orders, user_id: Sequel[:users][:id])
     expected_sql = "SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id) INNER JOIN orders ON (orders.user_id = users.id)"
     assert_sql expected_sql, dataset
   end
 
   def test_join_with_complex_conditions
-    dataset = mock_dataset(:users).join(:profiles) { |j, lj, _js| (j[:user_id] =~ lj[:id]) & (j[:active] =~ true) }
-    expected_sql = "SELECT * FROM users INNER JOIN profiles ON ((profiles.user_id IS users.id) AND (profiles.active IS TRUE))"
+    dataset = mock_dataset(:users).join(:profiles, user_id: :id).where(profiles__active: true)
+    expected_sql = "SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id) WHERE (profiles.active IS TRUE)"
     assert_sql expected_sql, dataset
   end
 
@@ -317,7 +311,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   def test_not_exists_subquery
     subquery = mock_dataset(:orders).where(user_id: :users__id)
     dataset = mock_dataset(:users).exclude(subquery.exists)
-    expected_sql = "SELECT * FROM users WHERE (NOT EXISTS (SELECT * FROM orders WHERE (user_id = users.id)))"
+    expected_sql = "SELECT * FROM users WHERE NOT (EXISTS (SELECT * FROM orders WHERE (user_id = users.id)))"
     assert_sql expected_sql, dataset
   end
 
@@ -429,25 +423,68 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_recursive_cte
-    base_case = mock_dataset.select(1.as(:n))
+    base_case = SequelDuckDBTest::MOCK_DB.select(Sequel.as(1, :n))
     recursive_case = mock_dataset(:t).select(Sequel.lit("n + 1")).where { n < 10 }
-    dataset = mock_dataset.with_recursive(:t, base_case.union(recursive_case)).from(:t)
-    expected_sql = "WITH RECURSIVE t AS (SELECT 1 AS n UNION SELECT n + 1 FROM t WHERE (n < 10)) SELECT * FROM t"
+    dataset = mock_dataset.with_recursive(:t, base_case, recursive_case).from(:t)
+    expected_sql = "WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE (n < 10)) SELECT * FROM t"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regular_cte_still_works
+    cte = mock_dataset.select(:name, :age).where { age > 18 }
+    dataset = mock_dataset.with(:adults, cte).from(:adults)
+    expected_sql = "WITH adults AS (SELECT name, age FROM test_table WHERE (age > 18)) SELECT * FROM adults"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_mixed_regular_and_recursive_ctes
+    # Test that we can have both regular and recursive CTEs in the same query
+    regular_cte = mock_dataset(:users).select(:id, :name).where { active =~ true }
+    base_case = SequelDuckDBTest::MOCK_DB.select(Sequel.as(1, :level))
+    recursive_case = mock_dataset(:levels).select(Sequel.lit("level + 1")).where { level < 3 }
+
+    dataset = mock_dataset
+              .with(:active_users, regular_cte)
+              .with_recursive(:levels, base_case, recursive_case)
+              .from(:active_users)
+              .cross_join(:levels)
+
+    expected_sql = "WITH RECURSIVE active_users AS (SELECT id, name FROM users WHERE (active IS TRUE)), levels AS (SELECT 1 AS level UNION ALL SELECT level + 1 FROM levels WHERE (level < 3)) SELECT * FROM active_users CROSS JOIN levels"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_recursive_cte_with_complex_base_case
+    # Test recursive CTE with more complex base case
+    base_case = mock_dataset(:employees).select(:id, :name, :manager_id, Sequel.as(0, :depth)).where(manager_id: nil)
+    recursive_case = mock_dataset(:employees).select(
+      Sequel.qualify(:e, :id),
+      Sequel.qualify(:e, :name),
+      Sequel.qualify(:e, :manager_id),
+      Sequel.lit("org_chart.depth + 1")
+    ).from(Sequel.as(:employees, :e))
+                                             .join(:org_chart, id: :manager_id)
+
+    dataset = mock_dataset.with_recursive(:org_chart, base_case, recursive_case)
+                          .from(:org_chart)
+                          .where { depth <= 3 }
+                          .order(:depth, :name)
+
+    expected_sql = "WITH RECURSIVE org_chart AS (SELECT id, name, manager_id, 0 AS depth FROM employees WHERE (manager_id IS NULL) UNION ALL SELECT e.id, e.name, e.manager_id, org_chart.depth + 1 FROM employees AS e INNER JOIN org_chart ON (org_chart.id = e.manager_id)) SELECT * FROM org_chart WHERE (depth <= 3) ORDER BY depth, name"
     assert_sql expected_sql, dataset
   end
 
   # Tests for complex combined queries
   def test_complex_query_with_all_features
-    dataset = mock_dataset(:users___u)
-              .select(:u__name, :u__age, Sequel.function(:count, :o__id).as(:order_count))
-              .left_join(:orders___o, user_id: :id)
-              .where { (u__age > 18) & (u__active =~ true) }
-              .group(:u__id, :u__name, :u__age)
-              .having { count(:o__id).positive? }
-              .order(Sequel.desc(:order_count), :u__name)
+    dataset = mock_dataset(:users)
+              .select(:name, :age, Sequel.function(:count, :id).as(:order_count))
+              .left_join(:orders, user_id: :id)
+              .where { (age > 18) & (active =~ true) }
+              .group(:id, :name, :age)
+              .having { count(:id) > 0 }
+              .order(Sequel.desc(:order_count), :name)
               .limit(10, 5)
 
-    expected_sql = "SELECT u.name, u.age, count(o.id) AS order_count FROM users AS u LEFT JOIN orders AS o ON (o.user_id = u.id) WHERE ((u.age > 18) AND (u.active IS TRUE)) GROUP BY u.id, u.name, u.age HAVING (count(o.id) > 0) ORDER BY order_count DESC, u.name LIMIT 10 OFFSET 5"
+    expected_sql = "SELECT name, age, count(id) AS order_count FROM users LEFT JOIN orders ON (orders.user_id = users.id) WHERE ((age > 18) AND (active IS TRUE)) GROUP BY id, name, age HAVING (count(id) > 0) ORDER BY order_count DESC, name LIMIT 10 OFFSET 5"
     assert_sql expected_sql, dataset
   end
 

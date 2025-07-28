@@ -7,10 +7,11 @@ This document provides comprehensive API documentation for the Sequel DuckDB ada
 1. [Version Compatibility](#version-compatibility)
 2. [Database Class API](#database-class-api)
 3. [Dataset Class API](#dataset-class-api)
-4. [Configuration Options](#configuration-options)
-5. [Error Handling](#error-handling)
-6. [Data Type Mappings](#data-type-mappings)
-7. [Performance Tuning](#performance-tuning)
+4. [SQL Generation Patterns](#sql-generation-patterns)
+5. [Configuration Options](#configuration-options)
+6. [Error Handling](#error-handling)
+7. [Data Type Mappings](#data-type-mappings)
+8. [Performance Tuning](#performance-tuning)
 
 ## Version Compatibility
 
@@ -661,6 +662,50 @@ db.with_recursive(:category_tree,
   db[:categories].join(:category_tree, parent_id: :id)
 ).from(:category_tree)
 ```
+
+## SQL Generation Patterns
+
+The sequel-duckdb adapter generates SQL optimized for DuckDB's analytical capabilities while maintaining compatibility with Sequel conventions. Understanding these patterns helps developers write efficient queries and troubleshoot issues.
+
+### Key SQL Pattern Features
+
+- **Clean LIKE clauses** without unnecessary ESCAPE clauses
+- **ILIKE conversion** to UPPER() LIKE UPPER() for case-insensitive matching
+- **Regex support** using DuckDB's regexp_matches() function
+- **Qualified column references** using standard dot notation
+- **Automatic recursive CTE detection** for WITH RECURSIVE syntax
+- **Proper expression parentheses** for correct operator precedence
+
+### Quick Reference
+
+```ruby
+# LIKE patterns (clean syntax)
+dataset.where(Sequel.like(:name, "%John%"))
+# SQL: SELECT * FROM users WHERE (name LIKE '%John%')
+
+# ILIKE patterns (case-insensitive)
+dataset.where(Sequel.ilike(:name, "%john%"))
+# SQL: SELECT * FROM users WHERE (UPPER(name) LIKE UPPER('%john%'))
+
+# Regex patterns
+dataset.where(name: /^John/)
+# SQL: SELECT * FROM users WHERE (regexp_matches(name, '^John'))
+
+# Qualified column references
+dataset.join(:profiles, user_id: :id)
+# SQL: SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id)
+
+# Recursive CTEs (auto-detected)
+base_case = db.select(Sequel.as(1, :n))
+recursive_case = db[:t].select(Sequel.lit("n + 1")).where { n < 10 }
+combined = base_case.union(recursive_case, all: true)
+dataset.with(:t, combined).from(:t)
+# SQL: WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE (n < 10)) SELECT * FROM t
+```
+
+### Detailed Documentation
+
+For comprehensive documentation of all SQL patterns, including design decisions and troubleshooting tips, see [DUCKDB_SQL_PATTERNS.md](DUCKDB_SQL_PATTERNS.md).
 
 ## Configuration Options
 

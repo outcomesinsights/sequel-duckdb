@@ -119,7 +119,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
         Integer :id, primary_key: true
         BigDecimal :price, size: [10, 2]
         Date :birth_date
-        Time :wake_time
+        column :wake_time, :time # Explicitly use :time type
         column :data, :blob
       end
 
@@ -340,7 +340,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
       logger = create_sql_logger("UPDATE")
       @db.loggers << logger
 
-      user.save
+      user.save_changes
 
       # Verify UPDATE SQL only includes changed fields
       update_sql = logger.captured_sql

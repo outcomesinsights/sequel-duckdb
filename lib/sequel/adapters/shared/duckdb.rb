@@ -487,7 +487,16 @@ module Sequel
           actual_table_name = table_name
         end
 
-        schema_parse_table(actual_table_name, opts)
+        # Cache schema information for type conversion
+        schema_info = schema_parse_table(actual_table_name, opts)
+        @schema_cache ||= {}
+        @schema_cache[actual_table_name] = {}
+
+        schema_info.each do |column_name, column_info|
+          @schema_cache[actual_table_name][column_name] = column_info
+        end
+
+        schema_info
       end
 
       # Get index information for a table
@@ -1147,6 +1156,54 @@ module Sequel
       rescue StandardError
         4 # Default fallback
       end
+
+      # Type conversion methods for DuckDB-specific handling
+
+      # Convert DuckDB TIME values to Ruby time-only objects
+      # DuckDB TIME columns should only contain time-of-day information
+      def typecast_value_time(value)
+        case value
+        when Time
+          # Extract only the time portion, discarding date information
+          # Create a new Time object with today's date but the original time
+          Time.local(1970, 1, 1, value.hour, value.min, value.sec, value.usec)
+        when String
+          # Parse time string and create time-only object
+          if value =~ /\A(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?\z/
+            hour = ::Regexp.last_match(1).to_i
+            min = ::Regexp.last_match(2).to_i
+            sec = ::Regexp.last_match(3).to_i
+            usec = (::Regexp.last_match(4) || "0").ljust(6, "0").to_i
+            Time.local(1970, 1, 1, hour, min, sec, usec)
+          else
+            # Fallback: parse as time and extract time portion
+            parsed = Time.parse(value.to_s)
+            Time.local(1970, 1, 1, parsed.hour, parsed.min, parsed.sec, parsed.usec)
+          end
+        else
+          value
+        end
+      end
+
+      # Override the default type conversion to use our custom TIME handling
+      # This method needs to be public for Sequel models to access it
+      public
+
+      def typecast_value(column, value)
+        return value if value.nil?
+
+        # Get column schema information to determine the correct type
+        if @schema_cache && @schema_cache[column]
+          column_type = @schema_cache[column][:type]
+          case column_type
+          when :time
+            return typecast_value_time(value)
+          end
+        end
+
+        # Fall back to default Sequel type conversion
+        super
+      end
     end
 
     # DatasetMethods module provides shared dataset functionality for DuckDB adapter
@@ -1247,13 +1304,28 @@ module Sequel
         true
       end
 
+      def supports_join_using?
+        true
+      end
+
       def quote_identifiers_default
         false
       end
 
-      # Override identifier quoting to avoid uppercase conversion
+      # Override identifier quoting to avoid uppercase conversion and handle qualified identifiers
       def quote_identifier_append(sql, name)
         name_str = name.to_s
+
+        # Handle qualified identifiers (table__column format) - convert to table.column
+        if name_str.include?("__")
+          parts = name_str.split("__", 2)
+          if parts.length == 2
+            table_part, column_part = parts
+            sql << "#{quote_identifier(table_part)}.#{quote_identifier(column_part)}"
+            return
+          end
+        end
+
         # Special case for * (used in count(*), etc.)
         sql << if name_str == "*"
                  "*"
@@ -1263,6 +1335,17 @@ module Sequel
                else
                  "\"#{name_str}\""
                end
+      end
+
+      # Validate table name for SELECT operations
+      def validate_table_name_for_select
+        return unless @opts[:from] # Skip if no FROM clause
+
+        @opts[:from].each do |table|
+          if table.nil? || (table.respond_to?(:to_s) && table.to_s.strip.empty?)
+            raise ArgumentError, "Table name cannot be nil or empty"
+          end
+        end
       end
 
       # Check if a word is a SQL reserved word that needs quoting
@@ -1285,6 +1368,47 @@ module Sequel
       end
 
       private
+
+      # Override the WITH clause generation to support RECURSIVE keyword
+      def select_with_sql(sql)
+        return unless opts[:with]
+
+        # Check if any WITH clause is recursive (either explicitly marked or auto-detected)
+        has_recursive = opts[:with].any? { |w| w[:recursive] || cte_is_recursive?(w) }
+
+        # Add WITH or WITH RECURSIVE prefix
+        sql << (has_recursive ? "WITH RECURSIVE " : "WITH ")
+
+        # Add each CTE
+        opts[:with].each_with_index do |w, i|
+          sql << ", " if i > 0
+          sql << "#{quote_identifier(w[:name])} AS (#{w[:dataset].sql})"
+        end
+
+        sql << " "
+      end
+
+      private
+
+      # Auto-detect if a CTE is recursive by analyzing its SQL for self-references
+      #
+      # @param cte_info [Hash] CTE information hash with :name and :dataset
+      # @return [Boolean] true if the CTE appears to be recursive
+      def cte_is_recursive?(cte_info)
+        return false unless cte_info[:dataset]
+
+        cte_name = cte_info[:name].to_s
+        cte_sql = cte_info[:dataset].sql
+
+        # Check if the CTE SQL contains references to its own name
+        # Look for patterns like "FROM table_name" or "JOIN table_name"
+        # Use word boundaries to avoid false positives with partial matches
+        recursive_pattern = /\b(?:FROM|JOIN)\s+#{Regexp.escape(cte_name)}\b/i
+
+        cte_sql.match?(recursive_pattern)
+      end
+
+      public
 
       # Add JOIN clauses to SQL (Requirement 6.9)
       def select_join_sql(sql)
@@ -1346,7 +1470,18 @@ module Sequel
                           end
 
             sql << " #{join_clause} "
-            sql << literal(table)
+
+            # Handle table with alias
+            if table.is_a?(Sequel::Dataset)
+              # Subquery with alias
+              sql << "(#{table.sql})"
+              sql << " AS #{quote_identifier(join.table_alias)}" if join.table_alias
+            else
+              # Regular table (may have alias)
+              sql << literal(table)
+              # Add alias if present
+              sql << " AS #{quote_identifier(join.table_alias)}" if join.table_alias
+            end
 
             sql << " USING (#{Array(using_columns).map { |col| quote_identifier(col) }.join(", ")})" if using_columns
 
@@ -1450,19 +1585,65 @@ module Sequel
 
       def complex_expression_sql_append(sql, op, args)
         case op
+        when :LIKE
+          # Generate clean LIKE without ESCAPE clause (Requirement 1.1)
+          sql << "("
+          literal_append(sql, args.first)
+          sql << " LIKE "
+          literal_append(sql, args.last)
+          sql << ")"
+        when :"NOT LIKE"
+          # Generate clean NOT LIKE without ESCAPE clause (Requirement 1.1)
+          sql << "("
+          literal_append(sql, args.first)
+          sql << " NOT LIKE "
+          literal_append(sql, args.last)
+          sql << ")"
         when :ILIKE
-          # DuckDB doesn't have ILIKE, use UPPER() workaround
-          sql << "UPPER("
+          # DuckDB doesn't have ILIKE, use UPPER() workaround with proper parentheses (Requirement 1.3)
+          sql << "(UPPER("
           literal_append(sql, args.first)
           sql << ") LIKE UPPER("
           literal_append(sql, args.last)
-          sql << ")"
-        when :~
-          # Regular expression matching for DuckDB
+          sql << "))"
+        when :"NOT ILIKE"
+          # Generate clean NOT ILIKE without ESCAPE clause (Requirement 1.3)
+          sql << "(UPPER("
           literal_append(sql, args.first)
-          sql << " ~ "
+          sql << ") NOT LIKE UPPER("
           literal_append(sql, args.last)
+          sql << "))"
+        when :~
+          # Regular expression matching for DuckDB with proper parentheses (Requirement 4.1, 4.3)
+          # DuckDB's ~ operator has limitations with anchors, so we use regexp_matches for reliability
+          sql << "(regexp_matches("
+          literal_append(sql, args.first)
+          sql << ", "
+          literal_append(sql, args.last)
+          sql << "))"
+        when :"~*"
+          # Case-insensitive regular expression matching for DuckDB (Requirement 4.2)
+          # Use regexp_matches with case-insensitive flag
+          sql << "(regexp_matches("
+          literal_append(sql, args.first)
+          sql << ", "
+          literal_append(sql, args.last)
+          sql << ", 'i'))"
         else
+          super
+        end
+      end
+
+      # Override join method to support USING clause syntax
+      def join(table, expr = nil, options = {})
+        # Handle the case where using parameter is passed
+        if options.is_a?(Hash) && options[:using]
+          using_columns = Array(options[:using])
+          join_type = options[:type] || :inner
+          join_clause = Sequel::SQL::JoinUsingClause.new(using_columns, join_type, table)
+          clone(join: (@opts[:join] || []) + [join_clause])
+        else
+          # Fall back to standard Sequel join behavior
           super
         end
       end
@@ -1508,6 +1689,9 @@ module Sequel
       public
 
       def sql
+        # Validate table name for SELECT operations
+        validate_table_name_for_select
+
         if @opts[:compound]
           compound_dataset_sql
         else
@@ -1548,7 +1732,14 @@ module Sequel
       def literal_append(sql, v)
         case v
         when Time
-          literal_datetime_append(sql, v)
+          # Check if this looks like a time-only value (year 1970 indicates time-only)
+          if v.year == 1970 && v.month == 1 && v.day == 1
+            # This is a time-only value, use TIME format
+            sql << "'#{v.strftime("%H:%M:%S")}'"
+          else
+            # This is a full datetime value
+            literal_datetime_append(sql, v)
+          end
         when DateTime
           literal_datetime_append(sql, v)
         when String
@@ -1599,26 +1790,15 @@ module Sequel
         value || 0
       end
 
-      # Get the first record from the dataset
-      #
-      # @return [Hash, nil] First record as hash or nil if no records
-      def first
-        # Use LIMIT 1 and fetch the first row
-        record = nil
-        clone(limit: 1).fetch_rows(select_sql) do |row|
-          record = row
-          break
-        end
-        record
-      end
-
-      # Get all records from the dataset
-      #
-      # @return [Array<Hash>] Array of all records as hashes
+      # Override all method to ensure proper model instantiation
+      # Sequel's default all method doesn't always apply row_proc correctly
       def all
         records = []
         fetch_rows(select_sql) do |row|
-          records << row
+          # Apply row_proc if it exists (for model instantiation)
+          row_proc = @row_proc || opts[:row_proc]
+          processed_row = row_proc ? row_proc.call(row) : row
+          records << processed_row
         end
         records
       end
@@ -1687,12 +1867,62 @@ module Sequel
         # Use streaming approach to avoid loading all results into memory at once
         # This is particularly important for large result sets
         if block_given?
-          db.execute(sql, &block)
+          # Get schema information for type conversion
+          table_schema = get_table_schema_for_conversion
+
+          # Execute with type conversion
+          db.execute(sql) do |row|
+            # Apply type conversion for TIME columns
+            converted_row = convert_row_types(row, table_schema)
+            yield converted_row
+          end
         else
           # Return enumerator if no block given (for compatibility)
           enum_for(:fetch_rows, sql)
         end
       end
+
+      private
+
+      # Get table schema information for type conversion
+      def get_table_schema_for_conversion
+        return nil unless @opts[:from] && @opts[:from].first
+
+        table_name = @opts[:from].first
+        # Handle case where table name is wrapped in an identifier
+        table_name = table_name.value if table_name.respond_to?(:value)
+
+        begin
+          schema_info = db.schema(table_name)
+          schema_hash = {}
+          schema_info.each do |column_name, column_info|
+            schema_hash[column_name] = column_info
+          end
+          schema_hash
+        rescue StandardError
+          # If schema lookup fails, return nil to skip type conversion
+          nil
+        end
+      end
+
+      # Convert row values based on column types
+      def convert_row_types(row, table_schema)
+        return row unless table_schema
+
+        converted_row = {}
+        row.each do |column_name, value|
+          column_info = table_schema[column_name]
+          converted_row[column_name] = if column_info && column_info[:type] == :time && value.is_a?(Time)
+                                         # Convert TIME columns to time-only values
+                                         Time.local(1970, 1, 1, value.hour, value.min, value.sec, value.usec)
+                                       else
+                                         value
+                                       end
+        end
+        converted_row
+      end
+
+      public
 
       # Enhanced bulk insert optimization (Requirement 9.3)
       # Override multi_insert to use DuckDB's efficient bulk loading capabilities

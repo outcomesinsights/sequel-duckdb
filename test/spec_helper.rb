@@ -14,6 +14,8 @@ require_relative "../lib/sequel/adapters/duckdb"
 module SequelDuckDBTest
   # Mock database for SQL generation testing (no actual database connection)
   MOCK_DB = Sequel.mock(host: "duckdb", quote_identifiers: false)
+
+  # Extend all datasets created by this mock database to include DuckDB methods
   MOCK_DB.extend_datasets do
     include Sequel::DuckDB::DatasetMethods
   end
@@ -38,7 +40,10 @@ module SequelDuckDBTest
 
     # Helper method to create a mock dataset for SQL generation testing
     def mock_dataset(table_name = :test_table)
-      MOCK_DB[table_name]
+      dataset = MOCK_DB[table_name]
+      # Ensure the dataset includes our DuckDB DatasetMethods
+      dataset.extend(Sequel::DuckDB::DatasetMethods) unless dataset.is_a?(Sequel::DuckDB::DatasetMethods)
+      dataset
     end
 
     # Helper method to create an in-memory database for integration testing

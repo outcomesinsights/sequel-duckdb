@@ -769,9 +769,239 @@ class DatasetTest < SequelDuckDBTest::TestCase
     end
   end
 
+  # LIKE clause integration tests (Requirements 1.1, 1.2, 1.3, 1.4)
+  def test_like_functionality_integration
+    db = create_db
+    db.create_table(:like_test_users) do
+      Integer :id, primary_key: true
+      String :name, null: false
+      String :email
+    end
+
+    # Insert test data
+    db[:like_test_users].insert(id: 1, name: "John Doe", email: "john@example.com")
+    db[:like_test_users].insert(id: 2, name: "Jane Smith", email: "jane@test.org")
+    db[:like_test_users].insert(id: 3, name: "Johnny Walker", email: "johnny@example.com")
+    db[:like_test_users].insert(id: 4, name: "Bob Johnson", email: "bob@company.net")
+
+    # Test basic LIKE functionality
+    results = db[:like_test_users].where(Sequel.like(:name, "John%")).all
+    assert_equal 2, results.length
+    names = results.map { |r| r[:name] }.sort
+    assert_equal ["John Doe", "Johnny Walker"], names
+
+    # Test LIKE with suffix patterns
+    results = db[:like_test_users].where(Sequel.like(:email, "%@example.com")).all
+    assert_equal 2, results.length
+
+    # Test NOT LIKE functionality
+    results = db[:like_test_users].exclude(Sequel.like(:name, "%John%")).all
+    assert_equal 1, results.length
+    assert_equal "Jane Smith", results.first[:name]
+
+    db.disconnect
+  end
+
+  def test_ilike_functionality_integration
+    db = create_db
+    db.create_table(:ilike_test_users) do
+      Integer :id, primary_key: true
+      String :name, null: false
+    end
+
+    # Insert test data
+    db[:ilike_test_users].insert(id: 1, name: "John Doe")
+    db[:ilike_test_users].insert(id: 2, name: "Jane Smith")
+    db[:ilike_test_users].insert(id: 3, name: "Johnny Walker")
+    db[:ilike_test_users].insert(id: 4, name: "Bob Johnson")
+
+    # Test case-insensitive ILIKE functionality
+    results = db[:ilike_test_users].where(Sequel.ilike(:name, "%JOHN%")).all
+    assert_equal 3, results.length # John, Johnny, Johnson
+    names = results.map { |r| r[:name] }.sort
+    assert_equal ["Bob Johnson", "John Doe", "Johnny Walker"], names
+
+    # Test NOT ILIKE functionality
+    results = db[:ilike_test_users].exclude(Sequel.ilike(:name, "%JOHN%")).all
+    assert_equal 1, results.length
+    assert_equal "Jane Smith", results.first[:name]
+
+    db.disconnect
+  end
+
+  def test_like_with_wildcards_integration
+    db = create_db
+    db.create_table(:wildcard_test_users) do
+      Integer :id, primary_key: true
+      String :name, null: false
+    end
+
+    # Insert test data
+    db[:wildcard_test_users].insert(id: 1, name: "John")
+    db[:wildcard_test_users].insert(id: 2, name: "Joan")
+    db[:wildcard_test_users].insert(id: 3, name: "Jane")
+
+    # Test single character wildcard
+    results = db[:wildcard_test_users].where(Sequel.like(:name, "Jo_n")).all
+    assert_equal 2, results.length # John and Joan
+    names = results.map { |r| r[:name] }.sort
+    assert_equal %w[Joan John], names
+
+    db.disconnect
+  end
+
+  def test_regex_functionality_integration
+    db = create_db
+    db.create_table(:regex_test_users) do
+      Integer :id, primary_key: true
+      String :name, null: false
+    end
+
+    # Insert test data
+    db[:regex_test_users].insert(id: 1, name: "John Doe")
+    db[:regex_test_users].insert(id: 2, name: "Jane Smith")
+    db[:regex_test_users].insert(id: 3, name: "Johnny Walker")
+
+    # Test regex functionality
+    results = db[:regex_test_users].where(name: /^John/).all
+    assert_equal 2, results.length # John Doe and Johnny Walker
+    names = results.map { |r| r[:name] }.sort
+    assert_equal ["John Doe", "Johnny Walker"], names
+
+    db.disconnect
+  end
+
+  def test_recursive_cte_integration
+    db = create_db
+
+    # Create a test table for hierarchical data
+    db.create_table(:categories) do
+      Integer :id, primary_key: true
+      String :name, null: false
+      Integer :parent_id
+    end
+
+    # Insert test data
+    db[:categories].insert(id: 1, name: "Electronics", parent_id: nil)
+    db[:categories].insert(id: 2, name: "Computers", parent_id: 1)
+    db[:categories].insert(id: 3, name: "Laptops", parent_id: 2)
+    db[:categories].insert(id: 4, name: "Gaming Laptops", parent_id: 3)
+    db[:categories].insert(id: 5, name: "Mobile", parent_id: 1)
+    db[:categories].insert(id: 6, name: "Smartphones", parent_id: 5)
+
+    # Test recursive CTE with hierarchical data
+    base_case = db[:categories].select(:id, :name, :parent_id, Sequel.as(0, :level)).where(parent_id: nil)
+    recursive_case = db[:categories].select(
+      Sequel.qualify(:c, :id),
+      Sequel.qualify(:c, :name),
+      Sequel.qualify(:c, :parent_id),
+      Sequel.lit("cat_tree.level + 1")
+    ).from(Sequel.as(:categories, :c))
+                                    .join(:cat_tree, id: :parent_id)
+
+    results = db[:dummy].with_recursive(:cat_tree, base_case, recursive_case)
+                        .from(:cat_tree)
+                        .order(:level, :id)
+                        .all
+
+    # Verify we get all categories in hierarchical order
+    assert_equal 6, results.length, "Should return all 6 categories"
+
+    # Electronics should be at level 0
+    electronics = results.find { |r| r[:name] == "Electronics" }
+    assert_equal 0, electronics[:level], "Electronics should be at level 0"
+
+    # Computers and Mobile should be at level 1
+    computers = results.find { |r| r[:name] == "Computers" }
+    mobile = results.find { |r| r[:name] == "Mobile" }
+    assert_equal 1, computers[:level], "Computers should be at level 1"
+    assert_equal 1, mobile[:level], "Mobile should be at level 1"
+
+    # Gaming Laptops should be at level 3 (deepest)
+    gaming = results.find { |r| r[:name] == "Gaming Laptops" }
+    assert_equal 3, gaming[:level], "Gaming Laptops should be at level 3"
+
+    # Test simple recursive CTE (number sequence)
+    base_case = db.select(Sequel.as(1, :n))
+    recursive_case = db[:t].select(Sequel.lit("n + 1")).where { n < 5 }
+
+    number_results = db[:dummy].with_recursive(:t, base_case, recursive_case)
+                               .from(:t)
+                               .all
+
+    # Should get numbers 1 through 5
+    assert_equal 5, number_results.length, "Should get 5 numbers"
+    assert_equal [1, 2, 3, 4, 5], number_results.map { |r| r[:n] }.sort, "Should get sequence 1-5"
+
+    db.disconnect
+  end
+
   private
 
   def create_db
     SequelDuckDBTest.create_test_db
+  end
+
+  # JOIN USING tests
+  def test_supports_join_using
+    dataset = mock_dataset(:users)
+    assert dataset.supports_join_using?, "DuckDB adapter should support JOIN USING"
+  end
+
+  def test_join_using_single_column
+    dataset = mock_dataset(:users)
+    join_clause = Sequel::SQL::JoinUsingClause.new([:user_id], :inner, :profiles)
+    dataset = dataset.clone(join: [join_clause])
+    expected_sql = "SELECT * FROM users INNER JOIN profiles USING (user_id)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_join_using_multiple_columns
+    dataset = mock_dataset(:users)
+    join_clause = Sequel::SQL::JoinUsingClause.new(%i[user_id company_id], :inner, :profiles)
+    dataset = dataset.clone(join: [join_clause])
+    expected_sql = "SELECT * FROM users INNER JOIN profiles USING (user_id, company_id)"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_join_using_left_join
+    dataset = mock_dataset(:users)
+    join_clause = Sequel::SQL::JoinUsingClause.new([:user_id], :left, :profiles)
+    dataset = dataset.clone(join: [join_clause])
+    expected_sql = "SELECT * FROM users LEFT JOIN profiles USING (user_id)"
+    assert_sql expected_sql, dataset
+  end
+
+  # Recursive CTE tests
+  def test_with_recursive_method_generates_recursive_keyword
+    base_case = SequelDuckDBTest::MOCK_DB.select(Sequel.as(1, :n))
+    recursive_case = SequelDuckDBTest::MOCK_DB[:t].select(Sequel.lit("n + 1")).where { n < 10 }
+    dataset = SequelDuckDBTest::MOCK_DB[:dummy].with_recursive(:t, base_case, recursive_case).from(:t)
+
+    expected_sql = "WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE (n < 10)) SELECT * FROM t"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_auto_detection_of_recursive_cte_patterns
+    base_case = SequelDuckDBTest::MOCK_DB.select(Sequel.as(1, :n))
+    recursive_case = SequelDuckDBTest::MOCK_DB[:t].select(Sequel.lit("n + 1")).where { n < 10 }
+    combined = base_case.union(recursive_case, all: true)
+    dataset = SequelDuckDBTest::MOCK_DB[:dummy].with(:t, combined).from(:t)
+
+    expected_sql = "WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE (n < 10)) SELECT * FROM t"
+    assert_sql expected_sql, dataset
+  end
+
+  # Regex functionality tests
+  def test_regex_sql_generation
+    dataset = mock_dataset(:users).where(name: /^John/)
+    expected_sql = "SELECT * FROM users WHERE (regexp_matches(name, '^John'))"
+    assert_sql expected_sql, dataset
+  end
+
+  def test_regex_case_insensitive_pattern
+    dataset = mock_dataset(:users).where(name: /john/i)
+    expected_sql = "SELECT * FROM users WHERE (regexp_matches(name, 'john', 'i'))"
+    assert_sql expected_sql, dataset
   end
 end

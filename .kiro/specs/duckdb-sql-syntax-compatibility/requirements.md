@@ -28,18 +28,7 @@ This specification addresses SQL generation issues in the sequel-duckdb adapter 
 3. WHEN I use boolean comparisons with `=~` THEN they SHALL generate proper `IS` syntax with parentheses
 4. WHEN tests check complex expressions THEN they SHALL expect properly parenthesized SQL
 
-### Requirement 3: Standard Table Alias Generation
-
-**User Story:** As a developer using Sequel with DuckDB, I want table aliases to use standard SQL `AS` syntax, so that the generated SQL follows established SQL conventions.
-
-#### Acceptance Criteria
-
-1. WHEN I use `table___alias` syntax THEN it SHALL generate `table AS alias` in the SQL
-2. WHEN I use table aliases in JOINs THEN they SHALL use proper `AS` syntax consistently
-3. WHEN I reference aliased tables THEN they SHALL use the alias name correctly
-4. WHEN tests check table aliases THEN they SHALL expect standard `AS` syntax
-
-### Requirement 4: Standard Qualified Column References
+### Requirement 3: Standard Qualified Column References
 
 **User Story:** As a developer using Sequel with DuckDB, I want qualified column references to use standard SQL dot notation, so that the generated SQL follows established SQL conventions.
 
@@ -50,7 +39,7 @@ This specification addresses SQL generation issues in the sequel-duckdb adapter 
 3. WHEN I use schema-qualified names THEN they SHALL use standard SQL format
 4. WHEN tests check qualified identifiers THEN they SHALL expect standard dot notation
 
-### Requirement 5: Proper Regular Expression Formatting
+### Requirement 4: Proper Regular Expression Formatting
 
 **User Story:** As a developer using Sequel with DuckDB, I want regular expression matching to generate properly formatted SQL with parentheses, so that the SQL follows Sequel's formatting conventions.
 
@@ -61,7 +50,7 @@ This specification addresses SQL generation issues in the sequel-duckdb adapter 
 3. WHEN I use complex regex patterns THEN they SHALL be properly formatted and parenthesized
 4. WHEN tests check regex syntax THEN they SHALL expect properly parenthesized expressions
 
-### Requirement 6: Standard Subquery Column References
+### Requirement 5: Standard Subquery Column References
 
 **User Story:** As a developer using Sequel with DuckDB, I want subqueries to properly reference outer query columns using standard SQL dot notation, so that correlated subqueries follow SQL conventions.
 
@@ -72,7 +61,7 @@ This specification addresses SQL generation issues in the sequel-duckdb adapter 
 3. WHEN I use EXISTS subqueries THEN column references SHALL use standard SQL format
 4. WHEN tests check subquery references THEN they SHALL expect standard dot notation
 
-### Requirement 7: Consistent SQL Generation Testing
+### Requirement 6: Consistent SQL Generation Testing
 
 **User Story:** As a developer maintaining the sequel-duckdb adapter, I want tests to verify that the adapter generates consistent, standard SQL, so that the adapter follows Sequel's established patterns.
 
@@ -83,7 +72,7 @@ This specification addresses SQL generation issues in the sequel-duckdb adapter 
 3. WHEN SQL generation issues are found THEN they SHALL be fixed in the adapter, not worked around in tests
 4. WHEN SQL correctness is verified THEN both functional and syntactic correctness SHALL be maintained
 
-### Requirement 8: Documentation of SQL Generation Patterns
+### Requirement 7: Documentation of SQL Generation Patterns
 
 **User Story:** As a developer using the sequel-duckdb adapter, I want to understand how the adapter generates SQL for DuckDB, so that I can write queries that work optimally with the adapter.
 

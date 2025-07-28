@@ -625,7 +625,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # Test literal conversion in INSERT
     dataset = db[:users]
-    dataset.insert(
+    insert_sql = dataset.insert_sql(
       name: "John's Data",
       active: true,
       created_at: Date.new(2023, 12, 25),
@@ -635,7 +635,6 @@ class TypeTest < SequelDuckDBTest::TestCase
     )
 
     # Check the generated SQL
-    insert_sql = db.sqls.last
     assert_match(/name.*'John''s Data'/, insert_sql, "String should be escaped in INSERT")
     assert_match(/active.*TRUE/, insert_sql, "Boolean should be converted in INSERT")
     assert_match(/created_at.*'2023-12-25'/, insert_sql, "Date should be formatted in INSERT")
@@ -881,8 +880,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # Test binary data in INSERT statements
     dataset = db[:files]
-    dataset.insert(name: "test.bin", content: binary_data)
-    insert_sql = db.sqls.last
+    insert_sql = dataset.insert_sql(name: "test.bin", content: binary_data)
     assert_match(/content.*'#{expected_hex}'/, insert_sql, "Binary data in INSERT should be hex encoded")
   end
 
@@ -899,8 +897,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test large integer in INSERT
     large_int = 9_223_372_036_854_775_807
     dataset = db[:counters]
-    dataset.insert(count: large_int)
-    insert_sql = db.sqls.last
+    insert_sql = dataset.insert_sql(count: large_int)
     assert_match(/count.*9223372036854775807/, insert_sql, "Large integer should be preserved in INSERT")
   end
 

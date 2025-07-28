@@ -2,9 +2,9 @@
 
 ## Overview
 
-This design addresses SQL generation issues in the sequel-duckdb adapter where the adapter is generating non-standard SQL syntax that doesn't match Sequel's established conventions. The issues include unwanted ESCAPE clauses in LIKE statements, missing parentheses in complex expressions, incorrect table alias syntax, and wrong qualified column reference format.
+This design addresses SQL generation issues in the sequel-duckdb adapter where the adapter is generating non-standard SQL syntax that doesn't match Sequel's established conventions. The issues include unwanted ESCAPE clauses in LIKE statements, missing parentheses in complex expressions, incorrect qualified column reference format, and improper subquery column references.
 
-The solution is to fix the adapter's SQL generation methods to produce clean, standard SQL that follows Sequel's patterns while being fully compatible with DuckDB.
+The solution is to fix the adapter's SQL generation methods to produce clean, standard SQL that follows Sequel's patterns while being fully compatible with DuckDB. This ensures consistent SQL generation that matches Sequel's conventions across all operations including LIKE clauses, complex expressions, qualified identifiers, regex operations, and subquery column references.
 
 ## Architecture
 
@@ -94,7 +94,29 @@ def qualified_identifier_sql_append(sql, table, column)
 end
 ```
 
-### 4. SQL Test Infrastructure Fix
+### 4. Subquery Column Reference Fix
+
+**Location**: `lib/sequel/adapters/shared/duckdb.rb` - DatasetMethods
+
+Ensure subqueries properly reference outer query columns using dot notation:
+
+```ruby
+def subquery_sql_append(sql, ds)
+  # Ensure subqueries use proper column references
+  sql << "("
+  subquery_sql_append_sql(sql, ds.sql)
+  sql << ")"
+end
+
+def exists_sql_append(sql, ds)
+  # EXISTS subqueries with proper column references
+  sql << "EXISTS ("
+  subquery_sql_append_sql(sql, ds.sql)
+  sql << ")"
+end
+```
+
+### 5. SQL Test Infrastructure Fix
 
 **Location**: `test/sql_test.rb`
 
@@ -119,6 +141,13 @@ class SqlTest < SequelDuckDBTest::TestCase
     expected_sql = "SELECT * FROM users WHERE (UPPER(name) LIKE UPPER('%john%'))"
     assert_sql expected_sql, dataset
   end
+
+  def test_subquery_column_references
+    subquery = @dataset.select(:id).where(Sequel.qualify(:users, :active) => true)
+    dataset = @dataset.where(id: subquery)
+    expected_sql = "SELECT * FROM users WHERE (id IN (SELECT id FROM users WHERE (users.active = true)))"
+    assert_sql expected_sql, dataset
+  end
 end
 ```
 
@@ -132,18 +161,26 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 
 ## Testing Strategy
 
-### 1. Update Existing Tests
-- Modify failing tests to accept DuckDB's valid syntax variations
-- Use the new `assert_sql_matches_any` helper method
-- Keep all existing test coverage
+### 1. SQL Generation Unit Tests
+- Test all SQL generation methods using Sequel's mock database functionality
+- Verify exact SQL syntax matches expected Sequel patterns
+- Test LIKE clauses generate clean SQL without ESCAPE clauses
+- Test complex expressions have proper parentheses
+- Test qualified column references use dot notation
+- Test regex expressions are properly formatted and parenthesized
+- Test subquery column references use standard SQL format
 
 ### 2. Integration Tests
-- Ensure actual database operations work correctly
-- Verify functional correctness over syntax exactness
+- Ensure actual database operations work correctly with generated SQL
+- Verify functional correctness alongside syntactic correctness
+- Test correlated subqueries with proper column references
+- Test complex queries with multiple SQL generation features
 
-### 3. Documentation Tests
-- Document the syntax differences that are accepted
-- Provide examples of valid variations
+### 3. Test Infrastructure Consistency
+- Fix SQL test infrastructure to use proper dataset creation
+- Ensure tests expect standard SQL syntax consistently
+- Maintain comprehensive test coverage for all SQL generation patterns
+- Use Test-Driven Development approach for all fixes
 
 ## Design Decisions and Rationales
 
@@ -185,5 +222,37 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 ### Phase 5: Verification and Documentation
 - Run all tests to ensure they pass with fixed adapter
 - Document the SQL generation patterns used by the adapter
+- Create comprehensive documentation of DuckDB-specific SQL patterns
+- Update API documentation with SQL generation examples
+
+## Documentation Strategy
+
+### SQL Pattern Documentation
+To address Requirement 7, the adapter will include comprehensive documentation of SQL generation patterns:
+
+**Location**: `API_DOCUMENTATION.md` and inline code comments
+
+1. **LIKE Clause Patterns**: Document how LIKE clauses are generated without ESCAPE clauses
+2. **Complex Expression Formatting**: Document parentheses usage in ILIKE and regex expressions
+3. **Qualified Column References**: Document dot notation usage for table.column references
+4. **Subquery Column References**: Document proper column referencing in correlated subqueries
+5. **DuckDB-Specific Optimizations**: Document any DuckDB-specific SQL optimizations used
+
+**Example Documentation Structure**:
+```ruby
+# SQL Generation Patterns for DuckDB Adapter
+#
+# LIKE Clauses:
+#   Input:  Sequel.like(:name, "%John%")
+#   Output: (name LIKE '%John%')
+#
+# ILIKE Clauses:
+#   Input:  Sequel.ilike(:name, "%john%")
+#   Output: (UPPER(name) LIKE UPPER('%john%'))
+#
+# Qualified Columns:
+#   Input:  Sequel.qualify(:users, :id)
+#   Output: users.id
+```
 
 This design fixes the root causes of the SQL generation issues rather than working around them, resulting in a more robust and standards-compliant adapter.

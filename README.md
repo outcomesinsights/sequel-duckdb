@@ -274,17 +274,17 @@ db.indexes(:users)
 
 ### Supported Type Mappings
 
-| Ruby Type | DuckDB Type | Notes |
-|-----------|-------------|-------|
-| String | VARCHAR/TEXT | Configurable size |
-| Integer | INTEGER/BIGINT | Auto-sized based on value |
-| Float | REAL/DOUBLE | Precision preserved |
-| BigDecimal | DECIMAL/NUMERIC | Precision and scale supported |
-| TrueClass/FalseClass | BOOLEAN | Native boolean support |
-| Date | DATE | Date-only values |
-| Time/DateTime | TIMESTAMP | Full datetime with timezone |
-| Time (time-only) | TIME | Time-only values |
-| String (binary) | BLOB | Binary data storage |
+| Ruby Type            | DuckDB Type     | Notes                         |
+| -------------------- | --------------- | ----------------------------- |
+| String               | VARCHAR/TEXT    | Configurable size             |
+| Integer              | INTEGER/BIGINT  | Auto-sized based on value     |
+| Float                | REAL/DOUBLE     | Precision preserved           |
+| BigDecimal           | DECIMAL/NUMERIC | Precision and scale supported |
+| TrueClass/FalseClass | BOOLEAN         | Native boolean support        |
+| Date                 | DATE            | Date-only values              |
+| Time/DateTime        | TIMESTAMP       | Full datetime with timezone   |
+| Time (time-only)     | TIME            | Time-only values              |
+| String (binary)      | BLOB            | Binary data storage           |
 
 ### Type Conversion Examples
 
@@ -645,3 +645,48 @@ db[:users].where(active: true).all
      db[:preferences].insert(user_id: user_id, theme: 'dark')
    end
    ```
+
+## Documentation
+
+### Complete API Reference
+
+For comprehensive API documentation including all methods, configuration options, and advanced features, see:
+
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference with examples
+- **[docs/DUCKDB_SQL_PATTERNS.md](docs/DUCKDB_SQL_PATTERNS.md)** - Detailed SQL generation patterns and syntax
+
+### SQL Generation Patterns
+
+The sequel-duckdb adapter generates SQL optimized for DuckDB while maintaining Sequel compatibility. Key patterns include:
+
+- **LIKE clauses**: Clean syntax without ESCAPE clauses
+- **ILIKE support**: Converted to UPPER() LIKE UPPER() for case-insensitive matching
+- **Regular expressions**: Using DuckDB's regexp_matches() function
+- **Qualified columns**: Standard dot notation (table.column)
+- **Recursive CTEs**: Automatic WITH RECURSIVE detection
+- **Proper parentheses**: Consistent expression grouping
+
+Example SQL patterns:
+```ruby
+# LIKE patterns
+dataset.where(Sequel.like(:name, "%John%"))
+# SQL: SELECT * FROM users WHERE (name LIKE '%John%')
+
+# ILIKE patterns (case-insensitive)
+dataset.where(Sequel.ilike(:name, "%john%"))
+# SQL: SELECT * FROM users WHERE (UPPER(name) LIKE UPPER('%john%'))
+
+# Regular expressions
+dataset.where(name: /^John/)
+# SQL: SELECT * FROM users WHERE (regexp_matches(name, '^John'))
+```
+
+For complete SQL pattern documentation, see [docs/DUCKDB_SQL_PATTERNS.md](docs/DUCKDB_SQL_PATTERNS.md).
+
+## Contributing
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/aguynamedryan/sequel-duckdb.
+
+## License
+
+The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
