@@ -42,96 +42,30 @@ module Sequel
     # @see Database
     # @since 0.1.0
     module DatabaseMethods
-      # Connect to a DuckDB database
-      #
-      # Creates a connection to either a file-based or in-memory DuckDB database.
-      # This method handles the low-level connection establishment and error handling.
-      #
-      # @param server [Hash] Server configuration options from Sequel
-      # @option server [String] :database Database path or ':memory:' for in-memory database
-      # @option server [Hash] :config DuckDB-specific configuration options
-      # @option server [Boolean] :readonly Whether to open database in read-only mode
-      #
-      # @return [::DuckDB::Connection] Active DuckDB database connection
-      #
-      # @raise [Sequel::DatabaseConnectionError] If connection fails due to:
-      #   - Invalid database path
-      #   - Insufficient permissions
-      #   - DuckDB library errors
-      #   - Configuration errors
-      #
-      # @example Connect to in-memory database
-      #   conn = connect(database: ':memory:')
-      #
-      # @example Connect to file database
-      #   conn = connect(database: '/path/to/database.duckdb')
-      #
-      # @example Connect with configuration
-      #   conn = connect(
-      #     database: '/path/to/database.duckdb',
-      #     config: { memory_limit: '2GB', threads: 4 }
-      #   )
-      #
-      # @see disconnect_connection
-      # @see valid_connection?
-      # @since 0.1.0
-      def connect(server)
-        opts = server_opts(server)
-        database_path = opts[:database]
 
-        begin
-          if database_path == ":memory:" || database_path.nil?
-            # Create in-memory database and return connection
-            db = ::DuckDB::Database.open(":memory:")
-          else
-            # Fix URI parsing issue - add leading slash if missing for absolute paths
-            database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
-
-            # Create file-based database (will create file if it doesn't exist) and return connection
-            db = ::DuckDB::Database.open(database_path)
-          end
-          db.connect
-        rescue ::DuckDB::Error => e
-          raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
-        rescue StandardError => e
-          raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
-        end
-      end
-
-      # Disconnect from a DuckDB database connection
-      #
-      # @param conn [::DuckDB::Connection] The database connection to close
-      # @return [void]
-      def disconnect_connection(conn)
-        return unless conn
-
-        begin
-          conn.close
-        rescue ::DuckDB::Error
-          # Ignore errors during disconnect - connection may already be closed
-        end
-      end
-
-      # Check if a DuckDB connection is valid and open
-      #
-      # @param conn [::DuckDB::Connection] The database connection to check
-      # @return [Boolean] true if connection is valid and open, false otherwise
-      def valid_connection?(conn)
-        return false unless conn
-
-        begin
-          # Try a simple query to check if the connection is still valid
-          conn.query("SELECT 1")
-          true
-        rescue ::DuckDB::Error
-          false
-        end
+      # DuckDB uses the :duckdb database type.
+      def database_type
+        :duckdb
       end
 
       # DuckDB doesn't support AUTOINCREMENT
       def supports_autoincrement?
         false
       end
+
+      # Whether to quote identifiers by default for this database
+      def quote_identifiers_default
+        true
+      end
+
+      private
+
+      # DuckDB doesn't fold unquoted identifiers to uppercase
+      def folds_unquoted_identifiers_to_uppercase?
+        false
+      end
+
+      public
 
       # Execute SQL statement
       #
@@ -1297,6 +1231,19 @@ module Sequel
     # This module is included by the main Dataset class to provide SQL generation
     # and query execution capabilities.
     module DatasetMethods
+      private
+
+      # DuckDB uses lowercase identifiers
+      def input_identifier(v)
+        v.to_s
+      end
+
+      # DuckDB uses lowercase identifiers
+      def output_identifier(v)
+        v == '' ? :untitled : v.to_sym
+      end
+
+      public
       # Generate INSERT SQL statement
       #
       # @param values [Hash, Array] Values to insert
@@ -1395,34 +1342,7 @@ module Sequel
         true
       end
 
-      def quote_identifiers_default
-        false
-      end
 
-      # Override identifier quoting to avoid uppercase conversion and handle qualified identifiers
-      def quote_identifier_append(sql, name)
-        name_str = name.to_s
-
-        # Handle qualified identifiers (table__column format) - convert to table.column
-        if name_str.include?("__")
-          parts = name_str.split("__", 2)
-          if parts.length == 2
-            table_part, column_part = parts
-            sql << "#{quote_identifier(table_part)}.#{quote_identifier(column_part)}"
-            return
-          end
-        end
-
-        # Special case for * (used in count(*), etc.)
-        sql << if name_str == "*"
-                 "*"
-               # Quote reserved words and identifiers with special characters
-               elsif name_str.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/) && !reserved_word?(name_str)
-                 name_str
-               else
-                 "\"#{name_str}\""
-               end
-      end
 
       # Validate table name for SELECT operations
       def validate_table_name_for_select
@@ -1735,56 +1655,6 @@ module Sequel
         end
       end
 
-      # Support for UNION, INTERSECT, EXCEPT operations
-      def union(dataset, opts = {})
-        compound_clone(:union, dataset, opts)
-      end
-
-      def intersect(dataset, opts = {})
-        compound_clone(:intersect, dataset, opts)
-      end
-
-      def except(dataset, opts = {})
-        compound_clone(:except, dataset, opts)
-      end
-
-      private
-
-      def compound_clone(type, dataset, opts)
-        clone(compound: type, compound_dataset: dataset, compound_all: opts[:all])
-      end
-
-      def compound_dataset_sql
-        return super unless @opts[:compound]
-
-        case @opts[:compound]
-        when :union
-          if @opts[:compound_all]
-            "#{select_sql} UNION ALL #{@opts[:compound_dataset].select_sql}"
-          else
-            "#{select_sql} UNION #{@opts[:compound_dataset].select_sql}"
-          end
-        when :intersect
-          "#{select_sql} INTERSECT #{@opts[:compound_dataset].select_sql}"
-        when :except
-          "#{select_sql} EXCEPT #{@opts[:compound_dataset].select_sql}"
-        else
-          super
-        end
-      end
-
-      public
-
-      def sql
-        # Validate table name for SELECT operations
-        validate_table_name_for_select
-
-        if @opts[:compound]
-          compound_dataset_sql
-        else
-          super
-        end
-      end
 
       # Override literal methods for DuckDB-specific formatting
       def literal_string_append(sql, s)
@@ -2427,4 +2297,19 @@ module Sequel
       end
     end
   end
+
+  # Setup mock adapter when using Sequel.mock(host: :duckdb)
+  def self.mock_adapter_setup(db)
+    db.instance_exec do
+      # Just do the minimal setup like SQLite
+      def schema_parse_table(*)
+        []
+      end
+      singleton_class.send(:private, :schema_parse_table)
+    end
+  end
+
+  # Register DuckDB adapter for mock databases
+  # This allows Sequel.mock(host: :duckdb) to work properly
+  Sequel::Database.set_shared_adapter_scheme(:duckdb, Sequel::DuckDB)
 end

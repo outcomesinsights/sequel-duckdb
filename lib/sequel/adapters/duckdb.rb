@@ -91,6 +91,92 @@ module Sequel
       # This allows Sequel.connect('duckdb://...') to work
       set_adapter_scheme :duckdb
 
+      # Connect to a DuckDB database
+      #
+      # Creates a connection to either a file-based or in-memory DuckDB database.
+      # This method handles the low-level connection establishment and error handling.
+      #
+      # @param server [Hash] Server configuration options from Sequel
+      # @option server [String] :database Database path or ':memory:' for in-memory database
+      # @option server [Hash] :config DuckDB-specific configuration options
+      # @option server [Boolean] :readonly Whether to open database in read-only mode
+      #
+      # @return [::DuckDB::Connection] Active DuckDB database connection
+      #
+      # @raise [Sequel::DatabaseConnectionError] If connection fails due to:
+      #   - Invalid database path
+      #   - Insufficient permissions
+      #   - DuckDB library errors
+      #   - Configuration errors
+      #
+      # @example Connect to in-memory database
+      #   conn = connect(database: ':memory:')
+      #
+      # @example Connect to file database
+      #   conn = connect(database: '/path/to/database.duckdb')
+      #
+      # @example Connect with configuration
+      #   conn = connect(
+      #     database: '/path/to/database.duckdb',
+      #     config: { memory_limit: '2GB', threads: 4 }
+      #   )
+      #
+      # @see disconnect_connection
+      # @see valid_connection?
+      # @since 0.1.0
+      def connect(server)
+        opts = server_opts(server)
+        database_path = opts[:database]
+
+        begin
+          if database_path == ":memory:" || database_path.nil?
+            # Create in-memory database and return connection
+            db = ::DuckDB::Database.open(":memory:")
+          else
+            # Fix URI parsing issue - add leading slash if missing for absolute paths
+            database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+
+            # Create file-based database (will create file if it doesn't exist) and return connection
+            db = ::DuckDB::Database.open(database_path)
+          end
+          db.connect
+        rescue ::DuckDB::Error => e
+          raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
+        rescue StandardError => e
+          raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
+        end
+      end
+
+      # Disconnect from a DuckDB database connection
+      #
+      # @param conn [::DuckDB::Connection] The database connection to close
+      # @return [void]
+      def disconnect_connection(conn)
+        return unless conn
+
+        begin
+          conn.close
+        rescue ::DuckDB::Error
+          # Ignore errors during disconnect - connection may already be closed
+        end
+      end
+
+      # Check if a DuckDB connection is valid and open
+      #
+      # @param conn [::DuckDB::Connection] The database connection to check
+      # @return [Boolean] true if connection is valid and open, false otherwise
+      def valid_connection?(conn)
+        return false unless conn
+
+        begin
+          # Try a simple query to check if the connection is still valid
+          conn.query("SELECT 1")
+          true
+        rescue ::DuckDB::Error
+          false
+        end
+      end
+
       # Return the default dataset class for this database
       #
       # This method is called by Sequel to determine which Dataset class
