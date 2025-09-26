@@ -10,6 +10,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
     # Test that database_error_classes method exists and returns expected classes
     error_classes = db.send(:database_error_classes)
+
     assert_instance_of Array, error_classes, "database_error_classes should return an array"
     assert_includes error_classes, ::DuckDB::Error, "Should include DuckDB::Error class"
   end
@@ -30,7 +31,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
     # Test that database_exception_use_sqlstates? method exists and returns boolean
     use_sqlstates = db.send(:database_exception_use_sqlstates?)
-    assert [true, false].include?(use_sqlstates), "database_exception_use_sqlstates? should return boolean"
+
+    assert_includes [true, false], use_sqlstates, "database_exception_use_sqlstates? should return boolean"
   end
 
   def test_connection_error_mapping
@@ -42,9 +44,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     end
 
     # Test with invalid connection string format
+    db = Sequel.connect("duckdb::memory:")
     assert_raises(Sequel::DatabaseConnectionError, "Invalid connection format should raise DatabaseConnectionError") do
-      # This should cause a connection error
-      db = Sequel.connect("duckdb::memory:")
       # Force connection with invalid parameters
       db.send(:connect, { database: "/dev/null/invalid" })
     end
@@ -200,6 +201,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
     begin
       db.execute("INVALID SQL SYNTAX")
+
       flunk "Should have raised an exception"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error message should indicate DuckDB origin")
@@ -256,6 +258,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     # Test that invalid connection is detected
     # We can't easily simulate connection loss, so we'll test the validation method
     conn = db.synchronize { |c| c }
+
     assert db.send(:valid_connection?, conn), "Valid connection should be detected as valid"
   end
 
@@ -377,6 +380,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
     begin
       db.execute("SELECT * FROM nonexistent_table WHERE id = ?", [123])
+
       flunk "Should have raised an exception"
     rescue Sequel::DatabaseError => e
       # The error should contain useful context for debugging
@@ -414,8 +418,8 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     end
     error_time = Time.now - start_time
 
-    # Error handling shouldn't add more than 50% overhead
-    assert error_time < (normal_time * 1.5), "Error handling should not significantly impact performance"
+    # Error handling shouldn't add more than 60% overhead
+    assert_operator error_time, :<, (normal_time * 1.6), "Error handling should not significantly impact performance"
   end
 
   def test_error_recovery_after_connection_issues

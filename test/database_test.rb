@@ -7,12 +7,12 @@ require_relative "spec_helper"
 class DatabaseTest < SequelDuckDBTest::TestCase
   def test_database_class_exists
     assert defined?(Sequel::DuckDB::Database), "Database class should be defined"
-    assert Sequel::DuckDB::Database < Sequel::Database, "Database should inherit from Sequel::Database"
+    assert_operator Sequel::DuckDB::Database, :<, Sequel::Database, "Database should inherit from Sequel::Database"
   end
 
   def test_database_includes_database_methods
-    assert Sequel::DuckDB::Database.included_modules.include?(Sequel::DuckDB::DatabaseMethods),
-           "Database should include DatabaseMethods module"
+    assert_includes Sequel::DuckDB::Database.included_modules, Sequel::DuckDB::DatabaseMethods,
+                    "Database should include DatabaseMethods module"
   end
 
   def test_adapter_scheme_registration
@@ -22,6 +22,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
   def test_dataset_class_default
     db = create_db
+
     assert_equal Sequel::DuckDB::Dataset, db.dataset_class_default,
                  "Database should return DuckDB::Dataset as default dataset class"
   end
@@ -50,7 +51,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       end
 
       assert_connection_valid(db)
-      assert File.exist?(db_path), "Database file should be created"
+      assert_path_exists db_path, "Database file should be created"
     end
   end
 
@@ -65,6 +66,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
   def test_database_test_connection
     db = create_db
+
     assert db.test_connection, "test_connection should return true for valid connection"
   end
 
@@ -80,9 +82,11 @@ class DatabaseTest < SequelDuckDBTest::TestCase
   def test_database_uri_parsing
     # Test various URI formats
     db1 = Sequel.connect("duckdb::memory:")
+
     assert_instance_of Sequel::DuckDB::Database, db1
 
     db2 = Sequel.connect("duckdb:///:memory:")
+
     assert_instance_of Sequel::DuckDB::Database, db2
   end
 
@@ -133,6 +137,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     # Verify data was committed
     assert_equal 2, db[:test_table].count, "Both records should be committed"
     records = db[:test_table].all
+
     assert_equal ["Auto Commit Test", "Auto Commit Test 2"], records.map { |r| r[:name] }.sort
   end
 
@@ -203,6 +208,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 2, db[:test_table].count, "Both records should be committed"
 
     names = db[:test_table].select_map(:name).sort
+
     assert_equal ["Inner Transaction", "Outer Transaction"], names
   end
 
@@ -238,18 +244,23 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Test various return value scenarios
     result1 = db.transaction { 42 }
+
     assert_equal 42, result1, "Transaction should return integer"
 
     result2 = db.transaction { "string_result" }
+
     assert_equal "string_result", result2, "Transaction should return string"
 
     result3 = db.transaction { [1, 2, 3] }
+
     assert_equal [1, 2, 3], result3, "Transaction should return array"
 
     result4 = db.transaction { { key: "value" } }
+
     assert_equal({ key: "value" }, result4, "Transaction should return hash")
 
     result5 = db.transaction { nil }
+
     assert_nil result5, "Transaction should return nil"
   end
 
@@ -326,6 +337,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Verify some expected columns exist
     column_names = schema.map(&:first)
+
     assert_includes column_names, :id, "Should have id column"
     assert_includes column_names, :name, "Should have name column"
     assert_includes column_names, :age, "Should have age column"
@@ -354,6 +366,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       db[:test_table].insert(id: 1, name: "User 1", age: 20)
       db[:test_table].insert(id: 2, name: "User 2", age: 30)
       count = db[:test_table].count
+
       assert_equal 2, count
     end
   end
@@ -400,6 +413,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       # Verify partial rollback - savepoint rolled back but outer transaction committed
       assert_equal initial_count + 2, db[:test_table].count, "Savepoint should allow partial rollback"
       names = db[:test_table].select_map(:name).sort
+
       assert_includes names, "Before Savepoint", "Record before savepoint should be committed"
       assert_includes names, "After Savepoint", "Record after savepoint should be committed"
       refute_includes names, "In Savepoint", "Record in savepoint should be rolled back"
@@ -525,13 +539,13 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     db = create_db
 
     # Test transaction status inquiry methods
-    refute db.in_transaction?, "Should not be in transaction initially"
+    refute_predicate db, :in_transaction?, "Should not be in transaction initially"
 
     db.transaction do
-      assert db.in_transaction?, "Should be in transaction inside transaction block"
+      assert_predicate db, :in_transaction?, "Should be in transaction inside transaction block"
     end
 
-    refute db.in_transaction?, "Should not be in transaction after transaction block"
+    refute_predicate db, :in_transaction?, "Should not be in transaction after transaction block"
   end
 
   def test_concurrent_transaction_handling
@@ -558,13 +572,13 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     create_test_table(db)
 
     # Test basic execute method with connection synchronization (Requirement 2.1)
-    result = nil
     assert_nothing_raised("execute method should work with connection synchronization") do
-      result = db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Execute Test', 30)")
+      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Execute Test', 30)")
     end
 
     # Verify the insert worked
     count = db[:test_table].count
+
     assert_equal 1, count, "Execute should insert record"
 
     # Test execute with SELECT query
@@ -623,9 +637,8 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Test execute method with block for result processing
     collected_rows = []
-    result = nil
     assert_nothing_raised("execute method should work with block") do
-      result = db.execute("SELECT * FROM test_table ORDER BY id") do |row|
+      db.execute("SELECT * FROM test_table ORDER BY id") do |row|
         collected_rows << row
       end
     end
@@ -667,10 +680,12 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Verify the insert worked
     count = db[:test_table].count
+
     assert_equal 1, count, "execute_insert should insert record"
 
     # Verify the data
     row = db[:test_table].first
+
     assert_equal "Insert Test", row[:name], "execute_insert should insert correct data"
     assert_equal 35, row[:age], "execute_insert should insert correct age"
   end
@@ -690,6 +705,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Verify the insert worked
     row = db[:test_table].where(id: 2).first
+
     refute_nil row, "Parameterized execute_insert should insert record"
     assert_equal "Param Insert", row[:name], "Parameterized execute_insert should insert correct data"
   end
@@ -702,13 +718,13 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Update Test', 25)")
 
     # Test execute_update method (Requirement 2.3)
-    result = nil
     assert_nothing_raised("execute_update should work") do
-      result = db.execute_update("UPDATE test_table SET age = 30 WHERE id = 1")
+      db.execute_update("UPDATE test_table SET age = 30 WHERE id = 1")
     end
 
     # Verify the update worked
     row = db[:test_table].where(id: 1).first
+
     assert_equal 30, row[:age], "execute_update should update record"
     assert_equal "Update Test", row[:name], "execute_update should preserve other fields"
   end
@@ -728,6 +744,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Verify the update worked
     row = db[:test_table].where(id: 1).first
+
     assert_equal "Updated Name", row[:name], "Parameterized execute_update should update name"
     assert_equal 35, row[:age], "Parameterized execute_update should update age"
   end
@@ -784,6 +801,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Verify first row
     first_row = collected_results[0]
+
     assert_instance_of Hash, first_row, "Each row should be a hash"
     assert_equal 1, first_row[:id], "First row should have correct id"
     assert_equal "Result Test 1", first_row[:name], "First row should have correct name"
@@ -838,8 +856,8 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 1, row[:id], "Integer should be preserved"
     assert_equal "John Doe", row[:name], "String should be preserved"
     assert_equal 30, row[:age], "Integer should be preserved"
-    assert_equal 50_000.5, row[:salary], "Double should be preserved"
-    assert_equal true, row[:is_active], "Boolean should be preserved"
+    assert_in_delta(50_000.5, row[:salary], 0.001, "Double should be preserved")
+    assert row[:is_active], "Boolean should be preserved"
     assert_equal "Test notes", row[:notes], "Text should be preserved"
 
     # Date and timestamp handling may vary by DuckDB version, so we'll just check they're not nil
@@ -957,6 +975,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       db.execute("SELECT COUNT(*) as count FROM test_table") do |row|
         count = row[:count]
       end
+
       assert_equal 3, count, "Count should be correct after multiple inserts"
 
       # Update operation
@@ -967,6 +986,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       db.execute("SELECT age FROM test_table WHERE id = 2") do |row|
         updated_age = row[:age]
       end
+
       assert_equal 30, updated_age, "Update should work correctly"
 
       # Delete operation
@@ -977,6 +997,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       db.execute("SELECT COUNT(*) as count FROM test_table") do |row|
         final_count = row[:count]
       end
+
       assert_equal 2, final_count, "Delete should work correctly"
     end
   end
@@ -1006,6 +1027,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Check that queries were logged
     log_output = string_io.string
+
     refute_empty log_output, "Queries should be logged when logging is enabled"
 
     # Should contain SQL statements
@@ -1080,6 +1102,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     # Test initial state
     initial_loggers = db.loggers
+
     assert_instance_of Array, initial_loggers, "Loggers should be an array"
 
     # Test adding a logger
@@ -1117,6 +1140,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     end
 
     log_output = string_io.string
+
     refute_empty log_output, "Parameterized queries should be logged"
 
     # Should contain the SQL with parameters
@@ -1166,11 +1190,13 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     end
 
     log_output = string_io.string
+
     refute_empty log_output, "Performance information should be logged"
 
     # Should contain multiple SQL operations
-    insert_count = log_output.scan(/INSERT/).length
-    assert insert_count >= 5, "Multiple INSERT operations should be logged"
+    insert_count = log_output.scan("INSERT").length
+
+    assert_operator insert_count, :>=, 5, "Multiple INSERT operations should be logged"
     assert_includes log_output, "SELECT", "SELECT operation should be logged"
   end
 
@@ -1192,6 +1218,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     end
 
     log_output = string_io.string
+
     refute_empty log_output, "Debug information should be available"
 
     # Debug logs should contain detailed information

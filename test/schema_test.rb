@@ -61,12 +61,14 @@ class SchemaTest < SequelDuckDBTest::TestCase
 
     # Initially should have no tables (or only system tables)
     initial_tables = db.tables
+
     assert_instance_of Array, initial_tables, "tables() should return an array"
 
     # Create a table and verify it appears in tables list
     create_test_table(db, :schema_test_table)
 
     tables = db.tables
+
     assert_includes tables, :schema_test_table, "tables() should include created table"
   end
 
@@ -85,6 +87,7 @@ class SchemaTest < SequelDuckDBTest::TestCase
       assert_equal 2, column_entry.length, "Each schema entry should have 2 elements"
 
       column_name, column_info = column_entry
+
       assert_instance_of Symbol, column_name, "Column name should be a symbol"
       assert_instance_of Hash, column_info, "Column info should be a hash"
     end
@@ -105,9 +108,11 @@ class SchemaTest < SequelDuckDBTest::TestCase
 
     # Test specific column properties
     id_column = schema.find { |col| col[0] == :id }
+
     refute_nil id_column, "ID column should exist"
 
     id_info = id_column[1]
+
     assert id_info.key?(:type), "Column info should have type"
     assert id_info.key?(:db_type), "Column info should have db_type"
     assert id_info.key?(:allow_null), "Column info should have allow_null"
@@ -226,6 +231,7 @@ class SchemaTest < SequelDuckDBTest::TestCase
 
     # Create table and test
     create_test_table(db, :exists_test)
+
     assert db.table_exists?(:exists_test), "Existing table should return true"
   end
 
@@ -244,6 +250,7 @@ class SchemaTest < SequelDuckDBTest::TestCase
     end
 
     tables = db.tables
+
     assert_includes tables, :table1, "Should include table1"
     assert_includes tables, :table2, "Should include table2"
 

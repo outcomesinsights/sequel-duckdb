@@ -1,5 +1,100 @@
+plugins:
+  - rubocop-minitest
+  - rubocop-rake
+  - rubocop-sequel
+
 AllCops:
   TargetRubyVersion: 3.1
+  NewCops: enable
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+# Disable complexity violations for database adapter code
+Metrics/ModuleLength:
+  Enabled: true
+  Exclude:
+    - lib/sequel/adapters/shared/duckdb.rb
+
+Metrics/MethodLength:
+  Enabled: true
+  Exclude:
+    - lib/sequel/adapters/shared/duckdb.rb
+    - test/**/*
+    - test/type_test.rb
+
+Metrics/ClassLength:
+  Enabled: true
+  Exclude:
+    - test/**/*
+    - test/type_test.rb
+
+Metrics/BlockLength:
+  Enabled: true
+  Exclude:
+    - test/**/*
+    - test/type_test.rb
+    - sequel-duckdb.gemspec
+
+Metrics/AbcSize:
+  Enabled: true
+  Exclude:
+    - lib/sequel/adapters/shared/duckdb.rb
+    - test/**/*
+    - test/type_test.rb
+
+Metrics/CyclomaticComplexity:
+  Enabled: true
+  Exclude:
+    - lib/sequel/adapters/shared/duckdb.rb
+    - test/**/*
+    - test/type_test.rb
+
+Metrics/PerceivedComplexity:
+  Enabled: true
+  Exclude:
+    - lib/sequel/adapters/shared/duckdb.rb
+    - test/**/*
+    - test/type_test.rb
+
+# Disable line length for generated SQL and complex expressions
+Layout/LineLength:
+  Enabled: true
+  Exclude:
+    - test/**/*
+    - test/type_test.rb
+    - sequel-duckdb.gemspec
+
+Minitest/MultipleAssertions:
+  Enabled: false
+
+# Allow duplicate branches for error handling patterns
+Lint/DuplicateBranch:
+  Enabled: true
+
+# Allow database adapter naming patterns
+Naming/MethodParameterName:
+  Enabled: true
+
+Naming/AccessorMethodName:
+  Enabled: true
+
+Naming/VariableNumber:
+  Enabled: true
+  Exclude:
+    - test/**/*
+
+# Allow database adapter patterns
+Lint/EmptyBlock:
+  Enabled: true
+  Exclude:
+    - test/**/*
+
+Lint/DuplicateMethods:
+  Enabled: true
+
+Style/TrivialAccessors:
+  Enabled: true
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes

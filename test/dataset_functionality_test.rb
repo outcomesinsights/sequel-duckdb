@@ -35,12 +35,14 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
 
     # Check first row (Jane Smith)
     first_row = rows.first
+
     assert_instance_of Hash, first_row, "Row should be a hash"
     assert_equal "Jane Smith", first_row[:name], "First row should be Jane Smith"
     assert_equal 25, first_row[:age], "Jane's age should be 25"
 
     # Check second row (John Doe)
     second_row = rows.last
+
     assert_equal "John Doe", second_row[:name], "Second row should be John Doe"
     assert_equal 30, second_row[:age], "John's age should be 30"
   end
@@ -74,6 +76,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_equal 2, rows.length, "Should return 2 rows"
 
     first_row = rows.first
+
     assert_equal 2, first_row.keys.length, "Should have 2 columns"
     assert first_row.key?(:name), "Should have name column"
     assert first_row.key?(:age), "Should have age column"
@@ -94,8 +97,9 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_equal 1, rows.length, "Should return 1 aggregation row"
 
     row = rows.first
+
     assert_equal 2, row[:count], "Count should be 2"
-    assert_equal 27.5, row[:avg_age], "Average age should be 27.5"
+    assert_in_delta(27.5, row[:avg_age], 0.001, "Average age should be 27.5")
   end
 
   def test_fetch_rows_with_joins
@@ -129,6 +133,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_equal 1, rows.length, "Should return 1 joined row"
 
     row = rows.first
+
     assert_equal "John Doe", row[:name], "Should have user name"
     assert_equal "john@example.com", row[:email], "Should have user email"
   end
@@ -167,6 +172,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
 
     if result.respond_to?(:each)
       rows = result.to_a
+
       assert_equal 2, rows.length, "Should return 2 rows via enumerator"
     else
       # If it doesn't return an enumerator, it should at least not crash
@@ -199,10 +205,11 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_equal 1, rows.length, "Should return 1 row"
 
     row = rows.first
+
     assert_instance_of String, row[:name], "Name should be string"
     assert_instance_of Integer, row[:age], "Age should be integer"
     assert_instance_of Date, row[:birth_date], "Birth date should be Date"
-    assert [true, false].include?(row[:active]), "Active should be boolean"
+    assert_includes [true, false], row[:active], "Active should be boolean"
     assert_instance_of Time, row[:created_at], "Created at should be Time"
     assert_instance_of Float, row[:score], "Score should be float"
   end
@@ -210,27 +217,32 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
   # Tests for DuckDB capability flags
   def test_supports_window_functions
     dataset = mock_dataset(:users)
-    assert dataset.supports_window_functions?, "DuckDB should support window functions"
+
+    assert_predicate dataset, :supports_window_functions?, "DuckDB should support window functions"
   end
 
   def test_supports_cte
     dataset = mock_dataset(:users)
-    assert dataset.supports_cte?, "DuckDB should support Common Table Expressions (CTE)"
+
+    assert_predicate dataset, :supports_cte?, "DuckDB should support Common Table Expressions (CTE)"
   end
 
   def test_supports_returning
     dataset = mock_dataset(:users)
-    refute dataset.supports_returning?, "DuckDB should not support RETURNING clause"
+
+    refute_predicate dataset, :supports_returning?, "DuckDB should not support RETURNING clause"
   end
 
   def test_supports_select_all_and_offset
     dataset = mock_dataset(:users)
-    assert dataset.supports_select_all_and_offset?, "DuckDB should support SELECT with OFFSET"
+
+    assert_predicate dataset, :supports_select_all_and_offset?, "DuckDB should support SELECT with OFFSET"
   end
 
   def test_quote_identifiers_default
     dataset = mock_dataset(:users)
-    refute dataset.quote_identifiers_default, "DuckDB adapter should not quote identifiers by default"
+
+    assert dataset.quote_identifiers_default, "DuckDB adapter should quote identifiers by default"
   end
 
   # Integration tests for basic query execution using fetch_rows
@@ -244,6 +256,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     count = 0
     dataset.fetch_rows(dataset.sql) do |row|
       count += 1
+
       assert_instance_of Hash, row, "Each row should be a hash"
       assert row.key?(:name), "Row should have name key"
       assert row.key?(:age), "Row should have age key"
@@ -261,6 +274,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     count = 0
     dataset.fetch_rows(dataset.sql) do |row|
       count += 1
+
       assert_equal 30, row[:age], "Filtered row should have age 30"
       assert_equal "John Doe", row[:name], "Should be John Doe"
     end
@@ -324,8 +338,9 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     names = []
     dataset.fetch_rows(dataset.sql) do |row|
       names << row[:name]
-      assert row[:age] > 25, "Age should be greater than 25"
-      assert_equal true, row[:active], "Should be active"
+
+      assert_operator row[:age], :>, 25, "Age should be greater than 25"
+      assert row[:active], "Should be active"
     end
 
     assert_equal ["Alice Brown", "John Doe"], names, "Should return Alice and John in order"
@@ -365,6 +380,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     processed_count = 0
     dataset.fetch_rows("SELECT * FROM test_table") do |row|
       processed_count += 1
+
       assert_instance_of Hash, row, "Each row should be a hash"
       # Verify we're not loading all rows into memory at once
       # This is more of a behavioral test
@@ -390,6 +406,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_equal 1, rows.length, "Should return 1 row"
 
     row = rows.first
+
     assert_equal "Test User", row[:name], "Name should be preserved"
     assert_nil row[:age], "Age should be nil"
     assert_nil row[:birth_date], "Birth date should be nil"

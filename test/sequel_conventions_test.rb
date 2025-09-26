@@ -45,18 +45,21 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
       adapter: "duckdb",
       database: ":memory:"
     )
+
     assert_connection_valid(db)
 
     # Test connection string format
     db2 = Sequel.connect("duckdb::memory:")
+
     assert_connection_valid(db2)
 
     # Test file database connection
     db3 = Sequel.connect("duckdb:test_db.duckdb")
+
     assert_connection_valid(db3)
 
     # Clean up test database file
-    File.delete("test_db.duckdb") if File.exist?("test_db.duckdb")
+    FileUtils.rm_f("test_db.duckdb")
   end
 
   def test_adapter_registration_follows_sequel_conventions
@@ -64,10 +67,12 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # Test that connection creates correct database class
     db = Sequel.connect("duckdb::memory:")
+
     assert_instance_of Sequel::DuckDB::Database, db
 
     # Test that datasets are correct class
     dataset = db[:test_table]
+
     assert_instance_of Sequel::DuckDB::Dataset, dataset
 
     # Test adapter scheme is set correctly
@@ -80,8 +85,8 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
     major = ruby_version[0]
     minor = ruby_version[1]
 
-    assert major >= 3, "Ruby version should be 3.0 or higher"
-    assert minor >= 1, "Ruby 3.x version should be 3.1 or higher" if major == 3
+    assert_operator major, :>=, 3, "Ruby version should be 3.0 or higher"
+    assert_operator minor, :>=, 1, "Ruby 3.x version should be 3.1 or higher" if major == 3
 
     # Test that modern Ruby features work
     db = create_db
@@ -126,10 +131,12 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # Test method chaining works (Sequel convention)
     chained = dataset.where(active: true).order(:name).limit(1)
+
     assert_instance_of Sequel::DuckDB::Dataset, chained
 
     # Test that results are properly formatted
     all_records = dataset.all
+
     assert_instance_of Array, all_records
     assert_instance_of Hash, all_records.first if all_records.any?
 
@@ -137,6 +144,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
     assert_instance_of Hash, first_record if first_record
 
     count = dataset.count
+
     assert_instance_of Integer, count
   end
 
@@ -165,10 +173,12 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
     end
 
     tables = db.tables
+
     assert_instance_of Array, tables
     assert_includes tables, :schema_test
 
     schema = db.schema(:schema_test)
+
     assert_instance_of Array, schema
 
     # Test schema format follows Sequel conventions
@@ -195,6 +205,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
       db[:test_table].insert(id: 100, name: "Transaction Test", age: 30)
       "success"
     end
+
     assert_equal "success", result
 
     # Verify record was inserted
@@ -214,6 +225,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # Verify rollback worked
     final_count = db[:test_table].count
+
     assert_equal initial_count, final_count
 
     # Test explicit rollback
@@ -247,6 +259,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # Check that SQL was logged
     log_content = log_output.string
+
     assert_includes log_content, "CREATE TABLE", "CREATE TABLE should be logged"
     assert_includes log_content, "INSERT", "INSERT should be logged"
     assert_includes log_content, "SELECT", "SELECT should be logged"
@@ -283,6 +296,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # All operations should succeed
     success_count = results.count { |r| r.start_with?("success") }
+
     assert_equal 3, success_count, "All threaded operations should succeed"
   end
 
@@ -298,15 +312,17 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
     end
 
     # Test that operations work with quoted identifiers
-    db[:"test-table"].insert(id: 1, "column-name": "test", "select": "value")
+    db[:"test-table"].insert(id: 1, "column-name": "test", select: "value")
 
     record = db[:"test-table"].first
+
     assert_equal "test", record[:"column-name"]
     assert_equal "value", record[:select]
 
     # Test schema introspection with quoted identifiers
     schema = db.schema(:"test-table")
     column_names = schema.map(&:first)
+
     assert_includes column_names, :"column-name"
     assert_includes column_names, :select
   end

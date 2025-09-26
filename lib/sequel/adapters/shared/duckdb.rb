@@ -2,6 +2,7 @@
 
 require "duckdb"
 
+# Sequel is the database toolkit for Ruby
 module Sequel
   module DuckDB
     # DatabaseMethods module provides shared database functionality for DuckDB adapter
@@ -42,7 +43,6 @@ module Sequel
     # @see Database
     # @since 0.1.0
     module DatabaseMethods
-
       # DuckDB uses the :duckdb database type.
       def database_type
         :duckdb
@@ -54,7 +54,7 @@ module Sequel
       end
 
       # Whether to quote identifiers by default for this database
-      def quote_identifiers_default
+      def quote_identifiers_default # rubocop:disable Naming/PredicateMethod
         true
       end
 
@@ -90,7 +90,9 @@ module Sequel
 
           # For UPDATE/DELETE operations without a block, return the number of affected rows
           # This is what Sequel models expect
-          if !block && result.is_a?(::DuckDB::Result) && (sql.strip.upcase.start_with?("UPDATE ") || sql.strip.upcase.start_with?("DELETE "))
+          if !block && result.is_a?(::DuckDB::Result) \
+            && (sql.strip.upcase.start_with?("UPDATE ") \
+            || sql.strip.upcase.start_with?("DELETE "))
             return result.rows_changed
           end
 
@@ -171,8 +173,10 @@ module Sequel
         when /violates.*not.*null/i, /not.*null.*constraint/i, /null.*value.*not.*allowed/i
           # NOT NULL constraint violations (Requirement 8.3) - moved up for priority
           Sequel::NotNullConstraintViolation
-        when /unique.*constraint/i, /duplicate.*key/i, /already.*exists/i
-          # UNIQUE constraint violations (Requirement 8.3)
+        when /unique.*constraint/i, /duplicate.*key/i, /already.*exists/i,
+           /primary.*key.*constraint/i, /duplicate.*primary.*key/i
+          # UNIQUE and PRIMARY KEY constraint violations (Requirement 8.3)
+          # Primary key violations are a type of unique constraint
           Sequel::UniqueConstraintViolation
         when /foreign.*key.*constraint/i, /violates.*foreign.*key/i
           # Foreign key constraint violations (Requirement 8.3)
@@ -180,35 +184,25 @@ module Sequel
         when /check.*constraint/i, /violates.*check/i
           # CHECK constraint violations (Requirement 8.3)
           Sequel::CheckConstraintViolation
-        when /primary.*key.*constraint/i, /duplicate.*primary.*key/i
-          # Primary key constraint violations (Requirement 8.3)
-          Sequel::UniqueConstraintViolation # Primary key violations are a type of unique constraint
         when /constraint.*violation/i, /violates.*constraint/i
           # Generic constraint violations (Requirement 8.3) - moved to end for lower priority
           Sequel::ConstraintViolation
-        when /syntax.*error/i, /parse.*error/i, /unexpected.*token/i
-          # SQL syntax errors (Requirement 8.2)
-          Sequel::DatabaseError
-        when /table.*does.*not.*exist/i, /relation.*does.*not.*exist/i, /no.*such.*table/i
-          # Table not found errors (Requirement 8.7)
-          Sequel::DatabaseError
-        when /column.*does.*not.*exist/i, /no.*such.*column/i, /unknown.*column/i, /referenced.*column.*not.*found/i, /does.*not.*have.*a.*column/i
-          # Column not found errors (Requirement 8.7)
-          Sequel::DatabaseError
-        when /schema.*does.*not.*exist/i, /no.*such.*schema/i
-          # Schema not found errors (Requirement 8.7)
-          Sequel::DatabaseError
-        when /function.*does.*not.*exist/i, /no.*such.*function/i, /unknown.*function/i
-          # Function not found errors (Requirement 8.7)
-          Sequel::DatabaseError
-        when /type.*error/i, /cannot.*cast/i, /invalid.*type/i
-          # Type conversion errors (Requirement 8.7)
-          Sequel::DatabaseError
-        when /permission.*denied/i, /access.*denied/i, /insufficient.*privileges/i
-          # Permission/access errors (Requirement 8.7)
-          Sequel::DatabaseError
         else
-          # Default to generic DatabaseError for all other DuckDB errors (Requirement 8.2)
+          # when /syntax.*error/i, /parse.*error/i, /unexpected.*token/i,
+          #      /table.*does.*not.*exist/i, /relation.*does.*not.*exist/i,
+          #      /no.*such.*table/i, /column.*does.*not.*exist/i,
+          #      /no.*such.*column/i, /unknown.*column/i,
+          #      /referenced.*column.*not.*found/i,
+          #      /does.*not.*have.*a.*column/i, /schema.*does.*not.*exist/i,
+          #      /no.*such.*schema/i, /function.*does.*not.*exist/i,
+          #      /no.*such.*function/i, /unknown.*function/i, /type.*error/i,
+          #      /cannot.*cast/i, /invalid.*type/i, /permission.*denied/i,
+          #      /access.*denied/i, /insufficient.*privileges/i
+          # Various database errors (Requirements 8.2, 8.7):
+          # - SQL syntax errors
+          # - Table/column/schema/function not found errors
+          # - Type conversion errors
+          # - Permission/access errors
           Sequel::DatabaseError
         end
       end
@@ -404,9 +398,7 @@ module Sequel
         formatted_value = case value
                           when String
                             "'#{value.gsub("'", "''")}'" # Escape single quotes
-                          when TrueClass, FalseClass
-                            value.to_s
-                          when Numeric
+                          when TrueClass, FalseClass, Numeric
                             value.to_s
                           else
                             "'#{value}'"
@@ -537,22 +529,14 @@ module Sequel
       # @return [Symbol] Sequel type symbol
       def map_duckdb_type_to_sequel(duckdb_type)
         case duckdb_type.upcase
-        when "INTEGER", "INT", "INT4"
+        when "INTEGER", "INT", "INT4", "SMALLINT", "INT2", "TINYINT", "INT1"
           :integer
         when "BIGINT", "INT8"
           :bigint
-        when "SMALLINT", "INT2"
-          :integer
-        when "TINYINT", "INT1"
-          :integer
-        when "REAL", "FLOAT4"
-          :float
-        when "DOUBLE", "FLOAT8"
+        when "REAL", "FLOAT4", "DOUBLE", "FLOAT8"
           :float
         when /^DECIMAL/, /^NUMERIC/
           :decimal
-        when "VARCHAR", "TEXT", "STRING"
-          :string
         when "BOOLEAN", "BOOL"
           :boolean
         when "DATE"
@@ -566,6 +550,7 @@ module Sequel
         when "UUID"
           :uuid
         else
+          # when "VARCHAR", "TEXT", "STRING"
           :string # Default fallback
         end
       end
@@ -741,17 +726,20 @@ module Sequel
       end
 
       # Override Sequel's transaction method to support advanced features
-      def transaction(opts = {}, &block)
+      def transaction(opts = {}, &)
         # Handle savepoint transactions (nested transactions)
-        return savepoint_transaction(opts, &block) if opts[:savepoint] && supports_savepoints?
+        return savepoint_transaction(opts, &) if opts[:savepoint] && supports_savepoints?
 
         # Handle isolation level setting
         if opts[:isolation] && supports_transaction_isolation_level?(opts[:isolation])
-          return isolation_transaction(opts, &block)
+          return isolation_transaction(
+            opts,
+            &
+          )
         end
 
         # Fall back to standard Sequel transaction handling
-        super(opts, &block)
+        super
       end
 
       private
@@ -780,7 +768,7 @@ module Sequel
           conn.query("ROLLBACK TO SAVEPOINT #{savepoint_name}")
           conn.query("RELEASE SAVEPOINT #{savepoint_name}")
           nil
-        rescue Exception => e
+        rescue StandardError => e
           # Rollback to savepoint on any other exception
           begin
             conn.query("ROLLBACK TO SAVEPOINT #{savepoint_name}")
@@ -822,7 +810,7 @@ module Sequel
           # Rollback on explicit rollback
           conn.query("ROLLBACK")
           nil
-        rescue Exception => e
+        rescue StandardError => e
           # Rollback on any other exception
           begin
             conn.query("ROLLBACK")
@@ -842,7 +830,9 @@ module Sequel
       # @return [String] SQL for primary key column
       def primary_key_column_sql(column, _opts)
         # DuckDB doesn't support AUTOINCREMENT, so we just use INTEGER PRIMARY KEY
-        "#{quote_identifier(column)} INTEGER PRIMARY KEY"
+        col_sql = String.new
+        quote_identifier_append(col_sql, column)
+        "#{col_sql} INTEGER PRIMARY KEY"
         # Don't add AUTOINCREMENT for DuckDB
       end
 
@@ -860,7 +850,9 @@ module Sequel
       def auto_increment_column_sql(column, _opts)
         # DuckDB uses sequences for auto-increment, but for primary keys
         # we can just use INTEGER PRIMARY KEY without AUTOINCREMENT
-        "#{quote_identifier(column)} INTEGER PRIMARY KEY"
+        col_sql = String.new
+        quote_identifier_append(col_sql, column)
+        "#{col_sql} INTEGER PRIMARY KEY"
       end
 
       # Map Ruby types to DuckDB types
@@ -869,7 +861,7 @@ module Sequel
       # @return [String] DuckDB type
       def type_literal(opts)
         case opts[:type]
-        when :primary_key
+        when :primary_key, :integer
           "INTEGER"
         when :string, :text
           if opts[:size]
@@ -877,8 +869,6 @@ module Sequel
           else
             "VARCHAR"
           end
-        when :integer
-          "INTEGER"
         when :bigint
           "BIGINT"
         when :float, :real
@@ -1146,7 +1136,7 @@ module Sequel
       #
       # @param thread_count [Integer] Number of threads to use
       def configure_parallel_execution(thread_count = nil)
-        thread_count ||= [4, get_cpu_count].min
+        thread_count ||= [4, cpu_count].min
 
         set_config_value("threads", thread_count)
         set_config_value("enable_optimizer", true)
@@ -1171,7 +1161,7 @@ module Sequel
       private
 
       # Get CPU count for parallel execution configuration
-      def get_cpu_count
+      def cpu_count
         require "etc"
         Etc.nprocessors
       rescue StandardError
@@ -1231,19 +1221,47 @@ module Sequel
     # This module is included by the main Dataset class to provide SQL generation
     # and query execution capabilities.
     module DatasetMethods
+      # DuckDB reserved words that must be quoted
+      DUCKDB_RESERVED_WORDS = %w[
+        order group select from where having limit offset union all distinct
+        case when then else end and or not in like between is null true false
+        join inner left right full outer on using as with recursive
+        create table view index drop alter insert update delete
+        primary key foreign references constraint unique check default
+        auto_increment serial bigserial smallserial
+        integer int bigint smallint tinyint boolean bool
+        varchar char text string blob
+        date time timestamp datetime interval
+        float double real decimal numeric
+        array struct map
+      ].freeze
+
       private
 
       # DuckDB uses lowercase identifiers
-      def input_identifier(v)
-        v.to_s
+      def input_identifier(value)
+        value.to_s
       end
 
       # DuckDB uses lowercase identifiers
-      def output_identifier(v)
-        v == '' ? :untitled : v.to_sym
+      def output_identifier(value)
+        value == "" ? :untitled : value.to_sym
       end
 
       public
+
+      # Delegate quote_identifiers_default to the database
+      def quote_identifiers_default
+        db.quote_identifiers_default
+      end
+
+      # Check if an identifier needs quoting
+      def identifier_needs_quoting?(name)
+        return true if super
+
+        DUCKDB_RESERVED_WORDS.include?(name.to_s.downcase)
+      end
+
       # Generate INSERT SQL statement
       #
       # @param values [Hash, Array] Values to insert
@@ -1293,11 +1311,13 @@ module Sequel
       def update_sql(values = {})
         return @opts[:sql] if @opts[:sql]
 
-        sql = "UPDATE #{table_name_sql} SET ".dup
+        sql = "UPDATE #{table_name_sql} SET "
 
         # Add SET clause
         set_clauses = values.map do |column, value|
-          "#{quote_identifier(column)} = #{literal(value)}"
+          col_sql = String.new
+          quote_identifier_append(col_sql, column)
+          "#{col_sql} = #{literal(value)}"
         end
         sql << set_clauses.join(", ")
 
@@ -1313,7 +1333,7 @@ module Sequel
       def delete_sql
         return @opts[:sql] if @opts[:sql]
 
-        sql = "DELETE FROM #{table_name_sql}".dup
+        sql = "DELETE FROM #{table_name_sql}"
 
         # Add WHERE clause
         select_where_sql(sql) if @opts[:where]
@@ -1342,15 +1362,14 @@ module Sequel
         true
       end
 
-
-
       # Validate table name for SELECT operations
       def validate_table_name_for_select
         return unless @opts[:from] # Skip if no FROM clause
 
         @opts[:from].each do |table|
           if table.nil? || (table.respond_to?(:to_s) && table.to_s.strip.empty?)
-            raise ArgumentError, "Table name cannot be nil or empty"
+            raise ArgumentError,
+                  "Table name cannot be nil or empty"
           end
         end
       end
@@ -1364,14 +1383,17 @@ module Sequel
       def table_name_sql
         raise ArgumentError, "Table name cannot be nil or empty" if @opts[:from].nil? || @opts[:from].empty?
 
-        table_name = @opts[:from].first.to_s
+        # Check if the table name is nil
+        table_name = @opts[:from].first
+        raise ArgumentError, "Table name cannot be nil" if table_name.nil?
+
+        table_name = table_name.to_s
         raise ArgumentError, "Table name cannot be empty" if table_name.empty?
 
-        if table_name.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/) && !reserved_word?(table_name)
-          table_name
-        else
-          "\"#{table_name}\""
-        end
+        # Use quote_identifier_append to respect quote_identifiers? setting
+        sql = String.new
+        quote_identifier_append(sql, table_name)
+        sql
       end
 
       private
@@ -1388,14 +1410,14 @@ module Sequel
 
         # Add each CTE
         opts[:with].each_with_index do |w, i|
-          sql << ", " if i > 0
-          sql << "#{quote_identifier(w[:name])} AS (#{w[:dataset].sql})"
+          sql << ", " if i.positive?
+          name_sql = String.new
+          quote_identifier_append(name_sql, w[:name])
+          sql << "#{name_sql} AS (#{w[:dataset].sql})"
         end
 
         sql << " "
       end
-
-      private
 
       # Auto-detect if a CTE is recursive by analyzing its SQL for self-references
       #
@@ -1417,11 +1439,24 @@ module Sequel
 
       public
 
+      # Override select_from_sql to validate table names
+      def select_from_sql(sql)
+        if (f = @opts[:from])
+          # Validate that no table names are nil
+          f.each do |table|
+            raise ArgumentError, "Table name cannot be nil" if table.nil?
+          end
+        end
+
+        # Call parent implementation
+        super
+      end
+
       # Add JOIN clauses to SQL (Requirement 6.9)
       def select_join_sql(sql)
         return unless @opts[:join]
 
-        @opts[:join].each do |join|
+        @opts[:join].each do |join| # rubocop:disable Metrics/BlockLength
           # Handle different join clause types
           case join
           when Sequel::SQL::JoinOnClause
@@ -1431,8 +1466,6 @@ module Sequel
 
             # Format join type
             join_clause = case join_type
-                          when :inner
-                            "INNER JOIN"
                           when :left, :left_outer
                             "LEFT JOIN"
                           when :right, :right_outer
@@ -1440,6 +1473,7 @@ module Sequel
                           when :full, :full_outer
                             "FULL JOIN"
                           else
+                            # when :inner
                             "INNER JOIN"
                           end
 
@@ -1447,7 +1481,9 @@ module Sequel
 
             # Add table name
             sql << if table.is_a?(Sequel::Dataset)
-                     "(#{table.sql}) AS #{quote_identifier(join.table_alias || "subquery")}"
+                     alias_sql = String.new
+                     quote_identifier_append(alias_sql, join.table_alias || "subquery")
+                     "(#{table.sql}) AS #{alias_sql}"
                    else
                      literal(table)
                    end
@@ -1464,8 +1500,6 @@ module Sequel
             using_columns = join.using
 
             join_clause = case join_type
-                          when :inner
-                            "INNER JOIN"
                           when :left, :left_outer
                             "LEFT JOIN"
                           when :right, :right_outer
@@ -1473,24 +1507,34 @@ module Sequel
                           when :full, :full_outer
                             "FULL JOIN"
                           else
+                            # when :inner
                             "INNER JOIN"
                           end
 
             sql << " #{join_clause} "
 
             # Handle table with alias
-            if table.is_a?(Sequel::Dataset)
-              # Subquery with alias
-              sql << "(#{table.sql})"
-              sql << " AS #{quote_identifier(join.table_alias)}" if join.table_alias
-            else
-              # Regular table (may have alias)
-              sql << literal(table)
-              # Add alias if present
-              sql << " AS #{quote_identifier(join.table_alias)}" if join.table_alias
+            sql << if table.is_a?(Sequel::Dataset)
+                     # Subquery with alias
+                     "(#{table.sql})"
+                   else
+                     # Regular table (may have alias)
+                     literal(table)
+                     # Add alias if present
+                   end
+            if join.table_alias
+              sql << " AS "
+              quote_identifier_append(sql, join.table_alias)
             end
 
-            sql << " USING (#{Array(using_columns).map { |col| quote_identifier(col) }.join(", ")})" if using_columns
+            if using_columns
+              sql << " USING ("
+              Array(using_columns).each_with_index do |col, i|
+                sql << ", " if i.positive?
+                quote_identifier_append(sql, col)
+              end
+              sql << ")"
+            end
 
           when Sequel::SQL::JoinClause
             join_type = join.join_type || :inner
@@ -1567,31 +1611,12 @@ module Sequel
         end
       end
 
-      # Enhanced literal handling for complex expressions
-      def literal_append(sql, v)
-        case v
-        when Time
-          literal_datetime_append(sql, v)
-        when DateTime
-          literal_datetime_append(sql, v)
-        when String
-          if v.encoding == Encoding::ASCII_8BIT
-            literal_blob_append(sql, v)
-          else
-            literal_string_append(sql, v)
-          end
-        else
-          super
-        end
-      end
-
       # DuckDB-specific SQL generation enhancements
 
       # Override complex_expression_sql_append for DuckDB-specific handling
-      public
 
-      def complex_expression_sql_append(sql, op, args)
-        case op
+      def complex_expression_sql_append(sql, operator, args)
+        case operator
         when :LIKE
           # Generate clean LIKE without ESCAPE clause (Requirement 1.1)
           sql << "("
@@ -1655,10 +1680,9 @@ module Sequel
         end
       end
 
-
       # Override literal methods for DuckDB-specific formatting
-      def literal_string_append(sql, s)
-        sql << "'" << s.gsub("'", "''") << "'"
+      def literal_string_append(sql, string)
+        sql << "'" << string.gsub("'", "''") << "'"
       end
 
       def literal_date(date)
@@ -1673,6 +1697,18 @@ module Sequel
         "'#{time.strftime("%H:%M:%S")}'"
       end
 
+      # Override symbol literal handling to prevent asterisk from being quoted
+      # This fixes count(*) function calls which should not quote the asterisk
+      def literal_symbol_append(sql, value)
+        # Special case for asterisk - don't quote it
+        if value == :*
+          sql << "*"
+        else
+          # Use standard Sequel symbol handling for all other symbols
+          super
+        end
+      end
+
       def literal_boolean(value)
         value ? "TRUE" : "FALSE"
       end
@@ -1685,30 +1721,29 @@ module Sequel
         "FALSE"
       end
 
-      # Override literal_append to handle Time objects and binary data properly
-      def literal_append(sql, v)
-        case v
+      # Override literal_append to handle DuckDB-specific type conversions
+      # Only handles cases that differ from Sequel's default behavior
+      def literal_append(sql, value)
+        case value
         when Time
-          # Check if this looks like a time-only value (year 1970 indicates time-only)
-          if v.year == 1970 && v.month == 1 && v.day == 1
+          # Special handling for time-only values (year 1970 indicates time-only)
+          if value.year == 1970 && value.month == 1 && value.day == 1
             # This is a time-only value, use TIME format
-            sql << "'#{v.strftime("%H:%M:%S")}'"
+            sql << "'#{value.strftime("%H:%M:%S")}'"
           else
-            # This is a full datetime value
-            literal_datetime_append(sql, v)
+            # Use our custom datetime formatting for consistency
+            literal_datetime_append(sql, value)
           end
         when DateTime
-          literal_datetime_append(sql, v)
+          # Use our custom datetime formatting for consistency
+          literal_datetime_append(sql, value)
         when String
-          case v
-          when LiteralString
-            sql << v
+          # Only handle binary data differently for DuckDB's hex format
+          if value.encoding == Encoding::ASCII_8BIT
+            literal_blob_append(sql, value)
           else
-            if v.encoding == Encoding::ASCII_8BIT
-              literal_blob_append(sql, v)
-            else
-              literal_string_append(sql, v)
-            end
+            # Let Sequel handle LiteralString and regular strings
+            super
           end
         else
           super
@@ -1732,20 +1767,6 @@ module Sequel
       end
 
       # Dataset operation methods (Requirements 6.1, 6.2, 6.3, 9.5)
-
-      # Count the number of records in the dataset
-      #
-      # @return [Integer] Number of records
-      def count
-        # Generate COUNT(*) SQL and execute it
-        count_sql = clone(select: [Sequel.function(:count, :*)]).select_sql
-        value = nil
-        fetch_rows(count_sql) do |row|
-          value = row.values.first
-          break
-        end
-        value || 0
-      end
 
       # Override all method to ensure proper model instantiation
       # Sequel's default all method doesn't always apply row_proc correctly
@@ -1804,10 +1825,10 @@ module Sequel
       # @param sql [String] SQL to execute
       # @param &block [Proc] Block to process each row
       # @return [Enumerator] If no block given, returns enumerator
-      def stream(sql = select_sql, &block)
+      def stream(sql = select_sql, &)
         if block_given?
           # Stream results by processing them one at a time
-          fetch_rows(sql, &block)
+          fetch_rows(sql, &)
         else
           # Return enumerator for lazy evaluation
           enum_for(:stream, sql)
@@ -1820,12 +1841,12 @@ module Sequel
       # Optimized fetch_rows method for large result sets (Requirement 9.1)
       # This method provides efficient row fetching with streaming capabilities
       # Override the existing fetch_rows method to make it public and optimized
-      def fetch_rows(sql, &block)
+      def fetch_rows(sql)
         # Use streaming approach to avoid loading all results into memory at once
         # This is particularly important for large result sets
         if block_given?
           # Get schema information for type conversion
-          table_schema = get_table_schema_for_conversion
+          table_schema = table_schema_for_conversion
 
           # Execute with type conversion
           db.execute(sql) do |row|
@@ -1842,8 +1863,8 @@ module Sequel
       private
 
       # Get table schema information for type conversion
-      def get_table_schema_for_conversion
-        return nil unless @opts[:from] && @opts[:from].first
+      def table_schema_for_conversion
+        return nil unless @opts[:from]&.first
 
         table_name = @opts[:from].first
         # Handle case where table name is wrapped in an identifier
@@ -1883,7 +1904,7 @@ module Sequel
 
       # Enhanced bulk insert optimization (Requirement 9.3)
       # Override multi_insert to use DuckDB's efficient bulk loading capabilities
-      def multi_insert(columns = nil, &block)
+      def multi_insert(columns = nil, &)
         if columns.is_a?(Array) && !columns.empty? && columns.first.is_a?(Hash)
           # Handle array of hashes (most common case)
           bulk_insert_optimized(columns)
@@ -1906,9 +1927,14 @@ module Sequel
         # Build optimized INSERT statement with VALUES clause
         # DuckDB handles multiple VALUES efficiently
         values_placeholders = rows.map { |_| "(#{columns.map { "?" }.join(", ")})" }.join(", ")
-        sql = "INSERT INTO #{quote_identifier(table_name)} (#{columns.map do |c|
-          quote_identifier(c)
-        end.join(", ")}) VALUES #{values_placeholders}"
+        table_sql = String.new
+        quote_identifier_append(table_sql, table_name)
+        col_list = columns.map do |c|
+          col_sql = String.new
+          quote_identifier_append(col_sql, c)
+          col_sql
+        end.join(", ")
+        sql = "INSERT INTO #{table_sql} (#{col_list}) VALUES #{values_placeholders}"
 
         # Flatten all row values for parameter binding
         params = rows.flat_map { |row| columns.map { |col| row[col] } }
@@ -1978,7 +2004,7 @@ module Sequel
 
       # Memory-efficient streaming for large result sets (Requirement 9.5)
       # Enhanced each method with better memory management
-      def each(&block)
+      def each(&)
         return enum_for(:each) unless block_given?
 
         # Use streaming approach to minimize memory usage
@@ -1987,7 +2013,7 @@ module Sequel
         # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
         if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
           # SQL already has LIMIT/OFFSET, execute directly without batching
-          fetch_rows(sql, &block)
+          fetch_rows(sql, &)
           return self
         end
 
@@ -2027,7 +2053,7 @@ module Sequel
       # @param memory_limit [Integer] Maximum memory growth allowed in bytes
       # @param &block [Proc] Block to process each row
       # @return [Enumerator] If no block given
-      def stream_with_memory_limit(memory_limit, &block)
+      def stream_with_memory_limit(memory_limit, &)
         return enum_for(:stream_with_memory_limit, memory_limit) unless block_given?
 
         sql = select_sql
@@ -2035,17 +2061,17 @@ module Sequel
         # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
         if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
           # SQL already has LIMIT/OFFSET, execute directly without batching
-          fetch_rows(sql, &block)
+          fetch_rows(sql, &)
           return self
         end
 
-        initial_memory = get_memory_usage
+        initial_memory = memory_usage
         batch_size = @opts[:stream_batch_size] || 500
         offset = 0
 
         loop do
           # Check memory usage before processing batch
-          current_memory = get_memory_usage
+          current_memory = memory_usage
           memory_growth = current_memory - initial_memory
 
           # Reduce batch size if memory usage is high
@@ -2073,20 +2099,28 @@ module Sequel
       private
 
       # Get approximate memory usage for streaming optimization
-      def get_memory_usage
+      def memory_usage
         GC.start
         ObjectSpace.count_objects[:TOTAL] * 40
       end
 
       public
 
-      # Optimized count method for large tables
-      def count(*args)
-        if args.empty? && !@opts[:group] && !@opts[:having] && !@opts[:distinct] && !@opts[:where]
-          # Use optimized COUNT(*) for simple cases only (no WHERE clause)
-          # Get table name from opts[:from]
+      # Optimized count method for DuckDB
+      # Provides fast path for simple COUNT(*) queries on base tables
+      # Falls back to Sequel's implementation for complex scenarios
+      def count(*args, &block)
+        # Only optimize if:
+        # - No arguments or block provided
+        # - No grouping, having, distinct, or where clauses
+        # - Has a from clause with a table
+        if args.empty? && !block && !@opts[:group] && !@opts[:having] &&
+           !@opts[:distinct] && !@opts[:where] && @opts[:from]&.first
+          # Use optimized COUNT(*) for simple cases
           table_name = @opts[:from].first
-          single_value("SELECT COUNT(*) FROM #{quote_identifier(table_name)}")
+          table_sql = String.new
+          quote_identifier_append(table_sql, table_name)
+          single_value("SELECT COUNT(*) FROM #{table_sql}")
         else
           # Fall back to standard Sequel count behavior for complex cases
           super
@@ -2150,8 +2184,8 @@ module Sequel
       end
 
       # Override where method to add index-aware optimization hints
-      def where(*cond, &block)
-        result = super(*cond, &block)
+      def where(*cond, &)
+        result = super
 
         # Add index optimization hints based on WHERE conditions
         result = result.add_index_hints(cond.first.keys) if cond.length == 1 && cond.first.is_a?(Hash)
@@ -2161,7 +2195,7 @@ module Sequel
 
       # Override order method to leverage index optimization
       def order(*columns)
-        result = super(*columns)
+        result = super
 
         # Add index hints for ORDER BY optimization
         order_columns = columns.map do |col|
@@ -2205,7 +2239,7 @@ module Sequel
 
       # Override select method to add columnar optimization
       def select(*columns)
-        result = super(*columns)
+        result = super
 
         # Mark as columnar-optimized if selecting specific columns
         result = result.clone(columnar_optimized: true) if columns.length.positive? && columns.length < 10
@@ -2215,7 +2249,7 @@ module Sequel
 
       # Optimize aggregation queries for columnar storage
       def group(*columns)
-        result = super(*columns)
+        result = super
 
         # Add columnar aggregation optimization hints
         result.clone(columnar_aggregation: true)

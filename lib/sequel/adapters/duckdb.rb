@@ -124,7 +124,7 @@ module Sequel
       # @see disconnect_connection
       # @see valid_connection?
       # @since 0.1.0
-      def connect(server)
+      def connect(server) # rubocop:disable Metrics/MethodLength
         opts = server_opts(server)
         database_path = opts[:database]
 

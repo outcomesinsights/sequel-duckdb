@@ -13,7 +13,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     result = db.send(:database_exception_class, exception, {})
 
     assert_kind_of Class, result, "database_exception_class should return a class"
-    assert result <= Exception, "Returned class should be an exception class"
+    assert_operator result, :<=, Exception, "Returned class should be an exception class"
   end
 
   def test_database_exception_message_method_exists
@@ -43,6 +43,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test NOT NULL constraint violation mapping
     begin
       db.execute("INSERT INTO enhanced_constraint_test (id, email) VALUES (1, 'test@example.com')")
+
       flunk "Should have raised a constraint violation"
     rescue Sequel::NotNullConstraintViolation => e
       assert_match(/NOT NULL/i, e.message, "NOT NULL constraint error should be properly mapped")
@@ -59,6 +60,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test UNIQUE constraint violation mapping
     begin
       db.execute("INSERT INTO enhanced_constraint_test (id, name, email, age) VALUES (2, 'Another User', 'test@example.com', 30)")
+
       flunk "Should have raised a unique constraint violation"
     rescue Sequel::UniqueConstraintViolation => e
       assert_match(/UNIQUE/i, e.message, "UNIQUE constraint error should be properly mapped")
@@ -71,6 +73,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test PRIMARY KEY constraint violation mapping
     begin
       db.execute("INSERT INTO enhanced_constraint_test (id, name, email, age) VALUES (1, 'Duplicate ID', 'another@example.com', 35)")
+
       flunk "Should have raised a primary key constraint violation"
     rescue Sequel::UniqueConstraintViolation => e
       # Primary key violations are mapped to UniqueConstraintViolation
@@ -84,6 +87,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test CHECK constraint violation mapping
     begin
       db.execute("INSERT INTO enhanced_constraint_test (id, name, email, age) VALUES (3, 'Invalid Age', 'invalid@example.com', -5)")
+
       flunk "Should have raised a check constraint violation"
     rescue Sequel::CheckConstraintViolation => e
       assert_match(/CHECK/i, e.message, "CHECK constraint error should be properly mapped")
@@ -105,6 +109,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
     syntax_errors.each do |sql|
       db.execute(sql)
+
       flunk "Should have raised a syntax error for: #{sql}"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
@@ -125,6 +130,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
     table_errors.each do |sql|
       db.execute(sql)
+
       flunk "Should have raised a table not found error for: #{sql}"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
@@ -145,6 +151,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
     column_errors.each do |sql|
       db.execute(sql)
+
       flunk "Should have raised a column not found error for: #{sql}"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
@@ -172,6 +179,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test with invalid SQL and parameters
     begin
       db.execute("INVALID SQL WITH ? PARAMETERS", %w[param1 param2])
+
       flunk "Should have raised a syntax error"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Error should include DuckDB context")
@@ -184,6 +192,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test connection errors are properly mapped
 
     Sequel.connect("duckdb:///invalid/path/that/does/not/exist.db")
+
     flunk "Should have raised a connection error"
   rescue Sequel::DatabaseConnectionError => e
     assert_match(/Failed to connect to DuckDB database/, e.message,
@@ -199,6 +208,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
 
     begin
       db.execute(test_sql, test_params)
+
       flunk "Should have raised an error"
     rescue Sequel::DatabaseError => e
       # Verify enhanced message format
@@ -210,6 +220,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     # Test error message without parameters
     begin
       db.execute("SELECT * FROM another_nonexistent_table")
+
       flunk "Should have raised an error"
     rescue Sequel::DatabaseError => e
       assert_match(/DuckDB error:/, e.message, "Should include DuckDB error prefix")
@@ -273,7 +284,7 @@ class EnhancedErrorMappingTest < SequelDuckDBTest::TestCase
     db = create_db
 
     # Test the handle_constraint_violation method if it exists
-    return unless db.respond_to?(:handle_constraint_violation, true)
+    skip unless db.respond_to?(:handle_constraint_violation, true)
 
     exception = ::DuckDB::Error.new("UNIQUE constraint violation")
     opts = { sql: "INSERT INTO test (id) VALUES (1)", params: [1] }

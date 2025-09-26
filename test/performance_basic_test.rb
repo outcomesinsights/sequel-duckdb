@@ -40,7 +40,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     batch_sizes = [100, 500, 1000]
 
     batch_sizes.each do |batch_size|
-      memory_before = get_memory_usage
+      memory_before = memory_usage
       processed_count = 0
 
       # Test streaming with custom batch size
@@ -48,38 +48,38 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
       dataset.each do |row|
         processed_count += 1
-        assert row.is_a?(Hash), "Streamed row should be a hash"
+
+        assert_kind_of Hash, row, "Streamed row should be a hash"
         assert row.key?(:id), "Streamed row should have id"
       end
 
-      memory_after = get_memory_usage
+      memory_after = memory_usage
       memory_growth = memory_after - memory_before
 
       assert_equal 5000, processed_count, "Should process all rows with batch size #{batch_size}"
-      assert memory_growth < 200_000_000,
-             "Memory growth should be controlled with batch size #{batch_size} (growth: #{memory_growth} bytes)"
+      assert_operator memory_growth, :<, 200_000_000, "Memory growth should be controlled with batch size #{batch_size} (growth: #{memory_growth} bytes)"
     end
   end
 
   def test_streaming_with_memory_limit
     # Test streaming with memory limit enforcement
-    memory_before = get_memory_usage
+    memory_before = memory_usage
     processed_count = 0
     max_memory_seen = memory_before
 
     # Stream with memory monitoring
     @db[:columnar_test].stream_with_memory_limit(100_000_000) do |row|
       processed_count += 1
-      current_memory = get_memory_usage
+      current_memory = memory_usage
       max_memory_seen = [max_memory_seen, current_memory].max
 
-      assert row.is_a?(Hash), "Row should be a hash"
+      assert_kind_of Hash, row, "Row should be a hash"
     end
 
     memory_growth = max_memory_seen - memory_before
 
     assert_equal 5000, processed_count, "Should process all rows"
-    assert memory_growth < 150_000_000, "Should respect memory limit (growth: #{memory_growth} bytes)"
+    assert_operator memory_growth, :<, 150_000_000, "Should respect memory limit (growth: #{memory_growth} bytes)"
   end
 
   # Test index-aware query generation (Requirement 9.7)
@@ -97,11 +97,13 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Test that index hints are added to the dataset
     analysis = dataset.analyze_query
-    assert analysis.is_a?(Hash), "Should return analysis hash"
+
+    assert_kind_of Hash, analysis, "Should return analysis hash"
     assert analysis.key?(:plan), "Should include plan"
 
     # Verify query still returns correct results
     results = dataset.all
+
     assert results.all? { |r| r[:category] == "Electronics" }, "Results should match filter"
   end
 
@@ -120,6 +122,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Verify results
     results = dataset.all
+
     assert results.all? { |r| r[:transaction_date] == Date.today && r[:processed] == true },
            "Results should match composite filter"
   end
@@ -144,10 +147,12 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Should optimize ORDER BY using amount index
     results = dataset.limit(10).all
+
     assert_equal 10, results.length, "Should return limited results"
 
     # Verify ordering
     amounts = results.map { |r| r[:amount] }
+
     assert_equal amounts.sort, amounts, "Results should be ordered by amount"
   end
 
@@ -174,8 +179,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     # Projection should be faster or at least not significantly slower
     # For small datasets, the difference may not be significant
-    assert projection_time <= full_scan_time * 3.0,
-           "Column projection should not be significantly slower (projection: #{projection_time}s, full: #{full_scan_time}s)"
+    assert_operator projection_time, :<=, full_scan_time * 3.0, "Column projection should not be significantly slower (projection: #{projection_time}s, full: #{full_scan_time}s)"
 
     # Verify results are correct
     assert results.all? { |r| r.key?(:category) && r.key?(:amount) }, "Should have projected columns"
@@ -199,13 +203,13 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     aggregation_time = Time.now - start_time
 
-    assert aggregation_time < 2.0, "Aggregation should be fast on columnar data (took #{aggregation_time}s)"
+    assert_operator aggregation_time, :<, 2.0, "Aggregation should be fast on columnar data (took #{aggregation_time}s)"
 
     # Verify aggregation results
     assert_equal 5000, stats[:total_count], "Should count all rows"
-    assert stats[:total_amount].positive?, "Should sum amounts"
-    assert stats[:avg_amount].positive?, "Should calculate average"
-    assert stats[:max_amount] >= stats[:min_amount], "Max should be >= min"
+    assert_predicate stats[:total_amount], :positive?, "Should sum amounts"
+    assert_predicate stats[:avg_amount], :positive?, "Should calculate average"
+    assert_operator stats[:max_amount], :>=, stats[:min_amount], "Max should be >= min"
   end
 
   def test_columnar_storage_group_by_optimization
@@ -222,14 +226,15 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     group_by_time = Time.now - start_time
 
-    assert group_by_time < 1.0, "GROUP BY should be fast on columnar data (took #{group_by_time}s)"
+    assert_operator group_by_time, :<, 1.0, "GROUP BY should be fast on columnar data (took #{group_by_time}s)"
 
     # Verify GROUP BY results
-    assert category_stats.length.positive?, "Should have grouped results"
+    assert_predicate category_stats.length, :positive?, "Should have grouped results"
     assert category_stats.all? { |r| r[:count].positive? }, "Each group should have count > 0"
 
     # Verify total count matches
     total_count = category_stats.sum { |r| r[:count] }
+
     assert_equal 5000, total_count, "Total count should match original data"
   end
 
@@ -247,10 +252,10 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     filter_time = Time.now - start_time
 
-    assert filter_time < 1.0, "Complex filtering should be efficient (took #{filter_time}s)"
+    assert_operator filter_time, :<, 1.0, "Complex filtering should be efficient (took #{filter_time}s)"
 
     # Verify filter results
-    assert filtered_results.all? { |r| r[:amount] >= 2000 && r[:amount] <= 8000 },
+    assert filtered_results.all? { |r| r[:amount].between?(2000, 8000) },
            "Should respect amount range filter"
     assert filtered_results.all? { |r| r[:category].include?("Electronics") },
            "Should respect category filter"
@@ -274,11 +279,11 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     parallel_time = Time.now - start_time
 
     # Should complete in reasonable time (parallel execution should help)
-    assert parallel_time < 3.0, "Large aggregation should complete efficiently (took #{parallel_time}s)"
+    assert_operator parallel_time, :<, 3.0, "Large aggregation should complete efficiently (took #{parallel_time}s)"
 
     # Verify results
     assert_equal 5000, result[:total_rows], "Should count all rows"
-    assert result[:total_amount].positive?, "Should calculate sum"
+    assert_predicate result[:total_amount], :positive?, "Should calculate sum"
   end
 
   def test_parallel_query_execution_complex_joins
@@ -313,10 +318,10 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     join_time = Time.now - start_time
 
-    assert join_time < 2.0, "Complex join should complete efficiently (took #{join_time}s)"
+    assert_operator join_time, :<, 2.0, "Complex join should complete efficiently (took #{join_time}s)"
 
     # Verify join results
-    assert join_results.length.positive?, "Should have join results"
+    assert_predicate join_results.length, :positive?, "Should have join results"
     assert join_results.all? { |r| r[:amount] > 3000 }, "Should respect WHERE clause"
     assert join_results.all? { |r| r.key?(:department) }, "Should have joined columns"
 
@@ -341,10 +346,10 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
     window_time = Time.now - start_time
 
-    assert window_time < 2.0, "Window functions should execute efficiently (took #{window_time}s)"
+    assert_operator window_time, :<, 2.0, "Window functions should execute efficiently (took #{window_time}s)"
 
     # Verify window function results
-    assert window_results.length.positive?, "Should have window function results"
+    assert_predicate window_results.length, :positive?, "Should have window function results"
     assert window_results.all? { |r| r[:row_num].positive? }, "Should have row numbers"
     assert window_results.all? { |r| r[:rank].positive? }, "Should have ranks"
   end
@@ -377,9 +382,8 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
 
       parallel_config_time = Time.now - start_time
 
-      assert parallel_config_time < 2.0,
-             "Configured parallel execution should be efficient (took #{parallel_config_time}s)"
-      assert result.length.positive?, "Should have grouped results"
+      assert_operator parallel_config_time, :<, 2.0, "Configured parallel execution should be efficient (took #{parallel_config_time}s)"
+      assert_predicate result.length, :positive?, "Should have grouped results"
     ensure
       # Restore original thread setting
       @db.set_config_value("threads", original_threads) if @db.respond_to?(:set_config_value)
@@ -403,7 +407,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     end
   end
 
-  def get_memory_usage
+  def memory_usage
     # Simple memory usage approximation
     GC.start
     ObjectSpace.count_objects[:TOTAL] * 40

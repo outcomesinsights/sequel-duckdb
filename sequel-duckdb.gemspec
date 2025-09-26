@@ -18,6 +18,7 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/sequel/sequel-duckdb"
   spec.metadata["changelog_uri"] = "https://github.com/sequel/sequel-duckdb/blob/main/CHANGELOG.md"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
@@ -35,6 +36,16 @@ Gem::Specification.new do |spec|
   # Core dependencies
   spec.add_dependency "duckdb", ">= 1.0.0"
   spec.add_dependency "sequel", ">= 5.0"
+
+  # Development dependencies
+  spec.add_development_dependency "irb"
+  spec.add_development_dependency "logger"
+  spec.add_development_dependency "minitest", "~> 5.0"
+  spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "rubocop", "~> 1.21"
+  spec.add_development_dependency "rubocop-minitest", "~> 0.38.2"
+  spec.add_development_dependency "rubocop-rake", "~> 0.7.1"
+  spec.add_development_dependency "rubocop-sequel", "~> 0.4.1"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html

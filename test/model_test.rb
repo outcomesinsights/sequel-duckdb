@@ -86,7 +86,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
       assert schema[:email][:allow_null], "Email should allow null"
 
       # Verify default values
-      assert_equal true, schema[:active][:default], "Active should have default value true"
+      assert schema[:active][:default], "Active should have default value true"
     end
 
     it "should work with models that have foreign key relationships" do
@@ -164,33 +164,35 @@ describe "Sequel::Model integration with DuckDB adapter" do
         @captured_sql = sql if sql.include?("INSERT")
       end
 
-      def logger.captured_sql
+      def logger.captured_sql # rubocop:disable Style/TrivialAccessors
         @captured_sql
       end
       @db.loggers << logger
 
       # Save the model instance
-      user.save
+      user.save_changes
 
       # Verify INSERT SQL was generated correctly
       insert_sql = logger.captured_sql
+
       assert insert_sql, "INSERT SQL should have been generated"
-      assert insert_sql.include?("INSERT INTO users"), "Should insert into users table"
-      assert insert_sql.include?("name"), "Should include name column"
-      assert insert_sql.include?("email"), "Should include email column"
-      assert insert_sql.include?("age"), "Should include age column"
-      assert insert_sql.include?("active"), "Should include active column"
-      assert insert_sql.include?("created_at"), "Should include created_at column"
+      assert_includes insert_sql, "INSERT INTO \"users\"", "Should insert into users table"
+      assert_includes insert_sql, "name", "Should include name column"
+      assert_includes insert_sql, "email", "Should include email column"
+      assert_includes insert_sql, "age", "Should include age column"
+      assert_includes insert_sql, "active", "Should include active column"
+      assert_includes insert_sql, "created_at", "Should include created_at column"
 
       # Verify the record was actually inserted
       assert user.id, "User should have an ID after saving"
 
       # Verify data can be retrieved
       retrieved_user = user_class[user.id]
+
       assert_equal "John Doe", retrieved_user.name
       assert_equal "john@example.com", retrieved_user.email
       assert_equal 30, retrieved_user.age
-      assert_equal true, retrieved_user.active
+      assert retrieved_user.active
     end
 
     it "should handle INSERT with only required fields" do
@@ -207,19 +209,21 @@ describe "Sequel::Model integration with DuckDB adapter" do
       logger = create_sql_logger("INSERT")
       @db.loggers << logger
 
-      user.save
+      user.save_changes
 
       # Verify INSERT SQL handles optional fields correctly
       insert_sql = logger.captured_sql
+
       assert insert_sql, "INSERT SQL should have been generated"
-      assert insert_sql.include?("INSERT INTO users"), "Should insert into users table"
-      assert insert_sql.include?("name"), "Should include name column"
+      assert_includes insert_sql, "INSERT INTO \"users\"", "Should insert into users table"
+      assert_includes insert_sql, "name", "Should include name column"
 
       # Verify the record was inserted with defaults
       assert user.id, "User should have an ID after saving"
       retrieved_user = user_class[user.id]
+
       assert_equal "Jane Doe", retrieved_user.name
-      assert_equal true, retrieved_user.active, "Should use default value for active"
+      assert retrieved_user.active, "Should use default value for active"
     end
 
     it "should handle INSERT with foreign key relationships" do
@@ -251,21 +255,23 @@ describe "Sequel::Model integration with DuckDB adapter" do
         created_at: Time.now
       )
 
-      logger = create_sql_logger("INSERT INTO posts")
+      logger = create_sql_logger("INSERT INTO \"posts\"")
       @db.loggers << logger
 
-      post.save
+      post.save_changes
 
       # Verify INSERT SQL includes foreign key
       insert_sql = logger.captured_sql
+
       assert insert_sql, "INSERT SQL should have been generated"
-      assert insert_sql.include?("INSERT INTO posts"), "Should insert into posts table"
-      assert insert_sql.include?("user_id"), "Should include user_id foreign key"
-      assert insert_sql.include?("title"), "Should include title column"
+      assert_includes insert_sql, "INSERT INTO \"posts\"", "Should insert into posts table"
+      assert_includes insert_sql, "user_id", "Should include user_id foreign key"
+      assert_includes insert_sql, "title", "Should include title column"
 
       # Verify the relationship works
       assert post.id, "Post should have an ID after saving"
       retrieved_post = post_class[post.id]
+
       assert_equal user.id, retrieved_post.user_id
       assert_equal "Test Post", retrieved_post.title
     end
@@ -297,24 +303,26 @@ describe "Sequel::Model integration with DuckDB adapter" do
       logger = create_sql_logger("UPDATE")
       @db.loggers << logger
 
-      user.save
+      user.save_changes
 
       # Verify UPDATE SQL was generated correctly
       update_sql = logger.captured_sql
+
       assert update_sql, "UPDATE SQL should have been generated"
-      assert update_sql.include?("UPDATE users"), "Should update users table"
-      assert update_sql.include?("name"), "Should update name column"
-      assert update_sql.include?("email"), "Should update email column"
-      assert update_sql.include?("age"), "Should update age column"
-      assert update_sql.include?("WHERE"), "Should include WHERE clause"
-      assert update_sql.include?("id"), "Should include ID in WHERE clause"
+      assert_includes update_sql, "UPDATE \"users\"", "Should update users table"
+      assert_includes update_sql, "name", "Should update name column"
+      assert_includes update_sql, "email", "Should update email column"
+      assert_includes update_sql, "age", "Should update age column"
+      assert_includes update_sql, "WHERE", "Should include WHERE clause"
+      assert_includes update_sql, "id", "Should include ID in WHERE clause"
 
       # Verify the record was actually updated
       retrieved_user = user_class[user.id]
+
       assert_equal "John Smith", retrieved_user.name
       assert_equal "johnsmith@example.com", retrieved_user.email
       assert_equal 31, retrieved_user.age
-      assert_equal true, retrieved_user.active, "Unchanged field should remain the same"
+      assert retrieved_user.active, "Unchanged field should remain the same"
     end
 
     it "should handle partial updates efficiently" do
@@ -344,19 +352,21 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
       # Verify UPDATE SQL only includes changed fields
       update_sql = logger.captured_sql
+
       assert update_sql, "UPDATE SQL should have been generated"
-      assert update_sql.include?("UPDATE users"), "Should update users table"
-      assert update_sql.include?("age"), "Should update age column"
-      refute update_sql.include?("name ="), "Should not update unchanged name"
-      refute update_sql.include?("email ="), "Should not update unchanged email"
-      refute update_sql.include?("active ="), "Should not update unchanged active"
+      assert_includes update_sql, "UPDATE \"users\"", "Should update users table"
+      assert_includes update_sql, "age", "Should update age column"
+      refute_includes update_sql, "name =", "Should not update unchanged name"
+      refute_includes update_sql, "email =", "Should not update unchanged email"
+      refute_includes update_sql, "active =", "Should not update unchanged active"
 
       # Verify the record was updated correctly
       retrieved_user = user_class[user.id]
+
       assert_equal "Jane Doe", retrieved_user.name, "Name should be unchanged"
       assert_equal "jane@example.com", retrieved_user.email, "Email should be unchanged"
       assert_equal 26, retrieved_user.age, "Age should be updated"
-      assert_equal true, retrieved_user.active, "Active should be unchanged"
+      assert retrieved_user.active, "Active should be unchanged"
     end
 
     it "should handle UPDATE with foreign key relationships" do
@@ -390,20 +400,22 @@ describe "Sequel::Model integration with DuckDB adapter" do
       post.user_id = user2.id
       post.content = "Updated content"
 
-      logger = create_sql_logger("UPDATE posts")
+      logger = create_sql_logger("UPDATE \"posts\"")
       @db.loggers << logger
 
-      post.save
+      post.save_changes
 
       # Verify UPDATE SQL includes foreign key update
       update_sql = logger.captured_sql
+
       assert update_sql, "UPDATE SQL should have been generated"
-      assert update_sql.include?("UPDATE posts"), "Should update posts table"
-      assert update_sql.include?("user_id"), "Should update user_id foreign key"
-      assert update_sql.include?("content"), "Should update content column"
+      assert_includes update_sql, "UPDATE \"posts\"", "Should update posts table"
+      assert_includes update_sql, "user_id", "Should update user_id foreign key"
+      assert_includes update_sql, "content", "Should update content column"
 
       # Verify the relationship was updated
       retrieved_post = post_class[post.id]
+
       assert_equal user2.id, retrieved_post.user_id
       assert_equal "Updated content", retrieved_post.content
       assert_equal "Test Post", retrieved_post.title, "Title should be unchanged"
@@ -436,13 +448,15 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
       # Verify DELETE SQL was generated correctly
       delete_sql = logger.captured_sql
+
       assert delete_sql, "DELETE SQL should have been generated"
-      assert delete_sql.include?("DELETE FROM users"), "Should delete from users table"
-      assert delete_sql.include?("WHERE"), "Should include WHERE clause"
-      assert delete_sql.include?("id"), "Should include ID in WHERE clause"
+      assert_includes delete_sql, 'DELETE FROM "users"', "Should delete from users table"
+      assert_includes delete_sql, "WHERE", "Should include WHERE clause"
+      assert_includes delete_sql, "id", "Should include ID in WHERE clause"
 
       # Verify the record was actually deleted
       deleted_user = user_class[user_id]
+
       assert_nil deleted_user, "User should be deleted from database"
     end
 
@@ -471,13 +485,15 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
       # Verify DELETE SQL was generated correctly
       delete_sql = logger.captured_sql
+
       assert delete_sql, "DELETE SQL should have been generated"
-      assert delete_sql.include?("DELETE FROM users"), "Should delete from users table"
-      assert delete_sql.include?("WHERE"), "Should include WHERE clause"
-      assert delete_sql.include?("id"), "Should include ID in WHERE clause"
+      assert_includes delete_sql, 'DELETE FROM "users"', "Should delete from users table"
+      assert_includes delete_sql, "WHERE", "Should include WHERE clause"
+      assert_includes delete_sql, "id", "Should include ID in WHERE clause"
 
       # Verify the record was actually deleted
       destroyed_user = user_class[user_id]
+
       assert_nil destroyed_user, "User should be destroyed from database"
     end
 
@@ -502,16 +518,18 @@ describe "Sequel::Model integration with DuckDB adapter" do
 
       # Verify DELETE SQL was generated correctly
       delete_sql = logger.captured_sql
+
       assert delete_sql, "DELETE SQL should have been generated"
-      assert delete_sql.include?("DELETE FROM users"), "Should delete from users table"
-      assert delete_sql.include?("WHERE"), "Should include WHERE clause"
-      assert delete_sql.include?("active"), "Should include active condition"
+      assert_includes delete_sql, 'DELETE FROM "users"', "Should delete from users table"
+      assert_includes delete_sql, "WHERE", "Should include WHERE clause"
+      assert_includes delete_sql, "active", "Should include active condition"
 
       # Verify correct number of records were deleted
       assert_equal 2, deleted_count, "Should delete 2 inactive users"
 
       # Verify only active user remains
       remaining_users = user_class.all
+
       assert_equal 1, remaining_users.length, "Should have 1 user remaining"
       assert_equal user1.id, remaining_users.first.id, "Active user should remain"
     end
@@ -543,35 +561,39 @@ describe "Sequel::Model integration with DuckDB adapter" do
       )
 
       # Delete the post first (to avoid foreign key constraint issues)
-      logger = create_sql_logger("DELETE FROM posts")
+      logger = create_sql_logger("DELETE FROM \"posts\"")
       @db.loggers << logger
 
       post.delete
 
       # Verify DELETE SQL was generated correctly
       delete_sql = logger.captured_sql
+
       assert delete_sql, "DELETE SQL should have been generated"
-      assert delete_sql.include?("DELETE FROM posts"), "Should delete from posts table"
-      assert delete_sql.include?("WHERE"), "Should include WHERE clause"
-      assert delete_sql.include?("id"), "Should include ID in WHERE clause"
+      assert_includes delete_sql, "DELETE FROM \"posts\"", "Should delete from posts table"
+      assert_includes delete_sql, "WHERE", "Should include WHERE clause"
+      assert_includes delete_sql, "id", "Should include ID in WHERE clause"
 
       # Verify the post was deleted
       deleted_post = post_class[post.id]
+
       assert_nil deleted_post, "Post should be deleted from database"
 
       # Now delete the user
-      user_logger = create_sql_logger("DELETE FROM users")
+      user_logger = create_sql_logger("DELETE FROM \"users\"")
       @db.loggers << user_logger
 
       user.delete
 
       # Verify user DELETE SQL was generated correctly
       user_delete_sql = user_logger.captured_sql
+
       assert user_delete_sql, "User DELETE SQL should have been generated"
-      assert user_delete_sql.include?("DELETE FROM users"), "Should delete from users table"
+      assert_includes user_delete_sql, "DELETE FROM \"users\"", "Should delete from users table"
 
       # Verify the user was deleted
       deleted_user = user_class[user.id]
+
       assert_nil deleted_user, "User should be deleted from database"
     end
   end

@@ -26,6 +26,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     user_tables = tables.reject do |table|
       table.to_s.start_with?("information_schema") || table.to_s.start_with?("pg_")
     end
+
     assert_empty user_tables, "Empty database should have no user tables"
   end
 
@@ -106,10 +107,12 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Test with default schema
     tables = @db.send(:schema_parse_tables, {})
+
     assert_includes tables, :schema_test, "Should find table in default schema"
 
     # Test with explicit schema option (may not be supported yet)
     tables_with_schema = @db.send(:schema_parse_tables, { schema: "main" })
+
     assert_instance_of Array, tables_with_schema, "Should return array even with schema option"
   end
 
@@ -133,12 +136,14 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       assert_equal 2, entry.length, "Each entry should have 2 elements"
 
       column_name, column_info = entry
+
       assert_instance_of Symbol, column_name, "Column name should be a symbol"
       assert_instance_of Hash, column_info, "Column info should be a hash"
     end
 
     # Verify expected columns exist
     column_names = schema.map(&:first)
+
     assert_includes column_names, :id, "Should have id column"
     assert_includes column_names, :name, "Should have name column"
     assert_includes column_names, :age, "Should have age column"
@@ -160,36 +165,44 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Test ID column properties
     id_column = schema.find { |col| col[0] == :id }
+
     refute_nil id_column, "ID column should exist"
 
     id_info = id_column[1]
+
     assert_required_column_properties(id_info)
-    assert_equal true, id_info[:primary_key], "ID should be primary key"
-    assert_equal false, id_info[:allow_null], "ID should not allow null"
+    assert id_info[:primary_key], "ID should be primary key"
+    refute id_info[:allow_null], "ID should not allow null"
 
     # Test name column properties
     name_column = schema.find { |col| col[0] == :name }
+
     refute_nil name_column, "Name column should exist"
 
     name_info = name_column[1]
+
     assert_required_column_properties(name_info)
     assert_equal :string, name_info[:type], "Name should be string type"
-    assert_equal false, name_info[:allow_null], "Name should not allow null"
+    refute name_info[:allow_null], "Name should not allow null"
 
     # Test age column properties (nullable)
     age_column = schema.find { |col| col[0] == :age }
+
     refute_nil age_column, "Age column should exist"
 
     age_info = age_column[1]
+
     assert_required_column_properties(age_info)
     assert_equal :integer, age_info[:type], "Age should be integer type"
-    assert_equal true, age_info[:allow_null], "Age should allow null"
+    assert age_info[:allow_null], "Age should allow null"
 
     # Test active column properties (with default)
     active_column = schema.find { |col| col[0] == :active }
+
     refute_nil active_column, "Active column should exist"
 
     active_info = active_column[1]
+
     assert_required_column_properties(active_info)
     assert_equal :boolean, active_info[:type], "Active should be boolean type"
     # Default value testing will depend on implementation
@@ -227,9 +240,11 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     type_mappings.each do |column_name, expected_type|
       column = schema.find { |col| col[0] == column_name }
+
       refute_nil column, "#{column_name} column should exist"
 
       column_info = column[1]
+
       assert_equal expected_type, column_info[:type],
                    "#{column_name} should have type #{expected_type}"
 
@@ -250,14 +265,17 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Find primary key column
     pk_column = schema.find { |col| col[1][:primary_key] == true }
+
     refute_nil pk_column, "Should have a primary key column"
     assert_equal :id, pk_column[0], "Primary key should be id column"
 
     # Verify non-primary key columns
     non_pk_columns = schema.select { |col| col[1][:primary_key] == false }
+
     assert_equal 2, non_pk_columns.length, "Should have 2 non-primary key columns"
 
     non_pk_names = non_pk_columns.map(&:first)
+
     assert_includes non_pk_names, :name, "Name should not be primary key"
     assert_includes non_pk_names, :value, "Value should not be primary key"
   end
@@ -274,22 +292,26 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Test required field
     required_column = schema.find { |col| col[0] == :required_field }
+
     refute_nil required_column, "Required field should exist"
-    assert_equal false, required_column[1][:allow_null], "Required field should not allow null"
+    refute required_column[1][:allow_null], "Required field should not allow null"
 
     # Test optional field
     optional_column = schema.find { |col| col[0] == :optional_field }
+
     refute_nil optional_column, "Optional field should exist"
-    assert_equal true, optional_column[1][:allow_null], "Optional field should allow null"
+    assert optional_column[1][:allow_null], "Optional field should allow null"
 
     # Test default nullable field
     default_column = schema.find { |col| col[0] == :default_nullable_field }
+
     refute_nil default_column, "Default nullable field should exist"
-    assert_equal true, default_column[1][:allow_null], "Default field should allow null"
+    assert default_column[1][:allow_null], "Default field should allow null"
 
     # Primary key should not allow null
     id_column = schema.find { |col| col[0] == :id }
-    assert_equal false, id_column[1][:allow_null], "Primary key should not allow null"
+
+    refute id_column[1][:allow_null], "Primary key should not allow null"
   end
 
   def test_schema_parse_table_default_values
@@ -314,9 +336,11 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     default_tests.each_key do |column_name|
       column = schema.find { |col| col[0] == column_name }
+
       refute_nil column, "#{column_name} column should exist"
 
       column_info = column[1]
+
       assert column_info.key?(:default), "#{column_name} should have default information"
 
       # The exact format of default values may vary based on implementation
@@ -328,6 +352,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     no_default_columns = %i[id name]
     no_default_columns.each do |column_name|
       column = schema.find { |col| col[0] == column_name }
+
       refute_nil column, "#{column_name} column should exist"
 
       column_info = column[1]
@@ -351,10 +376,12 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Test with empty options
     schema1 = @db.send(:schema_parse_table, :options_test, {})
+
     assert_instance_of Array, schema1, "Should work with empty options"
 
     # Test with schema option (if supported)
     schema2 = @db.send(:schema_parse_table, :options_test, { schema: "main" })
+
     assert_instance_of Array, schema2, "Should work with schema option"
 
     # Results should be similar (exact comparison depends on implementation)
@@ -394,6 +421,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert indexes.key?(:name_index), "Should have name_index"
 
     index_info = indexes[:name_index]
+
     assert_instance_of Hash, index_info, "Index info should be a hash"
 
     # Verify index properties
@@ -401,7 +429,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert_equal [:name], index_info[:columns], "Index should be on name column"
 
     assert index_info.key?(:unique), "Index should have unique information"
-    assert_equal false, index_info[:unique], "Index should not be unique by default"
+    refute index_info[:unique], "Index should not be unique by default"
   end
 
   def test_schema_parse_indexes_with_multi_column_index
@@ -421,6 +449,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     assert indexes.key?(:name_index), "Should have name_index"
 
     index_info = indexes[:name_index]
+
     assert_equal %i[first_name last_name], index_info[:columns],
                  "Multi-column index should have correct columns"
   end
@@ -443,13 +472,15 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     # Test unique email index
     assert indexes.key?(:unique_email_index), "Should have unique_email_index"
     email_index = indexes[:unique_email_index]
-    assert_equal true, email_index[:unique], "Email index should be unique"
+
+    assert email_index[:unique], "Email index should be unique"
     assert_equal [:email], email_index[:columns], "Email index should be on email column"
 
     # Test unique username index
     assert indexes.key?(:unique_username_index), "Should have unique_username_index"
     username_index = indexes[:unique_username_index]
-    assert_equal true, username_index[:unique], "Username index should be unique"
+
+    assert username_index[:unique], "Username index should be unique"
     assert_equal [:username], username_index[:columns], "Username index should be on username column"
   end
 
@@ -496,10 +527,12 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Test with empty options
     indexes1 = @db.send(:schema_parse_indexes, :index_options_test, {})
+
     assert_instance_of Hash, indexes1, "Should work with empty options"
 
     # Test with schema option
     indexes2 = @db.send(:schema_parse_indexes, :index_options_test, { schema: "main" })
+
     assert_instance_of Hash, indexes2, "Should work with schema option"
   end
 
@@ -549,6 +582,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
       # View should have selected columns
       column_names = schema.map(&:first)
+
       assert_includes column_names, :id, "View should have id column"
       assert_includes column_names, :name, "View should have name column"
       refute_includes column_names, :value, "View should not have value column"
@@ -579,6 +613,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
       # Find the foreign key column
       fk_column = schema.find { |col| col[0] == :parent_id }
+
       refute_nil fk_column, "Foreign key column should exist"
 
       column_info = fk_column[1]
@@ -611,6 +646,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
       # Test if foreign key methods exist
       if @db.respond_to?(:foreign_key_list)
         fk_list = @db.foreign_key_list(:fk_child)
+
         assert_instance_of Array, fk_list, "Foreign key list should be an array"
       end
     rescue NoMethodError
@@ -642,6 +678,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
   # Helper method to assert boolean value
   def assert_boolean(value, message = "Value should be boolean")
-    assert [true, false].include?(value), message
+    assert_includes [true, false], value, message
   end
 end

@@ -46,7 +46,8 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     @db[:performance_test].fetch_rows("SELECT * FROM performance_test") do |row|
       row_count += 1
-      assert row.is_a?(Hash), "Row should be a hash"
+
+      assert_kind_of Hash, row, "Row should be a hash"
       assert row.key?(:id), "Row should have id key"
       assert row.key?(:name), "Row should have name key"
     end
@@ -55,8 +56,7 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     execution_time = end_time - start_time
 
     assert_equal 1000, row_count, "Should fetch all 1000 rows"
-    assert execution_time < 5.0,
-           "Large result set should be fetched in reasonable time (< 5 seconds), took #{execution_time}"
+    assert_operator execution_time, :<, 5.0, "Large result set should be fetched in reasonable time (< 5 seconds), took #{execution_time}"
   end
 
   def test_fetch_rows_memory_efficiency_with_streaming
@@ -71,18 +71,18 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     @db[:performance_test].fetch_rows("SELECT * FROM performance_test ORDER BY id") do |row|
       processed_rows << row[:id]
       # Take memory snapshot every 100 rows
-      memory_snapshots << get_memory_usage if (processed_rows.length % 100).zero?
+      memory_snapshots << memory_usage if (processed_rows.length % 100).zero?
     end
 
     assert_equal 1000, processed_rows.length, "Should process all rows"
-    assert processed_rows.sort == (1..1000).to_a, "Should process rows in correct order"
+    assert_equal processed_rows.sort, (1..1000).to_a, "Should process rows in correct order"
 
     # Memory usage should not grow significantly (streaming behavior)
-    return unless memory_snapshots.length > 1
+    skip unless memory_snapshots.length > 1
 
     memory_growth = memory_snapshots.last - memory_snapshots.first
-    assert memory_growth < 50_000_000,
-           "Memory usage should not grow significantly during streaming (growth: #{memory_growth} bytes)"
+
+    assert_operator memory_growth, :<, 50_000_000, "Memory usage should not grow significantly during streaming (growth: #{memory_growth} bytes)"
   end
 
   def test_fetch_rows_with_limit_optimization
@@ -101,7 +101,7 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     execution_time = end_time - start_time
 
     assert_equal 10, row_count, "Should fetch exactly 10 rows"
-    assert execution_time < 0.1, "Limited query should be very fast (< 0.1 seconds), took #{execution_time}"
+    assert_operator execution_time, :<, 0.1, "Limited query should be very fast (< 0.1 seconds), took #{execution_time}"
   end
 
   # Test prepared statement support for performance (Requirement 9.2)
@@ -126,26 +126,25 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     5.times do
       start_time = Time.now
       @db[:performance_test].where(value: 100, active: true).all
-      regular_times << Time.now - start_time
+      regular_times << (Time.now - start_time)
     end
 
     # Time prepared statement execution (if supported)
     prepared_times = []
-    return unless @db.respond_to?(:prepare) || @db.dataset.respond_to?(:prepare)
+    skip unless @db.respond_to?(:prepare) || @db.dataset.respond_to?(:prepare)
 
     5.times do
       start_time = Time.now
       # Test prepared statement functionality
       @db.fetch(query_sql, 100, true).all
-      prepared_times << Time.now - start_time
+      prepared_times << (Time.now - start_time)
     end
 
     # Prepared statements should be at least as fast as regular queries
     avg_regular = regular_times.sum / regular_times.length
     avg_prepared = prepared_times.sum / prepared_times.length
 
-    assert avg_prepared <= avg_regular * 1.5,
-           "Prepared statements should not be significantly slower than regular queries"
+    assert_operator avg_prepared, :<=, avg_regular * 1.5, "Prepared statements should not be significantly slower than regular queries"
   end
 
   def test_prepared_statement_parameter_binding
@@ -200,8 +199,7 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     bulk_time = Time.now - bulk_start
 
     # Bulk insert should be significantly faster
-    assert bulk_time < individual_time * 0.5,
-           "Bulk insert should be at least 2x faster than individual inserts (bulk: #{bulk_time}s, individual: #{individual_time}s)"
+    assert_operator bulk_time, :<, individual_time * 0.5, "Bulk insert should be at least 2x faster than individual inserts (bulk: #{bulk_time}s, individual: #{individual_time}s)"
 
     # Verify all records were inserted
     assert_equal 100, @db[:performance_test].count, "All records should be inserted via bulk insert"
@@ -226,19 +224,18 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     execution_time = end_time - start_time
 
     assert_equal 5000, @db[:performance_test].count, "All 5000 records should be inserted"
-    assert execution_time < 10.0,
-           "Large bulk insert should complete in reasonable time (< 10 seconds), took #{execution_time}"
+    assert_operator execution_time, :<, 10.0, "Large bulk insert should complete in reasonable time (< 10 seconds), took #{execution_time}"
 
     # Test that records per second is reasonable
     records_per_second = 5000 / execution_time
-    assert records_per_second > 100,
-           "Should insert at least 100 records per second, achieved #{records_per_second.round(2)}"
+
+    assert_operator records_per_second, :>, 100, "Should insert at least 100 records per second, achieved #{records_per_second.round(2)}"
   end
 
   # Test efficient connection pooling (Requirement 9.4)
   def test_connection_pooling_efficiency
     # Test that connection pooling doesn't create excessive connections
-    initial_connection_count = get_connection_count
+    initial_connection_count = connection_count
 
     # Perform multiple operations that might create connections
     10.times do |i|
@@ -248,12 +245,12 @@ class PerformanceTest < SequelDuckDBTest::TestCase
       @db[:performance_test].where(value: i).update(active: false)
     end
 
-    final_connection_count = get_connection_count
+    final_connection_count = connection_count
 
     # Should not create excessive connections
     connection_growth = final_connection_count - initial_connection_count
-    assert connection_growth <= 2,
-           "Should not create excessive connections during operations (growth: #{connection_growth})"
+
+    assert_operator connection_growth, :<=, 2, "Should not create excessive connections during operations (growth: #{connection_growth})"
   end
 
   def test_connection_reuse_efficiency
@@ -270,13 +267,13 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Should reuse connections (not create new ones each time)
     unique_connections = connection_ids.uniq.length
-    assert unique_connections <= 2,
-           "Should reuse connections efficiently (used #{unique_connections} unique connections)"
+
+    assert_operator unique_connections, :<=, 2, "Should reuse connections efficiently (used #{unique_connections} unique connections)"
   end
 
   def test_connection_cleanup_after_errors
     # Test that connections are properly cleaned up after errors
-    initial_connection_count = get_connection_count
+    initial_connection_count = connection_count
 
     # Cause some errors that might leave connections open
     5.times do
@@ -289,10 +286,10 @@ class PerformanceTest < SequelDuckDBTest::TestCase
     GC.start
     sleep 0.1 # Give time for cleanup
 
-    final_connection_count = get_connection_count
+    final_connection_count = connection_count
     connection_growth = final_connection_count - initial_connection_count
 
-    assert connection_growth <= 1, "Should clean up connections after errors (growth: #{connection_growth})"
+    assert_operator connection_growth, :<=, 1, "Should clean up connections after errors (growth: #{connection_growth})"
   end
 
   # Test streaming result options for memory efficiency (Requirement 9.5)
@@ -311,7 +308,7 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Test streaming with each method
     processed_count = 0
-    memory_before = get_memory_usage
+    memory_before = memory_usage
 
     @db[:performance_test].each do |row|
       processed_count += 1
@@ -319,11 +316,11 @@ class PerformanceTest < SequelDuckDBTest::TestCase
       assert row[:name].start_with?("Stream Record"), "Should process streaming records correctly"
     end
 
-    memory_after = get_memory_usage
+    memory_after = memory_usage
     memory_growth = memory_after - memory_before
 
     assert_equal 2000, processed_count, "Should process all streaming records"
-    assert memory_growth < 100_000_000, "Streaming should not consume excessive memory (growth: #{memory_growth} bytes)"
+    assert_operator memory_growth, :<, 100_000_000, "Streaming should not consume excessive memory (growth: #{memory_growth} bytes)"
   end
 
   def test_streaming_with_large_text_fields
@@ -342,30 +339,28 @@ class PerformanceTest < SequelDuckDBTest::TestCase
 
     # Test that streaming handles large text efficiently
     start_time = Time.now
-    text_lengths = []
-
-    @db[:performance_test].each do |row|
-      text_lengths << row[:name].length
+    text_lengths = @db[:performance_test].map do |row|
+      row[:name].length
     end
 
     end_time = Time.now
     execution_time = end_time - start_time
 
     assert_equal 100, text_lengths.length, "Should process all records with large text"
-    assert execution_time < 1.0, "Streaming large text should be efficient (< 1 second), took #{execution_time}"
+    assert_operator execution_time, :<, 1.0, "Streaming large text should be efficient (< 1 second), took #{execution_time}"
   end
 
   private
 
   # Helper method to get approximate memory usage
-  def get_memory_usage
+  def memory_usage
     # Simple memory usage approximation
     GC.start
     ObjectSpace.count_objects[:TOTAL] * 40 # Rough estimate
   end
 
   # Helper method to get connection count (simplified)
-  def get_connection_count
+  def connection_count
     # This is a simplified connection count - in a real implementation,
     # you might track this more precisely
     @db.pool.size if @db.respond_to?(:pool) && @db.pool.respond_to?(:size)

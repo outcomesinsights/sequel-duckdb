@@ -4,13 +4,3 @@ source "https://rubygems.org"
 
 # Specify your gem's dependencies in sequel-duckdb.gemspec
 gemspec
-
-gem "irb"
-gem "rake", "~> 13.0"
-gem "rubocop", "~> 1.21"
-
-# Development dependencies
-gem "duckdb", ">= 1.0.0"
-gem "logger"
-gem "minitest", "~> 5.0"
-gem "sequel", ">= 5.0"

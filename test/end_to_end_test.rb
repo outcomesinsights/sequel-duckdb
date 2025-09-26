@@ -58,7 +58,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("SELECT with GROUP BY/HAVING should work") do
       dataset.select(:category, Sequel.function(:count, :*).as(:count))
              .group(:category)
-             .having { Sequel.function(:count, :*) > 0 }
+             .having { Sequel.function(:count, :*) > 0 } # rubocop:disable Style/NumericPredicate
              .all
     end
 
@@ -184,7 +184,8 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     end
 
     insert_time = Time.now - start_time
-    assert insert_time < 10, "Bulk insert should complete within 10 seconds, took #{insert_time}"
+
+    assert_operator insert_time, :<, 10, "Bulk insert should complete within 10 seconds, took #{insert_time}"
 
     # Test query performance on larger dataset
     start_time = Time.now
@@ -198,12 +199,13 @@ class EndToEndTest < SequelDuckDBTest::TestCase
                .limit(100)
                .all
 
-      assert result.is_a?(Array), "Query should return an array"
-      assert result.length <= 100, "Query should respect LIMIT"
+      assert_kind_of Array, result, "Query should return an array"
+      assert_operator result.length, :<=, 100, "Query should respect LIMIT"
     end
 
     query_time = Time.now - start_time
-    assert query_time < 5, "Complex query should complete within 5 seconds, took #{query_time}"
+
+    assert_operator query_time, :<, 5, "Complex query should complete within 5 seconds, took #{query_time}"
 
     # Test aggregation performance
     start_time = Time.now
@@ -219,26 +221,30 @@ class EndToEndTest < SequelDuckDBTest::TestCase
                )
                .all
 
-      assert result.is_a?(Array), "Aggregation should return an array"
-      assert result.length <= 2, "Should have at most 2 groups (true/false)"
+      assert_kind_of Array, result, "Aggregation should return an array"
+      assert_operator result.length, :<=, 2, "Should have at most 2 groups (true/false)"
     end
 
     aggregation_time = Time.now - start_time
-    assert aggregation_time < 3, "Aggregation should complete within 3 seconds, took #{aggregation_time}"
+
+    assert_operator aggregation_time, :<, 3, "Aggregation should complete within 3 seconds, took #{aggregation_time}"
 
     # Test update performance
     start_time = Time.now
 
     assert_nothing_raised("Bulk update should work") do
       updated_count = dataset.where(active: false).update(active: true)
-      assert updated_count > 0, "Should update some records"
+
+      assert_predicate updated_count, :positive?, "Should update some records"
     end
 
     update_time = Time.now - start_time
-    assert update_time < 5, "Bulk update should complete within 5 seconds, took #{update_time}"
+
+    assert_operator update_time, :<, 5, "Bulk update should complete within 5 seconds, took #{update_time}"
 
     # Verify final record count
     total_count = dataset.count
+
     assert_equal 1000, total_count, "Should have 1000 records after all operations"
   end
 
@@ -262,6 +268,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
         db[:"test_#{connections.length}"].insert(id: 1, data: "test")
 
         result = db[:"test_#{connections.length}"].first
+
         assert_equal "test", result[:data]
       end
     end
@@ -288,9 +295,10 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("Streaming results should work") do
       dataset.each do |row|
         count += 1
-        assert row.is_a?(Hash), "Each row should be a hash"
-        assert row[:id].is_a?(Integer), "ID should be an integer"
-        assert row[:data].is_a?(String), "Data should be a string"
+
+        assert_kind_of Hash, row, "Each row should be a hash"
+        assert_kind_of Integer, row[:id], "ID should be an integer"
+        assert_kind_of String, row[:data], "Data should be a string"
       end
     end
 
@@ -333,6 +341,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("Should recover after constraint violation") do
       dataset.insert(id: 2, name: "test2")
       result = dataset.where(name: "test2").first
+
       assert_equal "test2", result[:name]
     end
 
@@ -350,6 +359,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
 
     # Verify rollback worked
     final_count = dataset.count
+
     assert_equal initial_count, final_count, "Transaction should have rolled back"
   end
 
@@ -405,6 +415,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
 
     # Retrieve and verify data
     retrieved = dataset.first
+
     refute_nil retrieved, "Should retrieve inserted record"
 
     # Verify string types
@@ -424,11 +435,12 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_equal test_data[:boolean_field], retrieved[:boolean_field]
 
     # Verify binary type (may need special handling)
-    return unless retrieved[:blob_field].is_a?(String)
+    skip unless retrieved[:blob_field].is_a?(String)
 
     # DuckDB might return binary data as hex string
     if retrieved[:blob_field].match?(/\A[0-9a-fA-F]+\z/)
       retrieved_binary = [retrieved[:blob_field]].pack("H*").b
+
       assert_equal test_data[:blob_field], retrieved_binary
     else
       assert_equal test_data[:blob_field], retrieved[:blob_field]
@@ -529,6 +541,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
       user.update(age: 31)
 
       updated_user = user_class[1]
+
       assert_equal 31, updated_user.age
     end
 
@@ -563,7 +576,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
       thread_count.times do |thread_id|
         records_per_thread.times do |i|
           dataset.insert(
-            id: thread_id * records_per_thread + i + 1,
+            id: (thread_id * records_per_thread) + i + 1,
             data: "Thread #{thread_id} Record #{i}",
             thread_id: thread_id,
             created_at: Time.now
@@ -575,11 +588,13 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     # Verify all records were inserted
     total_count = dataset.count
     expected_count = thread_count * records_per_thread
+
     assert_equal expected_count, total_count, "Should have #{expected_count} records from concurrent inserts"
 
     # Verify data integrity
     thread_count.times do |thread_id|
       thread_records = dataset.where(thread_id: thread_id).count
+
       assert_equal records_per_thread, thread_records, "Thread #{thread_id} should have #{records_per_thread} records"
     end
 
@@ -587,15 +602,16 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("Sequential reads should work") do
       10.times do |i|
         result = dataset.where(thread_id: i % thread_count).count
-        assert result >= 0, "Read result should be non-negative"
-        assert result <= records_per_thread, "Read result should not exceed records per thread"
+
+        assert_operator result, :>=, 0, "Read result should be non-negative"
+        assert_operator result, :<=, records_per_thread, "Read result should not exceed records per thread"
       end
     end
   end
 
   private
 
-  def assert_nothing_raised(message = nil, &block)
+  def assert_nothing_raised(message = nil)
     yield
   rescue StandardError => e
     flunk "#{message || "Expected no exception"}, but got #{e.class}: #{e.message}"

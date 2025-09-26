@@ -32,6 +32,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
       # Retrieve and verify
       record = db[:string_test].where(id: index + 1).first
+
       assert_equal test_string, record[:text_field], "Text field should match inserted string"
       assert_equal test_string, record[:varchar_field], "Varchar field should match inserted string"
     end
@@ -66,6 +67,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
       # Retrieve and verify
       record = db[:integer_test].where(id: index + 1).first
+
       assert_equal test_int, record[:int_field], "Int field should match inserted integer"
       assert_equal test_int, record[:bigint_field], "Bigint field should match inserted integer"
     end
@@ -102,6 +104,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
       # Retrieve and verify (with small tolerance for floating point precision)
       record = db[:float_test].where(id: index + 1).first
+
       assert_in_delta test_float, record[:float_field], 0.000001, "Float field should match inserted float"
       assert_in_delta test_float, record[:double_field], 0.000001, "Double field should match inserted float"
     end
@@ -129,8 +132,9 @@ class TypeTest < SequelDuckDBTest::TestCase
 
       # Retrieve and verify
       record = db[:boolean_test].where(id: index + 1).first
+
       assert_equal test_case[:expected], record[:bool_field], "Boolean field should match inserted boolean"
-      assert_equal true, record[:bool_with_default], "Default boolean should be true"
+      assert record[:bool_with_default], "Default boolean should be true"
     end
   end
 
@@ -233,6 +237,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # Retrieve and verify all fields are nil
     record = db[:null_test].where(id: 1).first
+
     assert_nil record[:nullable_string], "Nullable string should be nil"
     assert_nil record[:nullable_int], "Nullable int should be nil"
     assert_nil record[:nullable_float], "Nullable float should be nil"
@@ -261,6 +266,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       db[:edge_case_test].insert(id: 2, string_field: long_string, int_field: 1, float_field: 1.0)
 
       record = db[:edge_case_test].where(id: 2).first
+
       assert_equal long_string, record[:string_field], "Long string should be preserved"
     end
 
@@ -324,247 +330,273 @@ class TypeTest < SequelDuckDBTest::TestCase
 
   def test_literal_string_append_basic
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test basic string literal generation
     sql = dataset.literal("simple string")
+
     assert_equal "'simple string'", sql, "Basic string should be quoted"
 
     # Test empty string
     sql = dataset.literal("")
+
     assert_equal "''", sql, "Empty string should be quoted"
 
     # Test string with spaces
     sql = dataset.literal("string with spaces")
+
     assert_equal "'string with spaces'", sql, "String with spaces should be quoted"
   end
 
   def test_literal_string_append_escaping
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test single quote escaping
     sql = dataset.literal("string with 'single quotes'")
+
     assert_equal "'string with ''single quotes'''", sql, "Single quotes should be escaped by doubling"
 
     # Test multiple single quotes
     sql = dataset.literal("'multiple' 'quotes'")
+
     assert_equal "'''multiple'' ''quotes'''", sql, "Multiple single quotes should be escaped"
 
     # Test string that is only single quotes
     sql = dataset.literal("'")
+
     assert_equal "''''", sql, "Single quote should be escaped"
 
     # Test string with consecutive single quotes
     sql = dataset.literal("''")
+
     assert_equal "''''''", sql, "Consecutive single quotes should be escaped"
   end
 
   def test_literal_string_append_special_characters
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test newlines and tabs
     sql = dataset.literal("string\nwith\nnewlines")
+
     assert_equal "'string\nwith\nnewlines'", sql, "Newlines should be preserved in literals"
 
     sql = dataset.literal("string\twith\ttabs")
+
     assert_equal "'string\twith\ttabs'", sql, "Tabs should be preserved in literals"
 
     # Test carriage returns
     sql = dataset.literal("string\rwith\rcarriage\rreturns")
+
     assert_equal "'string\rwith\rcarriage\rreturns'", sql, "Carriage returns should be preserved"
 
     # Test mixed whitespace
     sql = dataset.literal("string\n\t\rwith\n\t\rmixed")
+
     assert_equal "'string\n\t\rwith\n\t\rmixed'", sql, "Mixed whitespace should be preserved"
   end
 
   def test_literal_string_append_unicode
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test Unicode characters
     sql = dataset.literal("Unicode: 你好世界")
+
     assert_equal "'Unicode: 你好世界'", sql, "Unicode characters should be preserved"
 
     # Test emojis
     sql = dataset.literal("Emoji: 🌍🚀💻")
+
     assert_equal "'Emoji: 🌍🚀💻'", sql, "Emojis should be preserved"
 
     # Test mixed Unicode and ASCII
     sql = dataset.literal("Mixed: Hello 世界 🌍")
+
     assert_equal "'Mixed: Hello 世界 🌍'", sql, "Mixed Unicode and ASCII should be preserved"
   end
 
   def test_literal_date_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test basic date literal
     date = Date.new(2023, 12, 25)
     sql = dataset.literal(date)
+
     assert_equal "'2023-12-25'", sql, "Date should be formatted as ISO string"
 
     # Test different date formats
     date = Date.new(1990, 1, 1)
     sql = dataset.literal(date)
+
     assert_equal "'1990-01-01'", sql, "Date should maintain ISO format"
 
     # Test leap year date
     date = Date.new(2024, 2, 29)
     sql = dataset.literal(date)
+
     assert_equal "'2024-02-29'", sql, "Leap year date should be handled correctly"
 
     # Test current date
     today = Date.today
     sql = dataset.literal(today)
     expected = "'#{today.strftime("%Y-%m-%d")}'"
+
     assert_equal expected, sql, "Current date should be formatted correctly"
   end
 
   def test_literal_datetime_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test basic datetime literal - use literal_datetime directly
     datetime = Time.new(2023, 12, 25, 14, 30, 45)
     sql = dataset.send(:literal_datetime, datetime)
+
     assert_equal "'2023-12-25 14:30:45'", sql, "DateTime should be formatted as ISO string"
 
     # Test datetime with seconds
     datetime = Time.new(2023, 1, 1, 0, 0, 0)
     sql = dataset.send(:literal_datetime, datetime)
+
     assert_equal "'2023-01-01 00:00:00'", sql, "DateTime with zero time should be formatted correctly"
 
     # Test datetime with different time
     datetime = Time.new(2023, 6, 15, 23, 59, 59)
     sql = dataset.send(:literal_datetime, datetime)
+
     assert_equal "'2023-06-15 23:59:59'", sql, "DateTime with max time should be formatted correctly"
 
     # Test DateTime object (not Time)
     datetime = DateTime.new(2023, 3, 20, 12, 15, 30)
     sql = dataset.send(:literal_datetime, datetime)
+
     assert_equal "'2023-03-20 12:15:30'", sql, "DateTime object should be formatted correctly"
   end
 
   def test_literal_time_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test basic time literal - use literal_time directly
     time = Time.new(2023, 1, 1, 14, 30, 45)
     sql = dataset.send(:literal_time, time)
+
     assert_equal "'14:30:45'", sql, "Time should extract only time component"
 
     # Test midnight
     time = Time.new(2023, 1, 1, 0, 0, 0)
     sql = dataset.send(:literal_time, time)
+
     assert_equal "'00:00:00'", sql, "Midnight should be formatted correctly"
 
     # Test end of day
     time = Time.new(2023, 1, 1, 23, 59, 59)
     sql = dataset.send(:literal_time, time)
+
     assert_equal "'23:59:59'", sql, "End of day should be formatted correctly"
 
     # Test noon
     time = Time.new(2023, 1, 1, 12, 0, 0)
     sql = dataset.send(:literal_time, time)
+
     assert_equal "'12:00:00'", sql, "Noon should be formatted correctly"
   end
 
   def test_literal_boolean_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test true literal
     sql = dataset.literal(true)
+
     assert_equal "TRUE", sql, "Boolean true should be converted to TRUE"
 
     # Test false literal
     sql = dataset.literal(false)
+
     assert_equal "FALSE", sql, "Boolean false should be converted to FALSE"
   end
 
   def test_literal_null_value_handling
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test nil literal
     sql = dataset.literal(nil)
+
     assert_equal "NULL", sql, "nil should be converted to NULL"
   end
 
   def test_literal_integer_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test positive integer
     sql = dataset.literal(42)
+
     assert_equal "42", sql, "Positive integer should be converted as-is"
 
     # Test negative integer
     sql = dataset.literal(-42)
+
     assert_equal "-42", sql, "Negative integer should be converted as-is"
 
     # Test zero
     sql = dataset.literal(0)
+
     assert_equal "0", sql, "Zero should be converted as-is"
 
     # Test large integer
     sql = dataset.literal(2_147_483_647)
+
     assert_equal "2147483647", sql, "Large integer should be converted as-is"
   end
 
   def test_literal_float_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test positive float
     sql = dataset.literal(3.14159)
+
     assert_equal "3.14159", sql, "Positive float should be converted as-is"
 
     # Test negative float
     sql = dataset.literal(-3.14159)
+
     assert_equal "-3.14159", sql, "Negative float should be converted as-is"
 
     # Test zero float
     sql = dataset.literal(0.0)
+
     assert_equal "0.0", sql, "Zero float should be converted as-is"
 
     # Test scientific notation
     sql = dataset.literal(1.23e10)
+
     assert_equal "12300000000.0", sql, "Scientific notation should be converted to decimal"
 
     sql = dataset.literal(1.23e-10)
+
     assert_equal "1.23e-10", sql, "Small scientific notation should be preserved"
   end
 
   def test_literal_conversion_edge_cases
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
@@ -572,6 +604,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     long_string = "x" * 1000
     sql = dataset.literal(long_string)
     expected = "'#{"x" * 1000}'"
+
     assert_equal expected, sql, "Very long string should be handled correctly"
 
     # Test string with only quotes
@@ -585,43 +618,47 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # Test empty string edge case
     sql = dataset.literal("")
+
     assert_equal "''", sql, "Empty string should produce empty quotes"
 
     # Test string with null character (if supported)
     string_with_null = "before\x00after"
     sql = dataset.literal(string_with_null)
+
     assert_equal "'before\x00after'", sql, "String with null character should be preserved"
   end
 
   def test_literal_conversion_in_where_clauses
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     # Test that literal conversion works in WHERE clauses
     dataset = db[:users].where(name: "John's Data")
     sql = dataset.sql
-    assert_match(/name = 'John''s Data'/, sql, "String literals in WHERE should be escaped")
+
+    assert_match(/"name" = 'John''s Data'/, sql, "String literals in WHERE should be escaped")
 
     # Test with boolean
     dataset = db[:users].where(active: true)
     sql = dataset.sql
-    assert_match(/active IS TRUE/, sql, "Boolean literals in WHERE should be converted")
+
+    assert_match(/"active" IS TRUE/, sql, "Boolean literals in WHERE should be converted")
 
     # Test with date
     date = Date.new(2023, 12, 25)
     dataset = db[:users].where(created_at: date)
     sql = dataset.sql
-    assert_match(/created_at = '2023-12-25'/, sql, "Date literals in WHERE should be formatted")
+
+    assert_match(/"created_at" = '2023-12-25'/, sql, "Date literals in WHERE should be formatted")
 
     # Test with nil
     dataset = db[:users].where(deleted_at: nil)
     sql = dataset.sql
-    assert_match(/deleted_at IS NULL/, sql, "Nil literals in WHERE should use IS NULL")
+
+    assert_match(/"deleted_at" IS NULL/, sql, "Nil literals in WHERE should use IS NULL")
   end
 
   def test_literal_conversion_in_insert_statements
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     # Test literal conversion in INSERT
     dataset = db[:users]
@@ -649,7 +686,6 @@ class TypeTest < SequelDuckDBTest::TestCase
 
   def test_literal_binary_data_conversion
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
@@ -658,73 +694,84 @@ class TypeTest < SequelDuckDBTest::TestCase
     sql = dataset.literal(binary_data)
     # Binary data should be converted to hex format for DuckDB (without \x prefix)
     expected = "'#{binary_data.unpack1("H*")}'"
+
     assert_equal expected, sql, "Binary data should be converted to hex format"
 
     # Test binary data with null bytes
     binary_data = "\x00\x01\x02\x03".b
     sql = dataset.literal(binary_data)
     expected = "'00010203'"
+
     assert_equal expected, sql, "Binary data with null bytes should be hex encoded"
 
     # Test empty binary data
     binary_data = "".b
     sql = dataset.literal(binary_data)
     expected = "''"
+
     assert_equal expected, sql, "Empty binary data should produce empty hex"
 
     # Test binary data with high byte values
     binary_data = "\xFF\xFE\xFD".b
     sql = dataset.literal(binary_data)
     expected = "'fffefd'"
+
     assert_equal expected, sql, "High byte values should be hex encoded"
   end
 
   def test_literal_numeric_precision_handling
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test integer boundary values
     sql = dataset.literal(2_147_483_647) # Max 32-bit signed int
+
     assert_equal "2147483647", sql, "Max 32-bit integer should be handled"
 
     sql = dataset.literal(-2_147_483_648) # Min 32-bit signed int
+
     assert_equal "-2147483648", sql, "Min 32-bit integer should be handled"
 
     sql = dataset.literal(9_223_372_036_854_775_807) # Max 64-bit signed int
+
     assert_equal "9223372036854775807", sql, "Max 64-bit integer should be handled"
 
     # Test float precision
     sql = dataset.literal(1.7976931348623157e+308)  # Near Float::MAX
+
     assert sql.include?("1.797693134862315") || sql.include?("1.797693134862316"),
            "Large float should preserve precision"
 
     sql = dataset.literal(2.2250738585072014e-308)  # Near Float::MIN
+
     assert sql.include?("2.225073858507201e-308") || sql.include?("2.2250738585072014e-308"),
            "Small float should preserve precision"
 
     # Test decimal precision
     sql = dataset.literal(123.456789012345)
+
     assert_equal "123.456789012345", sql, "Decimal precision should be preserved"
   end
 
   def test_literal_numeric_special_values
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     dataset = db[:test_table]
 
     # Test positive and negative zero
     sql = dataset.literal(0.0)
+
     assert_equal "0.0", sql, "Positive zero should be handled"
 
     sql = dataset.literal(-0.0)
+
     assert_equal "-0.0", sql, "Negative zero should be handled"
 
     # Test infinity (if supported)
     begin
       sql = dataset.literal(Float::INFINITY)
+
       assert sql.include?("Infinity") || sql.include?("inf"), "Positive infinity should be handled"
     rescue StandardError
       # Skip if infinity is not supported
@@ -732,6 +779,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     begin
       sql = dataset.literal(-Float::INFINITY)
+
       assert sql.include?("-Infinity") || sql.include?("-inf"), "Negative infinity should be handled"
     rescue StandardError
       # Skip if negative infinity is not supported
@@ -740,6 +788,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     # Test NaN (if supported)
     begin
       sql = dataset.literal(Float::NAN)
+
       assert sql.include?("NaN") || sql.include?("nan"), "NaN should be handled"
     rescue StandardError
       # Skip if NaN is not supported
@@ -764,6 +813,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     record = db[:conversion_edge_test].where(id: 1).first
+
     assert_equal large_int, record[:int_field], "Large integer should be preserved"
 
     # Test float precision preservation
@@ -773,6 +823,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     record = db[:conversion_edge_test].where(id: 2).first
+
     assert_in_delta precise_float, record[:float_field], 0.000000000001, "Float precision should be preserved"
 
     # Test string to numeric coercion
@@ -781,6 +832,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     record = db[:conversion_edge_test].where(id: 3).first
+
     assert_equal 12_345, record[:int_field], "String should be coerced to integer"
 
     # Test string to float coercion
@@ -789,6 +841,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     end
 
     record = db[:conversion_edge_test].where(id: 4).first
+
     assert_in_delta 123.45, record[:float_field], 0.01, "String should be coerced to float"
 
     # Test binary data handling
@@ -838,6 +891,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       end
 
       record = db[:boundary_test].where(id: index + 1).first
+
       assert_equal test_int, record[:small_int], "Small int should handle boundary value"
       assert_equal test_int, record[:big_int], "Big int should handle boundary value"
     end
@@ -862,6 +916,7 @@ class TypeTest < SequelDuckDBTest::TestCase
       end
 
       record = db[:boundary_test].where(id: next_id).first
+
       assert_in_delta test_float, record[:float_val], 1e-15, "Float should handle boundary value"
       assert_in_delta test_float, record[:double_val], 1e-15, "Double should handle boundary value"
     end
@@ -869,35 +924,37 @@ class TypeTest < SequelDuckDBTest::TestCase
 
   def test_binary_data_literal_in_sql_context
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     # Test binary data in WHERE clauses
     binary_data = "test\x00data".b
     dataset = db[:files].where(content: binary_data)
     sql = dataset.sql
     expected_hex = binary_data.unpack1("H*")
-    assert_match(/content = '#{expected_hex}'/, sql, "Binary data in WHERE should be hex encoded")
+
+    assert_match(/"content" = '#{expected_hex}'/, sql, "Binary data in WHERE should be hex encoded")
 
     # Test binary data in INSERT statements
     dataset = db[:files]
     insert_sql = dataset.insert_sql(name: "test.bin", content: binary_data)
+
     assert_match(/content.*'#{expected_hex}'/, insert_sql, "Binary data in INSERT should be hex encoded")
   end
 
   def test_numeric_precision_in_sql_context
     db = Sequel.mock(host: "duckdb")
-    db.extend_datasets(Sequel::DuckDB::DatasetMethods)
 
     # Test high precision decimal in WHERE
     precise_decimal = 123.456789012345
     dataset = db[:measurements].where(value: precise_decimal)
     sql = dataset.sql
-    assert_match(/value = 123\.456789012345/, sql, "Precise decimal should be preserved in WHERE")
+
+    assert_match(/"value" = 123\.456789012345/, sql, "Precise decimal should be preserved in WHERE")
 
     # Test large integer in INSERT
     large_int = 9_223_372_036_854_775_807
     dataset = db[:counters]
     insert_sql = dataset.insert_sql(count: large_int)
+
     assert_match(/count.*9223372036854775807/, insert_sql, "Large integer should be preserved in INSERT")
   end
 
@@ -931,9 +988,11 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # Verify the coerced values
     record1 = db[:coercion_test].where(id: 1).first
+
     assert_equal "123", record1[:string_field], "String should remain string"
 
     record2 = db[:coercion_test].where(id: 2).first
+
     assert_equal "123", record2[:string_field], "Integer should be coerced to string"
   end
 
@@ -1006,7 +1065,7 @@ class TypeTest < SequelDuckDBTest::TestCase
     assert_equal "default_string", record[:string_with_default], "String default should be applied"
     assert_equal 42, record[:int_with_default], "Integer default should be applied"
     assert_in_delta 3.14, record[:float_with_default], 0.001, "Float default should be applied"
-    assert_equal true, record[:bool_with_default], "Boolean default should be applied"
+    assert record[:bool_with_default], "Boolean default should be applied"
 
     # Date default handling may vary by database
     refute_nil record[:date_with_default], "Date default should not be nil"
