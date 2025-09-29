@@ -46,7 +46,4 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop-minitest", "~> 0.38.2"
   spec.add_development_dependency "rubocop-rake", "~> 0.7.1"
   spec.add_development_dependency "rubocop-sequel", "~> 0.4.1"
-
-  # For more information and examples about making a new gem, check out our
-  # guide at: https://bundler.io/guides/creating_gem.html
 end

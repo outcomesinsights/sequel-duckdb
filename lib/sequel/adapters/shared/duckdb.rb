@@ -141,8 +141,8 @@ module Sequel
 
       # Extract SQL state from DuckDB exception if available
       #
-      # @param exception [::DuckDB::Error] The DuckDB exception
-      # @param opts [Hash] Additional options
+      # @param _exception [::DuckDB::Error] The DuckDB exception
+      # @param _opts [Hash] Additional options
       # @return [String, nil] SQL state code or nil if not available
       def database_exception_sqlstate(_exception, _opts)
         # DuckDB errors may not always have SQL state codes
@@ -160,7 +160,7 @@ module Sequel
       # Map DuckDB errors to appropriate Sequel exception types (Requirements 8.1, 8.2, 8.3, 8.7)
       #
       # @param exception [::DuckDB::Error] The DuckDB exception
-      # @param opts [Hash] Additional options
+      # @param _opts [Hash] Additional options
       # @return [Class] Sequel exception class to use
       def database_exception_class(exception, _opts)
         message = exception.message.to_s
@@ -642,7 +642,7 @@ module Sequel
 
       # Check if DuckDB supports the specified transaction isolation level
       #
-      # @param level [Symbol] Isolation level (:read_uncommitted, :read_committed, :repeatable_read, :serializable)
+      # @param _level [Symbol] Isolation level (:read_uncommitted, :read_committed, :repeatable_read, :serializable)
       # @return [Boolean] true if the isolation level is supported
       def supports_transaction_isolation_level?(_level)
         # DuckDB does not currently support setting transaction isolation levels
@@ -709,7 +709,7 @@ module Sequel
       # Sequel calls this with (conn, opts) arguments
       #
       # @param conn [::DuckDB::Connection] Database connection
-      # @param opts [Hash] Options
+      # @param _opts [Hash] Options
       # @return [void]
       def commit_transaction(conn, _opts = {})
         conn.query("COMMIT")
@@ -719,7 +719,7 @@ module Sequel
       # Sequel calls this with (conn, opts) arguments
       #
       # @param conn [::DuckDB::Connection] Database connection
-      # @param opts [Hash] Options
+      # @param _opts [Hash] Options
       # @return [void]
       def rollback_transaction(conn, _opts = {})
         conn.query("ROLLBACK")
@@ -826,7 +826,7 @@ module Sequel
       # Generate SQL for primary key column
       #
       # @param column [Symbol] Column name
-      # @param opts [Hash] Column options
+      # @param _opts [Hash] Column options
       # @return [String] SQL for primary key column
       def primary_key_column_sql(column, _opts)
         # DuckDB doesn't support AUTOINCREMENT, so we just use INTEGER PRIMARY KEY
@@ -845,7 +845,7 @@ module Sequel
       # DuckDB doesn't support AUTOINCREMENT, use sequences instead
       #
       # @param column [Symbol] Column name
-      # @param opts [Hash] Column options
+      # @param _opts [Hash] Column options
       # @return [String] SQL for auto-incrementing column
       def auto_increment_column_sql(column, _opts)
         # DuckDB uses sequences for auto-increment, but for primary keys
@@ -901,7 +901,7 @@ module Sequel
       # @param conn [::DuckDB::Connection] Database connection (already connected)
       # @param sql [String] SQL statement to execute
       # @param params [Array] Parameters for prepared statement
-      # @param opts [Hash] Options for execution
+      # @param _opts [Hash] Options for execution
       # @return [Object] Result of execution
       def execute_statement(conn, sql, params = [], _opts = {})
         # Log the SQL query with timing information (Requirements 8.4, 8.5)
@@ -1823,7 +1823,7 @@ module Sequel
       # Streaming result support where possible (Requirement 9.5)
       #
       # @param sql [String] SQL to execute
-      # @param &block [Proc] Block to process each row
+      # @yield [Hash] Block to process each row
       # @return [Enumerator] If no block given, returns enumerator
       def stream(sql = select_sql, &)
         if block_given?
@@ -2051,7 +2051,7 @@ module Sequel
       # Stream results with memory limit enforcement (Requirement 9.5)
       #
       # @param memory_limit [Integer] Maximum memory growth allowed in bytes
-      # @param &block [Proc] Block to process each row
+      # @yield [Hash] Block to process each row
       # @return [Enumerator] If no block given
       def stream_with_memory_limit(memory_limit, &)
         return enum_for(:stream_with_memory_limit, memory_limit) unless block_given?
