@@ -187,6 +187,63 @@ module Sequel
       def dataset_class_default
         Dataset
       end
+
+      # Execute SQL for SELECT queries
+      def execute(sql, opts = OPTS, &block)
+        _execute(:select, sql, opts, &block)
+      end
+
+      # Execute SQL for INSERT/UPDATE/DELETE queries
+      def execute_dui(sql, opts = OPTS)
+        _execute(:update, sql, opts)
+      end
+
+      # Execute SQL for INSERT queries
+      def execute_insert(sql, opts = OPTS)
+        _execute(:insert, sql, opts)
+      end
+
+      private
+
+      # Get database error classes for exception conversion
+      def database_error_classes
+        [::DuckDB::Error]
+      end
+
+      # Core execution method following SQLite pattern
+      def _execute(type, sql, opts, &block)
+        synchronize(opts[:server]) do |conn|
+          case type
+          when :select
+            log_connection_yield(sql, conn) do
+              result = conn.query(sql)
+              if block
+                # Convert rows to hash format for direct execute(sql) { |row| } calls
+                columns = result.columns
+                result.each do |row_array|
+                  row_hash = {}
+                  columns.each_with_index do |column, index|
+                    column_name = column.respond_to?(:name) ? column.name : column.to_s
+                    row_hash[column_name.to_sym] = row_array[index]
+                  end
+                  yield row_hash
+                end
+              end
+              result
+            end
+          when :insert
+            log_connection_yield(sql, conn) { conn.query(sql) }
+            nil
+          when :update
+            log_connection_yield(sql, conn) do
+              result = conn.query(sql)
+              result.rows_changed
+            end
+          end
+        end
+      rescue ::DuckDB::Error => e
+        raise_error(e, opts)
+      end
     end
 
     # Dataset class for DuckDB adapter
@@ -240,6 +297,20 @@ module Sequel
     # @since 0.1.0
     class Dataset < Sequel::Dataset
       include Sequel::DuckDB::DatasetMethods
+
+      # Fetch rows from database following SQLite pattern
+      def fetch_rows(sql)
+        # execute already converts rows to hashes when a block is given
+        # We just need to set the columns and pass through
+        first_row = true
+        execute(sql) do |row|
+          if first_row
+            self.columns = row.keys.map { |k| output_identifier(k) }
+            first_row = false
+          end
+          yield row
+        end
+      end
     end
   end
 end

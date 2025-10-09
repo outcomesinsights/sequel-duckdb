@@ -65,176 +65,17 @@ module Sequel
         false
       end
 
-      public
+      # Error classification using DATABASE_ERROR_REGEXPS following SQLite pattern
+      DATABASE_ERROR_REGEXPS = {
+        /NOT NULL constraint failed/i => Sequel::NotNullConstraintViolation,
+        /UNIQUE constraint failed|PRIMARY KEY|duplicate/i => Sequel::UniqueConstraintViolation,
+        /FOREIGN KEY constraint failed/i => Sequel::ForeignKeyConstraintViolation,
+        /CHECK constraint failed/i => Sequel::CheckConstraintViolation,
+        /constraint failed/i => Sequel::ConstraintViolation
+      }.freeze
 
-      # Execute SQL statement
-      #
-      # @param sql [String] SQL statement to execute
-      # @param opts [Hash, Array] Options for execution or parameters array
-      # @return [Object] Result of execution
-      def execute(sql, opts = {}, &block)
-        # Handle both old-style (sql, opts) and new-style (sql, params) calls
-        if opts.is_a?(Array)
-          params = opts
-          opts = {}
-        elsif opts.is_a?(Hash)
-          params = opts[:params] || []
-        else
-          # Handle other types (like strings) by treating as empty params
-          params = []
-          opts = {}
-        end
-
-        synchronize(opts[:server]) do |conn|
-          result = execute_statement(conn, sql, params, opts, &block)
-
-          # For UPDATE/DELETE operations without a block, return the number of affected rows
-          # This is what Sequel models expect
-          if !block && result.is_a?(::DuckDB::Result) \
-            && (sql.strip.upcase.start_with?("UPDATE ") \
-            || sql.strip.upcase.start_with?("DELETE "))
-            return result.rows_changed
-          end
-
-          return result
-        end
-      end
-
-      # Execute INSERT statement
-      #
-      # @param sql [String] INSERT SQL statement
-      # @param opts [Hash] Options for execution
-      # @return [Object] Result of execution
-      def execute_insert(sql, opts = {})
-        execute(sql, opts)
-        # For INSERT statements, we should return the inserted ID if possible
-        # Since DuckDB doesn't support AUTOINCREMENT, we'll return nil for now
-        # This matches the behavior expected by Sequel
-        nil
-      end
-
-      # Execute UPDATE statement
-      #
-      # @param sql [String] UPDATE SQL statement
-      # @param opts [Hash] Options for execution
-      # @return [Object] Result of execution
-      def execute_update(sql, opts = {})
-        result = execute(sql, opts)
-        # For UPDATE/DELETE statements, return the number of affected rows
-        # DuckDB::Result has a rows_changed method for affected row count
-        if result.respond_to?(:rows_changed)
-          result.rows_changed
-        else
-          # Fallback: try to get row count from result
-          result.is_a?(Integer) ? result : 0
-        end
-      end
-
-      private
-
-      # Get database error classes that should be caught and converted to Sequel exceptions
-      #
-      # @return [Array<Class>] Array of DuckDB error classes
-      def database_error_classes
-        [::DuckDB::Error]
-      end
-
-      # Extract SQL state from DuckDB exception if available
-      #
-      # @param _exception [::DuckDB::Error] The DuckDB exception
-      # @param _opts [Hash] Additional options
-      # @return [String, nil] SQL state code or nil if not available
-      def database_exception_sqlstate(_exception, _opts)
-        # DuckDB errors may not always have SQL state codes
-        # This can be enhanced when more detailed error information is available
-        nil
-      end
-
-      # Whether to use SQL states for exception handling
-      #
-      # @return [Boolean] true if SQL states should be used
-      def database_exception_use_sqlstates?
-        false
-      end
-
-      # Map DuckDB errors to appropriate Sequel exception types (Requirements 8.1, 8.2, 8.3, 8.7)
-      #
-      # @param exception [::DuckDB::Error] The DuckDB exception
-      # @param _opts [Hash] Additional options
-      # @return [Class] Sequel exception class to use
-      def database_exception_class(exception, _opts)
-        message = exception.message.to_s
-
-        # Map specific DuckDB error patterns to appropriate Sequel exceptions
-        case message
-        when /connection/i, /database.*not.*found/i, /cannot.*open/i
-          # Connection-related errors (Requirement 8.1)
-          Sequel::DatabaseConnectionError
-        when /violates.*not.*null/i, /not.*null.*constraint/i, /null.*value.*not.*allowed/i
-          # NOT NULL constraint violations (Requirement 8.3) - moved up for priority
-          Sequel::NotNullConstraintViolation
-        when /unique.*constraint/i, /duplicate.*key/i, /already.*exists/i,
-           /primary.*key.*constraint/i, /duplicate.*primary.*key/i
-          # UNIQUE and PRIMARY KEY constraint violations (Requirement 8.3)
-          # Primary key violations are a type of unique constraint
-          Sequel::UniqueConstraintViolation
-        when /foreign.*key.*constraint/i, /violates.*foreign.*key/i
-          # Foreign key constraint violations (Requirement 8.3)
-          Sequel::ForeignKeyConstraintViolation
-        when /check.*constraint/i, /violates.*check/i
-          # CHECK constraint violations (Requirement 8.3)
-          Sequel::CheckConstraintViolation
-        when /constraint.*violation/i, /violates.*constraint/i
-          # Generic constraint violations (Requirement 8.3) - moved to end for lower priority
-          Sequel::ConstraintViolation
-        else
-          # when /syntax.*error/i, /parse.*error/i, /unexpected.*token/i,
-          #      /table.*does.*not.*exist/i, /relation.*does.*not.*exist/i,
-          #      /no.*such.*table/i, /column.*does.*not.*exist/i,
-          #      /no.*such.*column/i, /unknown.*column/i,
-          #      /referenced.*column.*not.*found/i,
-          #      /does.*not.*have.*a.*column/i, /schema.*does.*not.*exist/i,
-          #      /no.*such.*schema/i, /function.*does.*not.*exist/i,
-          #      /no.*such.*function/i, /unknown.*function/i, /type.*error/i,
-          #      /cannot.*cast/i, /invalid.*type/i, /permission.*denied/i,
-          #      /access.*denied/i, /insufficient.*privileges/i
-          # Various database errors (Requirements 8.2, 8.7):
-          # - SQL syntax errors
-          # - Table/column/schema/function not found errors
-          # - Type conversion errors
-          # - Permission/access errors
-          Sequel::DatabaseError
-        end
-      end
-
-      # Enhanced error message formatting for better debugging (Requirements 8.2, 8.7)
-      #
-      # @param exception [::DuckDB::Error] The DuckDB exception
-      # @param opts [Hash] Additional options including SQL and parameters
-      # @return [String] Enhanced error message
-      def database_exception_message(exception, opts)
-        message = "DuckDB error: #{exception.message}"
-
-        # Add SQL context if available for better debugging
-        message += " -- SQL: #{opts[:sql]}" if opts[:sql]
-
-        # Add parameter context if available
-        message += " -- Parameters: #{opts[:params].inspect}" if opts[:params] && !opts[:params].empty?
-
-        message
-      end
-
-      # Handle constraint violation errors with specific categorization (Requirement 8.3)
-      #
-      # @param exception [::DuckDB::Error] The DuckDB exception
-      # @param opts [Hash] Additional options
-      # @return [Exception] Appropriate Sequel constraint exception
-      def handle_constraint_violation(exception, opts = {})
-        message = database_exception_message(exception, opts)
-        exception_class = database_exception_class(exception, opts)
-
-        # Create the appropriate exception with enhanced message
-        exception_class.new(message)
+      def database_error_regexps
+        DATABASE_ERROR_REGEXPS
       end
 
       # Schema introspection methods
@@ -246,10 +87,10 @@ module Sequel
       def schema_parse_tables(opts = {})
         schema_name = opts[:schema] || "main"
 
-        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'"
+        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = '#{schema_name}' AND table_type = 'BASE TABLE'"
 
         tables = []
-        execute(sql, [schema_name]) do |row|
+        execute(sql) do |row|
           tables << row[:table_name].to_sym
         end
 
@@ -279,12 +120,12 @@ module Sequel
             numeric_precision,
             numeric_scale
           FROM information_schema.columns
-          WHERE table_schema = ? AND table_name = ?
+          WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}'
           ORDER BY ordinal_position
         SQL
 
         columns = []
-        execute(sql, [schema_name, table_name.to_s]) do |row|
+        execute(sql) do |row|
           column_name = row[:column_name].to_sym
 
           # Map DuckDB types to Sequel types
@@ -340,11 +181,11 @@ module Sequel
             expressions,
             sql
           FROM duckdb_indexes()
-          WHERE schema_name = ? AND table_name = ?
+          WHERE schema_name = '#{schema_name}' AND table_name = '#{table_name}'
         SQL
 
         indexes = {}
-        execute(sql, [schema_name, table_name.to_s]) do |row|
+        execute(sql) do |row|
           index_name = row[:index_name].to_sym
 
           # Parse column expressions - DuckDB returns them as JSON array strings
@@ -457,10 +298,10 @@ module Sequel
       def table_exists?(table_name, opts = {})
         schema_name = opts[:schema] || "main"
 
-        sql = "SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ? LIMIT 1"
+        sql = "SELECT 1 FROM information_schema.tables WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}' LIMIT 1"
 
         result = nil
-        execute(sql, [schema_name, table_name.to_s]) do |_row|
+        execute(sql) do |_row|
           result = true
         end
 
@@ -596,12 +437,12 @@ module Sequel
             AND tc.table_schema = kcu.table_schema
             AND tc.table_name = kcu.table_name
           WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND tc.table_schema = ?
-            AND tc.table_name = ?
+            AND tc.table_schema = '#{schema_name}'
+            AND tc.table_name = '#{table_name}'
         SQL
 
         primary_key_columns = []
-        execute(sql, [schema_name, table_name.to_s]) do |row|
+        execute(sql) do |row|
           primary_key_columns << row[:column_name].to_sym
         end
 
@@ -896,162 +737,6 @@ module Sequel
         end
       end
 
-      # Execute SQL statement against DuckDB connection
-      #
-      # @param conn [::DuckDB::Connection] Database connection (already connected)
-      # @param sql [String] SQL statement to execute
-      # @param params [Array] Parameters for prepared statement
-      # @param _opts [Hash] Options for execution
-      # @return [Object] Result of execution
-      def execute_statement(conn, sql, params = [], _opts = {})
-        # Log the SQL query with timing information (Requirements 8.4, 8.5)
-        start_time = Time.now
-
-        begin
-          # Log the SQL query before execution
-          log_sql_query(sql, params)
-
-          # Handle parameterized queries
-          if params && !params.empty?
-            # Prepare statement with ? placeholders
-            stmt = conn.prepare(sql)
-
-            # Bind parameters using 1-based indexing
-            params.each_with_index do |param, index|
-              stmt.bind(index + 1, param)
-            end
-
-            # Execute the prepared statement
-            result = stmt.execute
-          else
-            # Execute directly without parameters
-            result = conn.query(sql)
-          end
-
-          # Log timing information for the operation
-          end_time = Time.now
-          execution_time = end_time - start_time
-          log_sql_timing(sql, execution_time)
-
-          if block_given?
-            # Get column names from the result
-            columns = result.columns
-
-            # Iterate through each row
-            result.each do |row_array|
-              # Convert array to hash with column names as keys
-              row_hash = {}
-              columns.each_with_index do |column, index|
-                # DuckDB::Column objects have a name method
-                column_name = column.respond_to?(:name) ? column.name : column.to_s
-                row_hash[column_name.to_sym] = row_array[index]
-              end
-              yield row_hash
-            end
-          else
-            result
-          end
-        rescue ::DuckDB::Error => e
-          # Log the error for debugging (Requirement 8.6)
-          end_time = Time.now
-          execution_time = end_time - start_time
-          log_sql_error(sql, params, e, execution_time)
-
-          # Use enhanced error mapping for better exception categorization (Requirements 8.1, 8.2, 8.3, 8.7)
-          error_opts = { sql: sql, params: params }
-          exception_class = database_exception_class(e, error_opts)
-          enhanced_message = database_exception_message(e, error_opts)
-
-          raise exception_class, enhanced_message
-        rescue StandardError => e
-          # Log unexpected errors
-          end_time = Time.now
-          execution_time = end_time - start_time
-          log_sql_error(sql, params, e, execution_time)
-          raise e
-        end
-      end
-
-      # Log SQL query execution (Requirement 8.4)
-      #
-      # @param sql [String] SQL statement
-      # @param params [Array] Parameters for the query
-      def log_sql_query(sql, params = [])
-        return unless log_connection_info?
-
-        if params && !params.empty?
-          # Log parameterized query with parameters
-          log_info("SQL Query: #{sql} -- Parameters: #{params.inspect}")
-        else
-          # Log simple query
-          log_info("SQL Query: #{sql}")
-        end
-      end
-
-      # Log SQL query timing information (Requirement 8.5)
-      #
-      # @param sql [String] SQL statement
-      # @param execution_time [Float] Time taken to execute in seconds
-      def log_sql_timing(sql, execution_time)
-        return unless log_connection_info?
-
-        # Log timing information, highlighting slow operations
-        time_ms = (execution_time * 1000).round(2)
-
-        if execution_time > 1.0 # Log slow operations (> 1 second) as warnings
-          log_warn("SLOW SQL Query (#{time_ms}ms): #{sql}")
-        else
-          log_info("SQL Query completed in #{time_ms}ms")
-        end
-      end
-
-      # Log SQL query errors (Requirement 8.6)
-      #
-      # @param sql [String] SQL statement that failed
-      # @param params [Array] Parameters for the query
-      # @param error [Exception] The error that occurred
-      # @param execution_time [Float] Time taken before error
-      def log_sql_error(sql, params, error, execution_time)
-        return unless log_connection_info?
-
-        time_ms = (execution_time * 1000).round(2)
-
-        if params && !params.empty?
-          log_error("SQL Error after #{time_ms}ms: #{error.message} -- SQL: #{sql} -- Parameters: #{params.inspect}")
-        else
-          log_error("SQL Error after #{time_ms}ms: #{error.message} -- SQL: #{sql}")
-        end
-      end
-
-      # Check if connection info should be logged
-      #
-      # @return [Boolean] true if logging is enabled
-      def log_connection_info?
-        # Use Sequel's built-in logging mechanism
-        !loggers.empty?
-      end
-
-      # Log info message using Sequel's logging system
-      #
-      # @param message [String] Message to log
-      def log_info(message)
-        log_connection_yield(message, nil) { nil }
-      end
-
-      # Log warning message using Sequel's logging system
-      #
-      # @param message [String] Message to log
-      def log_warn(message)
-        log_connection_yield("WARNING: #{message}", nil) { nil }
-      end
-
-      # Log error message using Sequel's logging system
-      #
-      # @param message [String] Message to log
-      def log_error(message)
-        log_connection_yield("ERROR: #{message}", nil) { nil }
-      end
-
       public
 
       # EXPLAIN functionality access for query plans (Requirement 9.6)
@@ -1271,10 +956,10 @@ module Sequel
       #   db.schemas  # => [:main, :analytics, :staging]
       def schemas(opts = OPTS)
         sql = "SELECT schema_name FROM information_schema.schemata"
-        sql += " WHERE catalog_name = ?" if opts[:catalog]
+        sql += " WHERE catalog_name = '#{opts[:catalog]}'" if opts[:catalog]
 
         schemas = []
-        execute(sql, opts[:catalog] ? [opts[:catalog]] : []) do |row|
+        execute(sql) do |row|
           schemas << row[:schema_name].to_sym
         end
 
@@ -1290,10 +975,10 @@ module Sequel
       # @example Check if schema exists
       #   db.schema_exists?(:analytics)  # => true
       def schema_exists?(name, opts = OPTS)
-        sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = ? LIMIT 1"
+        sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = '#{name}' LIMIT 1"
 
         result = nil
-        execute(sql, [name.to_s]) do |_row|
+        execute(sql) do |_row|
           result = true
         end
 
@@ -1900,569 +1585,6 @@ module Sequel
         "'#{blob.unpack1("H*")}'"
       end
 
-      # Dataset operation methods (Requirements 6.1, 6.2, 6.3, 9.5)
-
-      # Override all method to ensure proper model instantiation
-      # Sequel's default all method doesn't always apply row_proc correctly
-      def all
-        records = []
-        fetch_rows(select_sql) do |row|
-          # Apply row_proc if it exists (for model instantiation)
-          row_proc = @row_proc || opts[:row_proc]
-          processed_row = row_proc ? row_proc.call(row) : row
-          records << processed_row
-        end
-        records
-      end
-
-      # Insert a record into the dataset's table
-      #
-      # @param values [Hash] Column values to insert
-      # @return [Integer, nil] Number of affected rows (always nil for DuckDB due to no AUTOINCREMENT)
-      def insert(values = {})
-        sql = insert_sql(values)
-        result = db.execute(sql)
-
-        # For DuckDB, we need to return the number of affected rows
-        # Since DuckDB doesn't support AUTOINCREMENT, we return nil for the ID
-        # but we should return 1 to indicate successful insertion
-        if result.is_a?(::DuckDB::Result)
-          # DuckDB::Result doesn't have a direct way to get affected rows for INSERT
-          # For INSERT operations, if no error occurred, assume 1 row was affected
-          1
-        else
-          result
-        end
-      end
-
-      # Update records in the dataset
-      #
-      # @param values [Hash] Column values to update
-      # @return [Integer] Number of affected rows
-      def update(values = {})
-        sql = update_sql(values)
-        # Use execute_update which properly returns the row count
-        db.execute_update(sql)
-      end
-
-      # Delete records from the dataset
-      #
-      # @return [Integer] Number of affected rows
-      def delete
-        sql = delete_sql
-        # Use execute_update which properly returns the row count
-        db.execute_update(sql)
-      end
-
-      # Streaming result support where possible (Requirement 9.5)
-      #
-      # @param sql [String] SQL to execute
-      # @yield [Hash] Block to process each row
-      # @return [Enumerator] If no block given, returns enumerator
-      def stream(sql = select_sql, &)
-        if block_given?
-          # Stream results by processing them one at a time
-          fetch_rows(sql, &)
-        else
-          # Return enumerator for lazy evaluation
-          enum_for(:stream, sql)
-        end
-      end
-
-      # Performance optimization methods (Requirements 9.1, 9.2, 9.3, 9.4)
-      # These methods are public to provide enhanced performance capabilities
-
-      # Optimized fetch_rows method for large result sets (Requirement 9.1)
-      # This method provides efficient row fetching with streaming capabilities
-      # Override the existing fetch_rows method to make it public and optimized
-      def fetch_rows(sql)
-        # Use streaming approach to avoid loading all results into memory at once
-        # This is particularly important for large result sets
-        if block_given?
-          # Get schema information for type conversion
-          table_schema = table_schema_for_conversion
-
-          # Execute with type conversion
-          db.execute(sql) do |row|
-            # Apply type conversion for TIME columns
-            converted_row = convert_row_types(row, table_schema)
-            yield converted_row
-          end
-        else
-          # Return enumerator if no block given (for compatibility)
-          enum_for(:fetch_rows, sql)
-        end
-      end
-
-      private
-
-      # Get table schema information for type conversion
-      def table_schema_for_conversion
-        return nil unless @opts[:from]&.first
-
-        table_name = @opts[:from].first
-        # Handle case where table name is wrapped in an identifier
-        table_name = table_name.value if table_name.respond_to?(:value)
-
-        begin
-          schema_info = db.schema(table_name)
-          schema_hash = {}
-          schema_info.each do |column_name, column_info|
-            schema_hash[column_name] = column_info
-          end
-          schema_hash
-        rescue StandardError
-          # If schema lookup fails, return nil to skip type conversion
-          nil
-        end
-      end
-
-      # Convert row values based on column types
-      def convert_row_types(row, table_schema)
-        return row unless table_schema
-
-        converted_row = {}
-        row.each do |column_name, value|
-          column_info = table_schema[column_name]
-          converted_row[column_name] = if column_info && column_info[:type] == :time && value.is_a?(Time)
-                                         # Convert TIME columns to time-only values
-                                         Time.local(1970, 1, 1, value.hour, value.min, value.sec, value.usec)
-                                       else
-                                         value
-                                       end
-        end
-        converted_row
-      end
-
-      public
-
-      # Enhanced bulk insert optimization (Requirement 9.3)
-      # Override multi_insert to use DuckDB's efficient bulk loading capabilities
-      def multi_insert(columns = nil, &)
-        if columns.is_a?(Array) && !columns.empty? && columns.first.is_a?(Hash)
-          # Handle array of hashes (most common case)
-          bulk_insert_optimized(columns)
-        else
-          # Fall back to standard Sequel behavior for other cases
-          super
-        end
-      end
-
-      # Optimized bulk insert implementation using DuckDB's capabilities
-      def bulk_insert_optimized(rows)
-        return 0 if rows.empty?
-
-        # Get column names from first row
-        columns = rows.first.keys
-
-        # Get table name from opts[:from]
-        table_name = @opts[:from].first
-
-        # Build optimized INSERT statement with VALUES clause
-        # DuckDB handles multiple VALUES efficiently
-        values_placeholders = rows.map { |_| "(#{columns.map { "?" }.join(", ")})" }.join(", ")
-        table_sql = String.new
-        quote_identifier_append(table_sql, table_name)
-        col_list = columns.map do |c|
-          col_sql = String.new
-          quote_identifier_append(col_sql, c)
-          col_sql
-        end.join(", ")
-        sql = "INSERT INTO #{table_sql} (#{col_list}) VALUES #{values_placeholders}"
-
-        # Flatten all row values for parameter binding
-        params = rows.flat_map { |row| columns.map { |col| row[col] } }
-
-        # Execute the bulk insert
-        db.execute(sql, params)
-
-        rows.length
-      end
-
-      # Prepared statement support for performance (Requirement 9.2)
-      # Enhanced prepare method that leverages DuckDB's prepared statement capabilities
-      def prepare(type, name = nil, *values)
-        # Check if DuckDB connection supports prepared statements
-        if db.respond_to?(:prepare_statement)
-          # Use DuckDB's native prepared statement support
-          sql = case type
-                when :select, :all
-                  select_sql
-                when :first
-                  clone(limit: 1).select_sql
-                when :insert
-                  insert_sql(*values)
-                when :update
-                  update_sql(*values)
-                when :delete
-                  delete_sql
-                else
-                  raise ArgumentError, "Unsupported prepared statement type: #{type}"
-                end
-
-          # Create and cache prepared statement
-          prepared_stmt = db.prepare_statement(sql)
-
-          # Return a callable object that executes the prepared statement
-          lambda do |*params|
-            case type
-            when :select, :all
-              prepared_stmt.execute(*params).to_a
-            when :first
-              result = prepared_stmt.execute(*params).first
-              result
-            else
-              prepared_stmt.execute(*params)
-            end
-          end
-        else
-          # Fall back to standard Sequel prepared statement handling
-          super
-        end
-      end
-
-      # Connection pooling optimization (Requirement 9.4)
-      # Enhanced connection management for better performance
-      def with_connection_pooling
-        # Ensure efficient connection reuse
-        db.synchronize do |conn|
-          # Verify connection is still valid before use
-          unless db.valid_connection?(conn)
-            # Reconnect if connection is invalid
-            conn = db.connect(db.opts)
-          end
-
-          yield conn
-        end
-      end
-
-      # Memory-efficient streaming for large result sets (Requirement 9.5)
-      # Enhanced each method with better memory management
-      def each(&)
-        return enum_for(:each) unless block_given?
-
-        # Use streaming approach to minimize memory usage
-        sql = select_sql
-
-        # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
-        if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
-          # SQL already has LIMIT/OFFSET, execute directly without batching
-          fetch_rows(sql, &)
-          return self
-        end
-
-        # Process results in batches to balance memory usage and performance
-        batch_size = @opts[:stream_batch_size] || 1000
-        offset = 0
-
-        loop do
-          # Fetch a batch of results
-          batch_sql = "#{sql} LIMIT #{batch_size} OFFSET #{offset}"
-          batch_count = 0
-
-          fetch_rows(batch_sql) do |row|
-            yield row
-            batch_count += 1
-          end
-
-          # Break if we got fewer rows than the batch size (end of results)
-          break if batch_count < batch_size
-
-          offset += batch_size
-        end
-
-        self
-      end
-
-      # Set custom batch size for streaming operations (Requirement 9.5)
-      #
-      # @param size [Integer] Batch size for streaming
-      # @return [Dataset] New dataset with custom batch size
-      def stream_batch_size(size)
-        clone(stream_batch_size: size)
-      end
-
-      # Stream results with memory limit enforcement (Requirement 9.5)
-      #
-      # @param memory_limit [Integer] Maximum memory growth allowed in bytes
-      # @yield [Hash] Block to process each row
-      # @return [Enumerator] If no block given
-      def stream_with_memory_limit(memory_limit, &)
-        return enum_for(:stream_with_memory_limit, memory_limit) unless block_given?
-
-        sql = select_sql
-
-        # Check if SQL already has LIMIT/OFFSET - if so, don't add batching
-        if sql.match?(/\bLIMIT\b/i) || sql.match?(/\bOFFSET\b/i)
-          # SQL already has LIMIT/OFFSET, execute directly without batching
-          fetch_rows(sql, &)
-          return self
-        end
-
-        initial_memory = memory_usage
-        batch_size = @opts[:stream_batch_size] || 500
-        offset = 0
-
-        loop do
-          # Check memory usage before processing batch
-          current_memory = memory_usage
-          memory_growth = current_memory - initial_memory
-
-          # Reduce batch size if memory usage is high
-          batch_size = [batch_size / 2, 100].max if memory_growth > memory_limit * 0.8
-
-          batch_sql = "#{sql} LIMIT #{batch_size} OFFSET #{offset}"
-          batch_count = 0
-
-          fetch_rows(batch_sql) do |row|
-            yield row
-            batch_count += 1
-
-            # Force garbage collection periodically to manage memory
-            GC.start if (batch_count % 100).zero?
-          end
-
-          break if batch_count < batch_size
-
-          offset += batch_size
-        end
-
-        self
-      end
-
-      private
-
-      # Get approximate memory usage for streaming optimization
-      def memory_usage
-        GC.start
-        ObjectSpace.count_objects[:TOTAL] * 40
-      end
-
-      public
-
-      # Optimized count method for DuckDB
-      # Provides fast path for simple COUNT(*) queries on base tables
-      # Falls back to Sequel's implementation for complex scenarios
-      def count(*args, &block)
-        # Only optimize if:
-        # - No arguments or block provided
-        # - No grouping, having, distinct, or where clauses
-        # - Has a from clause with a table
-        if args.empty? && !block && !@opts[:group] && !@opts[:having] &&
-           !@opts[:distinct] && !@opts[:where] && @opts[:from]&.first
-          # Use optimized COUNT(*) for simple cases
-          table_name = @opts[:from].first
-          table_sql = String.new
-          quote_identifier_append(table_sql, table_name)
-          single_value("SELECT COUNT(*) FROM #{table_sql}")
-        else
-          # Fall back to standard Sequel count behavior for complex cases
-          super
-        end
-      end
-
-      private
-
-      # Get a single value from a SQL query (used by count)
-      def single_value(sql)
-        value = nil
-        fetch_rows(sql) do |row|
-          value = row.values.first
-          break
-        end
-        value
-      end
-
-      # Helper method to check if bulk operations should be used
-      def should_use_bulk_operations?(row_count)
-        # Use bulk operations for more than 10 rows
-        row_count > 10
-      end
-
-      # Helper method to optimize query execution based on result set size
-      def optimize_for_result_size(sql)
-        # Add DuckDB-specific optimization hints if needed
-        if @opts[:small_result_set]
-          # For small result sets, DuckDB can use different optimization strategies
-        end
-        sql
-      end
-
-      public
-
-      # Index-aware query generation methods (Requirement 9.7)
-
-      # Get query execution plan with index usage information
-      #
-      # @return [String] Query execution plan
-      def explain
-        explain_sql = "EXPLAIN #{select_sql}"
-        plan_text = ""
-
-        fetch_rows(explain_sql) do |row|
-          plan_text += "#{row.values.join(" ")}\n"
-        end
-
-        plan_text
-      end
-
-      # Get detailed query analysis including index usage
-      #
-      # @return [Hash] Analysis information
-      def analyze_query
-        {
-          plan: explain,
-          indexes_used: extract_indexes_from_plan(explain),
-          optimization_hints: generate_optimization_hints
-        }
-      end
-
-      # Override where method to add index-aware optimization hints
-      def where(*cond, &)
-        result = super
-
-        # Add index optimization hints based on WHERE conditions
-        result = result.add_index_hints(cond.first.keys) if cond.length == 1 && cond.first.is_a?(Hash)
-
-        result
-      end
-
-      # Override order method to leverage index optimization
-      def order(*columns)
-        result = super
-
-        # Add index hints for ORDER BY optimization
-        order_columns = columns.map do |col|
-          case col
-          when Sequel::SQL::OrderedExpression
-            col.expression
-          else
-            col
-          end
-        end
-
-        result.add_index_hints(order_columns)
-      end
-
-      # Add index optimization hints to the dataset
-      #
-      # @param columns [Array] Columns that might benefit from index usage
-      # @return [Dataset] Dataset with index hints
-      def add_index_hints(columns)
-        # Get available indexes for the table
-        table_name = @opts[:from]&.first
-        return self unless table_name
-
-        available_indexes = begin
-          db.indexes(table_name)
-        rescue StandardError
-          {}
-        end
-
-        # Find indexes that match the columns
-        matching_indexes = available_indexes.select do |_index_name, index_info|
-          index_columns = index_info[:columns] || []
-          columns.any? { |col| index_columns.include?(col.to_sym) }
-        end
-
-        # Add index hints to options
-        clone(index_hints: matching_indexes.keys)
-      end
-
-      # Columnar storage optimization methods (Requirement 9.7)
-
-      # Override select method to add columnar optimization
-      def select(*columns)
-        result = super
-
-        # Mark as columnar-optimized if selecting specific columns
-        result = result.clone(columnar_optimized: true) if columns.length.positive? && columns.length < 10
-
-        result
-      end
-
-      # Optimize aggregation queries for columnar storage
-      def group(*columns)
-        result = super
-
-        # Add columnar aggregation optimization hints
-        result.clone(columnar_aggregation: true)
-      end
-
-      # Parallel query execution support (Requirement 9.7)
-
-      # Enable parallel execution for the query
-      #
-      # @param thread_count [Integer] Number of threads to use (optional)
-      # @return [Dataset] Dataset configured for parallel execution
-      def parallel(thread_count = nil)
-        opts = { parallel_execution: true }
-        opts[:parallel_threads] = thread_count if thread_count
-        clone(opts)
-      end
-
-      private
-
-      # Extract index names from query execution plan
-      def extract_indexes_from_plan(plan)
-        indexes = []
-        plan.scan(/idx_\w+|index\s+(\w+)/i) do |match|
-          indexes << (match.is_a?(Array) ? match.first : match)
-        end
-        indexes.compact.uniq
-      end
-
-      # Generate optimization hints based on query structure
-      def generate_optimization_hints
-        hints = []
-
-        # Check for potential index usage
-        hints << "Consider adding indexes on WHERE clause columns" if @opts[:where]
-
-        # Check for ORDER BY optimization
-        hints << "ORDER BY may benefit from index on ordered columns" if @opts[:order]
-
-        # Check for GROUP BY optimization
-        hints << "GROUP BY operations are optimized for columnar storage" if @opts[:group]
-
-        hints
-      end
-
-      # Optimize SQL for columnar projection
-      def optimize_for_columnar_projection(sql)
-        # Add DuckDB-specific hints for columnar projection
-        if @opts[:columnar_optimized]
-          # DuckDB automatically optimizes column access, but we can add hints
-        end
-        sql
-      end
-
-      # Determine if parallel execution should be used
-      def should_use_parallel_execution?
-        # Use parallel execution for:
-        # 1. Explicit parallel requests
-        # 2. Complex aggregations
-        # 3. Large joins
-        # 4. Window functions
-
-        return true if @opts[:parallel_execution]
-        return true if @opts[:group] && @opts[:columnar_aggregation]
-        return true if @opts[:join] && @opts[:join].length > 1
-        return true if sql.downcase.include?("over(")
-
-        false
-      end
-
-      # Add parallel execution hints to SQL
-      def add_parallel_hints(sql)
-        # DuckDB handles parallelization automatically, but we can add configuration
-        if @opts[:parallel_threads]
-          # NOTE: This would require connection-level configuration in practice
-          # For now, we'll rely on DuckDB's automatic parallelization
-        end
-
-        sql
-      end
     end
   end
 
