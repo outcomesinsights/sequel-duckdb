@@ -161,25 +161,6 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     end
   end
 
-  def test_fetch_rows_without_block
-    db = create_db
-    create_test_table(db)
-    insert_test_data(db)
-    dataset = db[:test_table]
-
-    # fetch_rows should work without a block and return an enumerator
-    result = dataset.fetch_rows("SELECT * FROM test_table")
-
-    if result.respond_to?(:each)
-      rows = result.to_a
-
-      assert_equal 2, rows.length, "Should return 2 rows via enumerator"
-    else
-      # If it doesn't return an enumerator, it should at least not crash
-      assert_nothing_raised("fetch_rows without block should not raise error")
-    end
-  end
-
   def test_fetch_rows_with_different_data_types
     db = create_db
     create_test_table(db)

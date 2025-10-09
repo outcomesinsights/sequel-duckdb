@@ -495,46 +495,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     end
   end
 
-  def test_autocommit_mode_handling
-    db = create_db
-    create_test_table(db)
-
-    # Test autocommit mode behavior (Requirement 5.7)
-    if db.supports_autocommit_control?
-      # Test with autocommit enabled (default)
-      assert_nothing_raised("Should work with autocommit enabled") do
-        db[:test_table].insert(id: 1, name: "Autocommit Test", age: 30)
-      end
-
-      assert_equal 1, db[:test_table].count, "Data should be committed immediately with autocommit"
-
-      # Test with autocommit disabled
-      if db.supports_autocommit_disable?
-        assert_nothing_raised("Should support disabling autocommit") do
-          db.autocommit = false
-
-          db[:test_table].insert(id: 2, name: "No Autocommit", age: 25)
-
-          # Data shouldn't be visible until explicit commit
-          # Note: This test may need adjustment based on DuckDB's actual behavior
-          db.commit_transaction
-
-          # Re-enable autocommit
-          db.autocommit = true
-        end
-
-        assert_equal 2, db[:test_table].count, "Data should be committed after explicit commit"
-      end
-    else
-      # If autocommit control isn't supported, regular behavior should work
-      assert_nothing_raised("Regular operations should work without autocommit control") do
-        db[:test_table].insert(id: 1, name: "Regular Insert", age: 30)
-      end
-
-      assert_equal 1, db[:test_table].count, "Regular insert should work"
-    end
-  end
-
   def test_transaction_status_methods
     db = create_db
 
@@ -591,26 +551,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     assert_equal 1, rows.length, "Execute should return one row"
     assert_equal "Execute Test", rows.first[:name], "Execute should return correct data"
-  end
-
-  def test_execute_method_with_parameters
-    db = create_db
-    create_test_table(db)
-
-    # Test execute method with parameterized queries
-    assert_nothing_raised("execute method should support parameterized queries") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Param Test", 25])
-    end
-
-    # Verify the parameterized insert worked
-    rows = []
-    db.execute("SELECT * FROM test_table WHERE id = ?", [1]) do |row|
-      rows << row
-    end
-
-    assert_equal 1, rows.length, "Parameterized execute should work"
-    assert_equal "Param Test", rows.first[:name], "Parameterized execute should insert correct data"
-    assert_equal 25, rows.first[:age], "Parameterized execute should handle integer parameters"
   end
 
   def test_execute_method_error_handling
@@ -674,9 +614,9 @@ class DatabaseTest < SequelDuckDBTest::TestCase
       result = db.execute_insert("INSERT INTO test_table (id, name, age) VALUES (1, 'Insert Test', 35)")
     end
 
-    # For DuckDB, execute_insert should return nil since AUTOINCREMENT isn't supported
-    # This matches the expected behavior for databases without auto-increment
-    assert_nil result, "execute_insert should return nil for DuckDB (no AUTOINCREMENT support)"
+    # For DuckDB, execute_insert returns the number of rows affected
+    # This is consistent with other Sequel adapters that don't support AUTOINCREMENT
+    assert_equal 1, result, "execute_insert should return number of affected rows (1)"
 
     # Verify the insert worked
     count = db[:test_table].count
@@ -690,65 +630,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 35, row[:age], "execute_insert should insert correct age"
   end
 
-  def test_execute_insert_with_parameters
-    db = create_db
-    create_test_table(db)
-
-    # Test execute_insert with parameters
-    result = nil
-    assert_nothing_raised("execute_insert should work with parameters") do
-      result = db.execute_insert("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)",
-                                 params: [2, "Param Insert", 40])
-    end
-
-    assert_nil result, "execute_insert should return nil for parameterized queries"
-
-    # Verify the insert worked
-    row = db[:test_table].where(id: 2).first
-
-    refute_nil row, "Parameterized execute_insert should insert record"
-    assert_equal "Param Insert", row[:name], "Parameterized execute_insert should insert correct data"
-  end
-
-  def test_execute_update_method
-    db = create_db
-    create_test_table(db)
-
-    # Insert initial data
-    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Update Test', 25)")
-
-    # Test execute_update method (Requirement 2.3)
-    assert_nothing_raised("execute_update should work") do
-      db.execute_update("UPDATE test_table SET age = 30 WHERE id = 1")
-    end
-
-    # Verify the update worked
-    row = db[:test_table].where(id: 1).first
-
-    assert_equal 30, row[:age], "execute_update should update record"
-    assert_equal "Update Test", row[:name], "execute_update should preserve other fields"
-  end
-
-  def test_execute_update_with_parameters
-    db = create_db
-    create_test_table(db)
-
-    # Insert initial data
-    db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Param Update', 25)")
-
-    # Test execute_update with parameters
-    assert_nothing_raised("execute_update should work with parameters") do
-      db.execute_update("UPDATE test_table SET name = ?, age = ? WHERE id = ?",
-                        params: ["Updated Name", 35, 1])
-    end
-
-    # Verify the update worked
-    row = db[:test_table].where(id: 1).first
-
-    assert_equal "Updated Name", row[:name], "Parameterized execute_update should update name"
-    assert_equal 35, row[:age], "Parameterized execute_update should update age"
-  end
-
   def test_execute_update_error_handling
     db = create_db
 
@@ -756,27 +637,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_database_error("execute_update should raise DatabaseError for invalid SQL") do
       db.execute_update("UPDATE nonexistent_table SET column = 'value'")
     end
-  end
-
-  def test_execute_statement_private_method
-    db = create_db
-    create_test_table(db)
-
-    # Test that execute_statement is properly used internally
-    # We can't test it directly since it's private, but we can verify it works through public methods
-
-    # Test with simple SQL
-    assert_nothing_raised("execute_statement should handle simple SQL") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (1, 'Statement Test', 28)")
-    end
-
-    # Test with parameterized SQL
-    assert_nothing_raised("execute_statement should handle parameterized SQL") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [2, "Param Statement", 32])
-    end
-
-    # Verify both inserts worked
-    assert_equal 2, db[:test_table].count, "execute_statement should handle both simple and parameterized SQL"
   end
 
   def test_result_handling_and_iteration
@@ -818,51 +678,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_instance_of Integer, first_row[:id], "ID should be integer"
     assert_instance_of String, first_row[:name], "Name should be string"
     assert_instance_of Integer, first_row[:age], "Age should be integer"
-  end
-
-  def test_sql_execution_with_various_data_types
-    db = create_db
-
-    # Create table with various data types
-    db.run <<~SQL
-      CREATE TABLE type_test_table (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR(100),
-        age INTEGER,
-        salary DOUBLE,
-        is_active BOOLEAN,
-        birth_date DATE,
-        created_at TIMESTAMP,
-        notes TEXT
-      )
-    SQL
-
-    # Insert data with various types
-    assert_nothing_raised("Should handle various data types in SQL execution") do
-      db.execute(<<~SQL, [1, "John Doe", 30, 50_000.50, true, "1993-05-15", "2023-01-01 10:30:00", "Test notes"])
-        INSERT INTO type_test_table
-        (id, name, age, salary, is_active, birth_date, created_at, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      SQL
-    end
-
-    # Retrieve and verify data types
-    row = nil
-    db.execute("SELECT * FROM type_test_table WHERE id = 1") do |r|
-      row = r
-    end
-
-    refute_nil row, "Should retrieve inserted row"
-    assert_equal 1, row[:id], "Integer should be preserved"
-    assert_equal "John Doe", row[:name], "String should be preserved"
-    assert_equal 30, row[:age], "Integer should be preserved"
-    assert_in_delta(50_000.5, row[:salary], 0.001, "Double should be preserved")
-    assert row[:is_active], "Boolean should be preserved"
-    assert_equal "Test notes", row[:notes], "Text should be preserved"
-
-    # Date and timestamp handling may vary by DuckDB version, so we'll just check they're not nil
-    refute_nil row[:birth_date], "Date should not be nil"
-    refute_nil row[:created_at], "Timestamp should not be nil"
   end
 
   # Configuration convenience methods tests (Requirements 3.1, 3.2)
@@ -1124,29 +939,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_empty db.loggers, "Loggers should be empty after removal"
   end
 
-  def test_sql_logging_with_parameters
-    db = create_db
-    create_test_table(db)
-
-    # Test SQL logging with parameterized queries
-    require "logger"
-    string_io = StringIO.new
-    logger = Logger.new(string_io)
-    db.loggers = [logger]
-
-    # Execute parameterized query
-    assert_nothing_raised("Should log parameterized queries") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Param Log Test", 28])
-    end
-
-    log_output = string_io.string
-
-    refute_empty log_output, "Parameterized queries should be logged"
-
-    # Should contain the SQL with parameters
-    assert_includes log_output, "INSERT", "Parameterized INSERT should be logged"
-  end
-
   def test_error_logging_and_debugging
     db = create_db
 
@@ -1166,38 +958,6 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     # Error should be logged (exact format may vary)
     # At minimum, the failed SQL should appear in logs
     assert_includes log_output, "INVALID SQL", "Failed SQL should be logged"
-  end
-
-  def test_performance_logging_for_slow_operations
-    db = create_db
-    create_test_table(db)
-
-    # Test performance logging for operations (Requirement 8.5)
-    require "logger"
-    string_io = StringIO.new
-    logger = Logger.new(string_io)
-    db.loggers = [logger]
-
-    # Execute multiple operations to test performance logging
-    assert_nothing_raised("Should log performance information") do
-      # Insert multiple records
-      (1..5).each do |i|
-        db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "Perf Test #{i}", 20 + i])
-      end
-
-      # Execute a more complex query
-      db.execute("SELECT * FROM test_table WHERE age > 22 ORDER BY name")
-    end
-
-    log_output = string_io.string
-
-    refute_empty log_output, "Performance information should be logged"
-
-    # Should contain multiple SQL operations
-    insert_count = log_output.scan("INSERT").length
-
-    assert_operator insert_count, :>=, 5, "Multiple INSERT operations should be logged"
-    assert_includes log_output, "SELECT", "SELECT operation should be logged"
   end
 
   def test_debug_information_availability

@@ -314,7 +314,8 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
   end
 
   def test_join_using_clause
-    dataset = mock_dataset(:users).join(:profiles, nil, using: :user_id)
+    # In Sequel, to use USING clause, pass an array of column symbols as the join condition
+    dataset = mock_dataset(:users).join(:profiles, [:user_id])
     expected_sql = "SELECT * FROM \"users\" INNER JOIN \"profiles\" USING (\"user_id\")"
 
     assert_sql expected_sql, dataset
@@ -514,6 +515,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
               .cross_join(:levels)
 
     # Since 'level + 1' is a literal, 'level' is not quoted
+    # DuckDB requires WITH RECURSIVE when any CTE is recursive
     expected_sql = "WITH RECURSIVE \"active_users\" AS (SELECT \"id\", \"name\" FROM \"users\" WHERE (\"active\" IS TRUE)), \"levels\" AS (SELECT 1 AS \"level\" UNION ALL SELECT level + 1 FROM \"levels\" WHERE (\"level\" < 3)) SELECT * FROM \"active_users\" CROSS JOIN \"levels\""
 
     assert_sql expected_sql, dataset

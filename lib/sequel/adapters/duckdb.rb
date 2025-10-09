@@ -232,8 +232,10 @@ module Sequel
               result
             end
           when :insert
-            log_connection_yield(sql, conn) { conn.query(sql) }
-            nil
+            log_connection_yield(sql, conn) do
+              result = conn.query(sql)
+              result.rows_changed
+            end
           when :update
             log_connection_yield(sql, conn) do
               result = conn.query(sql)

@@ -776,11 +776,21 @@ module Sequel
         true
       end
 
+      # DuckDB supports multi-row inserts using VALUES syntax
+      # This allows inserting multiple rows in a single INSERT statement
+      def multi_insert_sql_strategy
+        :values
+      end
+
       def supports_join_using?
         true
       end
 
-
+      # DuckDB requires WITH RECURSIVE if any CTE is recursive
+      # This follows the same pattern as PostgreSQL
+      def select_with_sql_base
+        opts[:with].any?{|w| w[:recursive]} ? "WITH RECURSIVE " : "WITH "
+      end
 
       # DuckDB-specific SQL generation enhancements
 

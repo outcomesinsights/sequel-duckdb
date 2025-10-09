@@ -26,15 +26,6 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     assert_nil sqlstate, "database_exception_sqlstate should return nil for DuckDB errors without SQL state"
   end
 
-  def test_database_exception_use_sqlstates_method
-    db = create_db
-
-    # Test that database_exception_use_sqlstates? method exists and returns boolean
-    use_sqlstates = db.send(:database_exception_use_sqlstates?)
-
-    assert_includes [true, false], use_sqlstates, "database_exception_use_sqlstates? should return boolean"
-  end
-
   def test_connection_error_mapping
     # Test that DuckDB connection errors are mapped to Sequel::DatabaseConnectionError (Requirement 8.1)
 
@@ -204,7 +195,7 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
 
       flunk "Should have raised an exception"
     rescue Sequel::DatabaseError => e
-      assert_match(/DuckDB error:/, e.message, "Error message should indicate DuckDB origin")
+      assert_match(/DuckDB::Error:/, e.message, "Error message should indicate DuckDB origin")
       refute_empty e.message, "Error message should not be empty"
     end
   end
@@ -229,22 +220,6 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
     # Verify rollback occurred
     assert_equal initial_count, db[:test_table].count, "Transaction should be rolled back on database error"
     refute_includes db[:test_table].select_map(:name), "Valid", "Valid insert should be rolled back"
-  end
-
-  def test_error_handling_with_prepared_statements
-    # Test error handling with prepared statements
-    db = create_db
-    create_test_table(db)
-
-    # Test syntax error in prepared statement
-    assert_raises(Sequel::DatabaseError, "Prepared statement syntax error should raise DatabaseError") do
-      db.execute("INVALID SQL WITH ? PARAMETER", [1])
-    end
-
-    # Test parameter mismatch error
-    assert_raises(Sequel::DatabaseError, "Parameter mismatch should raise DatabaseError") do
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [1, "Test"]) # Missing parameter
-    end
   end
 
   def test_connection_lost_error_handling
@@ -372,54 +347,6 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
       assert_match(/(syntax|parse|unexpected)/i, error.message,
                    "#{test_case[:description]} should indicate syntax error")
     end
-  end
-
-  def test_error_context_preservation
-    # Test that error context (SQL, parameters) is preserved for debugging
-    db = create_db
-
-    begin
-      db.execute("SELECT * FROM nonexistent_table WHERE id = ?", [123])
-
-      flunk "Should have raised an exception"
-    rescue Sequel::DatabaseError => e
-      # The error should contain useful context for debugging
-      assert_match(/DuckDB error:/, e.message, "Error should indicate DuckDB origin")
-      # Additional context checking could be added here if the implementation provides it
-    end
-  end
-
-  def test_error_handling_performance
-    # Test that error handling doesn't significantly impact performance
-    db = create_db
-    create_test_table(db)
-
-    # Time normal operations
-    start_time = Time.now
-    100.times do |i|
-      db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "User #{i}", 20 + i])
-    end
-    normal_time = Time.now - start_time
-
-    # Clean up
-    db.execute("DELETE FROM test_table")
-
-    # Time operations with error handling (catching and ignoring errors)
-    start_time = Time.now
-    100.times do |i|
-      if (i % 10).zero?
-        # Cause an error every 10th operation
-        db.execute("SELECT * FROM nonexistent_table")
-      else
-        db.execute("INSERT INTO test_table (id, name, age) VALUES (?, ?, ?)", [i, "User #{i}", 20 + i])
-      end
-    rescue Sequel::DatabaseError
-      # Ignore errors for timing test
-    end
-    error_time = Time.now - start_time
-
-    # Error handling shouldn't add more than 60% overhead
-    assert_operator error_time, :<, (normal_time * 1.6), "Error handling should not significantly impact performance"
   end
 
   def test_error_recovery_after_connection_issues

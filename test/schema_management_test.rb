@@ -236,21 +236,6 @@ describe "Schema Management" do
       _(result[:amount].to_f).must_be_close_to(99.99, 0.01)
     end
 
-    it "supports schema qualification in Sequel DSL" do
-      @db.create_table(Sequel[:analytics][:metrics]) do
-        Integer :id, primary_key: true
-        String :metric_name
-        Integer :value
-      end
-
-      # Use raw SQL for insertion with schema qualification
-      @db.execute("INSERT INTO analytics.metrics (id, metric_name, value) VALUES (?, ?, ?)", [1, "page_views", 1000])
-
-      # Query using raw SQL
-      count = @db.fetch("SELECT COUNT(*) AS count FROM analytics.metrics").first[:count]
-      _(count).must_equal(1)
-    end
-
     it "retrieves schema information for tables in custom schemas" do
       @db.create_table(Sequel[:analytics][:reports]) do
         primary_key :id

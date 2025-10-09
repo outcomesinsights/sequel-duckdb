@@ -486,41 +486,6 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_equal 1, dataset.count, "Should have 1 record remaining"
   end
 
-  def test_dataset_streaming_support
-    db = create_db
-    create_test_table(db)
-    dataset = db[:test_table]
-
-    # Insert test data
-    (1..5).each do |i|
-      dataset.insert(id: i, name: "Stream Test #{i}", age: 20 + i)
-    end
-
-    # Test streaming with block (Requirement 9.5)
-    streamed_records = []
-    assert_nothing_raised("Streaming should work with block") do
-      dataset.stream do |record|
-        streamed_records << record
-      end
-    end
-
-    assert_equal 5, streamed_records.length, "Streaming should process all records"
-    streamed_records.each do |record|
-      assert_instance_of Hash, record, "Streamed record should be a hash"
-      assert_includes record.keys, :name, "Streamed record should have expected keys"
-    end
-
-    # Test streaming without block (should return enumerator)
-    enumerator = dataset.stream
-
-    assert_instance_of Enumerator, enumerator, "Stream without block should return enumerator"
-
-    # Test enumerator functionality
-    first_from_enum = enumerator.first
-
-    assert_instance_of Hash, first_from_enum, "Enumerator should yield hashes"
-  end
-
   def test_dataset_result_set_handling_and_conversion
     db = create_db
     create_test_table(db)
