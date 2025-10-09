@@ -218,19 +218,12 @@ module Sequel
       #
       # @raise [Sequel::DatabaseError] If the pragma setting is invalid or fails
       #
-      # @example Set memory limit
-      #   db.set_pragma("memory_limit", "2GB")
       #   db.set_pragma(:memory_limit, "1GB")
       #
-      # @example Set thread count
-      #   db.set_pragma("threads", 4)
       #
-      # @example Enable/disable features
-      #   db.set_pragma("enable_progress_bar", true)
       #   db.set_pragma("enable_profiling", false)
       #
       # @see configure_duckdb
-      # @since 0.1.0
       def set_pragma(key, value)
         # Convert key to string for consistency
         pragma_key = key.to_s
@@ -265,22 +258,17 @@ module Sequel
       #
       # @raise [Sequel::DatabaseError] If any pragma setting fails
       #
-      # @example Configure multiple settings
-      #   db.configure_duckdb(
       #     memory_limit: "2GB",
       #     threads: 8,
       #     enable_progress_bar: true,
       #     default_order: "ASC"
       #   )
       #
-      # @example Configure with string keys
-      #   db.configure_duckdb(
       #     "memory_limit" => "1GB",
       #     "threads" => 4
       #   )
       #
       # @see set_pragma
-      # @since 0.1.0
       def configure_duckdb(options = {})
         return if options.empty?
 
@@ -570,14 +558,8 @@ module Sequel
       # @option opts [Boolean] :or_replace Add OR REPLACE clause (mutually exclusive with :if_not_exists)
       # @return [void]
       #
-      # @example Create a schema
-      #   db.create_schema(:analytics)
       #
-      # @example Create with IF NOT EXISTS
-      #   db.create_schema(:staging, if_not_exists: true)
       #
-      # @example Create with OR REPLACE
-      #   db.create_schema(:temp, or_replace: true)
       def create_schema(name, opts = OPTS)
         self << create_schema_sql(name, opts)
       end
@@ -611,14 +593,8 @@ module Sequel
       # @option opts [Boolean] :cascade Add CASCADE clause to drop dependent objects
       # @return [void]
       #
-      # @example Drop a schema
-      #   db.drop_schema(:analytics)
       #
-      # @example Drop with IF EXISTS
-      #   db.drop_schema(:staging, if_exists: true)
       #
-      # @example Drop with CASCADE
-      #   db.drop_schema(:temp, cascade: true)
       def drop_schema(name, opts = OPTS)
         self << drop_schema_sql(name, opts)
         remove_all_cached_schemas
@@ -657,8 +633,6 @@ module Sequel
       # @option opts [String] :catalog Catalog name to filter by
       # @return [Array<Symbol>] Array of schema names as symbols
       #
-      # @example List all schemas
-      #   db.schemas  # => [:main, :analytics, :staging]
       def schemas(opts = OPTS)
         sql = "SELECT schema_name FROM information_schema.schemata"
         sql += " WHERE catalog_name = '#{opts[:catalog]}'" if opts[:catalog]
@@ -677,8 +651,6 @@ module Sequel
       # @param opts [Hash] Options (reserved for future use)
       # @return [Boolean] true if schema exists
       #
-      # @example Check if schema exists
-      #   db.schema_exists?(:analytics)  # => true
       def schema_exists?(name, opts = OPTS)
         sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = '#{name}' LIMIT 1"
 
@@ -786,84 +758,6 @@ module Sequel
         DUCKDB_RESERVED_WORDS.include?(name.to_s.downcase)
       end
 
-      # Generate INSERT SQL statement
-      #
-      # @param values [Hash, Array] Values to insert
-      # @return [String] The INSERT SQL statement
-      def insert_sql(*values)
-        return @opts[:sql] if @opts[:sql]
-
-        # Handle empty values case
-        if values.empty? || (values.length == 1 && values.first.empty?)
-          return "INSERT INTO #{table_name_sql} DEFAULT VALUES"
-        end
-
-        # Handle single hash of values
-        if values.length == 1 && values.first.is_a?(Hash)
-          values_hash = values.first
-          columns = values_hash.keys
-          column_list = literal(columns)
-          values_list = literal(columns.map { |k| values_hash[k] })
-
-          return "INSERT INTO #{table_name_sql} #{column_list} VALUES #{values_list}"
-        end
-
-        # Handle array of hashes (multiple records)
-        if values.length == 1 && values.first.is_a?(Array)
-          records = values.first
-          return "INSERT INTO #{table_name_sql} DEFAULT VALUES" if records.empty?
-
-          first_record = records.first
-          columns = first_record.keys
-          column_list = literal(columns)
-
-          values_lists = records.map do |record|
-            literal(columns.map { |k| record[k] })
-          end
-
-          return "INSERT INTO #{table_name_sql} #{column_list} VALUES #{values_lists.join(", ")}"
-        end
-
-        # Fallback for other cases
-        "INSERT INTO #{table_name_sql} DEFAULT VALUES"
-      end
-
-      # Generate UPDATE SQL statement
-      #
-      # @param values [Hash] Values to update
-      # @return [String] The UPDATE SQL statement
-      def update_sql(values = {})
-        return @opts[:sql] if @opts[:sql]
-
-        sql = "UPDATE #{table_name_sql} SET "
-
-        # Add SET clause
-        set_clauses = values.map do |column, value|
-          col_sql = String.new
-          quote_identifier_append(col_sql, column)
-          "#{col_sql} = #{literal(value)}"
-        end
-        sql << set_clauses.join(", ")
-
-        # Add WHERE clause
-        select_where_sql(sql) if @opts[:where]
-
-        sql
-      end
-
-      # Generate DELETE SQL statement
-      #
-      # @return [String] The DELETE SQL statement
-      def delete_sql
-        return @opts[:sql] if @opts[:sql]
-
-        sql = "DELETE FROM #{table_name_sql}"
-
-        # Add WHERE clause
-        select_where_sql(sql) if @opts[:where]
-
-        sql
-      end
 
       # DuckDB capability flags
       def supports_window_functions?
@@ -886,254 +780,7 @@ module Sequel
         true
       end
 
-      # Validate table name for SELECT operations
-      def validate_table_name_for_select
-        return unless @opts[:from] # Skip if no FROM clause
 
-        @opts[:from].each do |table|
-          if table.nil? || (table.respond_to?(:to_s) && table.to_s.strip.empty?)
-            raise ArgumentError,
-                  "Table name cannot be nil or empty"
-          end
-        end
-      end
-
-      # Check if a word is a SQL reserved word that needs quoting
-      def reserved_word?(word)
-        %w[order group select from where having limit offset].include?(word.downcase)
-      end
-
-      # Get properly quoted table name
-      def table_name_sql
-        raise ArgumentError, "Table name cannot be nil or empty" if @opts[:from].nil? || @opts[:from].empty?
-
-        # Check if the table name is nil
-        table_name = @opts[:from].first
-        raise ArgumentError, "Table name cannot be nil" if table_name.nil?
-
-        table_name = table_name.to_s
-        raise ArgumentError, "Table name cannot be empty" if table_name.empty?
-
-        # Use quote_identifier_append to respect quote_identifiers? setting
-        sql = String.new
-        quote_identifier_append(sql, table_name)
-        sql
-      end
-
-      private
-
-      # Override the WITH clause generation to support RECURSIVE keyword
-      def select_with_sql(sql)
-        return unless opts[:with]
-
-        # Check if any WITH clause is recursive (either explicitly marked or auto-detected)
-        has_recursive = opts[:with].any? { |w| w[:recursive] || cte_is_recursive?(w) }
-
-        # Add WITH or WITH RECURSIVE prefix
-        sql << (has_recursive ? "WITH RECURSIVE " : "WITH ")
-
-        # Add each CTE
-        opts[:with].each_with_index do |w, i|
-          sql << ", " if i.positive?
-          name_sql = String.new
-          quote_identifier_append(name_sql, w[:name])
-          sql << "#{name_sql} AS (#{w[:dataset].sql})"
-        end
-
-        sql << " "
-      end
-
-      # Auto-detect if a CTE is recursive by analyzing its SQL for self-references
-      #
-      # @param cte_info [Hash] CTE information hash with :name and :dataset
-      # @return [Boolean] true if the CTE appears to be recursive
-      def cte_is_recursive?(cte_info)
-        return false unless cte_info[:dataset]
-
-        cte_name = cte_info[:name].to_s
-        cte_sql = cte_info[:dataset].sql
-
-        # Check if the CTE SQL contains references to its own name
-        # Look for patterns like "FROM table_name" or "JOIN table_name"
-        # Use word boundaries to avoid false positives with partial matches
-        recursive_pattern = /\b(?:FROM|JOIN)\s+#{Regexp.escape(cte_name)}\b/i
-
-        cte_sql.match?(recursive_pattern)
-      end
-
-      public
-
-      # Override select_from_sql to validate table names
-      def select_from_sql(sql)
-        if (f = @opts[:from])
-          # Validate that no table names are nil
-          f.each do |table|
-            raise ArgumentError, "Table name cannot be nil" if table.nil?
-          end
-        end
-
-        # Call parent implementation
-        super
-      end
-
-      # Add JOIN clauses to SQL (Requirement 6.9)
-      def select_join_sql(sql)
-        return unless @opts[:join]
-
-        @opts[:join].each do |join| # rubocop:disable Metrics/BlockLength
-          # Handle different join clause types
-          case join
-          when Sequel::SQL::JoinOnClause
-            join_type = join.join_type || :inner
-            table = join.table
-            conditions = join.on
-
-            # Format join type
-            join_clause = case join_type
-                          when :left, :left_outer
-                            "LEFT JOIN"
-                          when :right, :right_outer
-                            "RIGHT JOIN"
-                          when :full, :full_outer
-                            "FULL JOIN"
-                          else
-                            # when :inner
-                            "INNER JOIN"
-                          end
-
-            sql << " #{join_clause} "
-
-            # Add table name
-            sql << if table.is_a?(Sequel::Dataset)
-                     alias_sql = String.new
-                     quote_identifier_append(alias_sql, join.table_alias || "subquery")
-                     "(#{table.sql}) AS #{alias_sql}"
-                   else
-                     literal(table)
-                   end
-
-            # Add ON conditions
-            if conditions
-              sql << " ON "
-              literal_append(sql, conditions)
-            end
-
-          when Sequel::SQL::JoinUsingClause
-            join_type = join.join_type || :inner
-            table = join.table
-            using_columns = join.using
-
-            join_clause = case join_type
-                          when :left, :left_outer
-                            "LEFT JOIN"
-                          when :right, :right_outer
-                            "RIGHT JOIN"
-                          when :full, :full_outer
-                            "FULL JOIN"
-                          else
-                            # when :inner
-                            "INNER JOIN"
-                          end
-
-            sql << " #{join_clause} "
-
-            # Handle table with alias
-            sql << if table.is_a?(Sequel::Dataset)
-                     # Subquery with alias
-                     "(#{table.sql})"
-                   else
-                     # Regular table (may have alias)
-                     literal(table)
-                     # Add alias if present
-                   end
-            if join.table_alias
-              sql << " AS "
-              quote_identifier_append(sql, join.table_alias)
-            end
-
-            if using_columns
-              sql << " USING ("
-              Array(using_columns).each_with_index do |col, i|
-                sql << ", " if i.positive?
-                quote_identifier_append(sql, col)
-              end
-              sql << ")"
-            end
-
-          when Sequel::SQL::JoinClause
-            join_type = join.join_type || :inner
-            table = join.table
-
-            join_clause = case join_type
-                          when :cross
-                            "CROSS JOIN"
-                          when :natural
-                            "NATURAL JOIN"
-                          else
-                            "INNER JOIN"
-                          end
-
-            sql << " #{join_clause} "
-            sql << literal(table)
-          end
-        end
-      end
-
-      # Add WHERE clause to SQL (enhanced for complex conditions - Requirement 6.4)
-      def select_where_sql(sql)
-        return unless @opts[:where]
-
-        sql << " WHERE "
-        literal_append(sql, @opts[:where])
-      end
-
-      # Add GROUP BY clause to SQL (Requirement 6.7)
-      def select_group_sql(sql)
-        return unless @opts[:group]
-
-        sql << " GROUP BY "
-        if @opts[:group].is_a?(Array)
-          sql << @opts[:group].map { |col| literal(col) }.join(", ")
-        else
-          literal_append(sql, @opts[:group])
-        end
-      end
-
-      # Add HAVING clause to SQL (Requirement 6.8)
-      def select_having_sql(sql)
-        return unless @opts[:having]
-
-        sql << " HAVING "
-        literal_append(sql, @opts[:having])
-      end
-
-      # Add ORDER BY clause to SQL (enhanced - Requirement 6.5)
-      def select_order_sql(sql)
-        return unless @opts[:order]
-
-        sql << " ORDER BY "
-        sql << if @opts[:order].is_a?(Array)
-                 @opts[:order].map { |col| order_column_sql(col) }.join(", ")
-               else
-                 order_column_sql(@opts[:order])
-               end
-      end
-
-      # Format individual ORDER BY column
-      def order_column_sql(column)
-        case column
-        when Sequel::SQL::OrderedExpression
-          col_sql = literal(column.expression)
-          col_sql << (column.descending ? " DESC" : " ASC")
-          # Check if nulls option exists (may not be available in all Sequel versions)
-          if column.respond_to?(:nulls) && column.nulls
-            col_sql << (column.nulls == :first ? " NULLS FIRST" : " NULLS LAST")
-          end
-          col_sql
-        else
-          literal(column)
-        end
-      end
 
       # DuckDB-specific SQL generation enhancements
 
@@ -1186,20 +833,6 @@ module Sequel
           literal_append(sql, args.last)
           sql << ", 'i'))"
         else
-          super
-        end
-      end
-
-      # Override join method to support USING clause syntax
-      def join(table, expr = nil, options = {})
-        # Handle the case where using parameter is passed
-        if options.is_a?(Hash) && options[:using]
-          using_columns = Array(options[:using])
-          join_type = options[:type] || :inner
-          join_clause = Sequel::SQL::JoinUsingClause.new(using_columns, join_type, table)
-          clone(join: (@opts[:join] || []) + [join_clause])
-        else
-          # Fall back to standard Sequel join behavior
           super
         end
       end
