@@ -84,6 +84,86 @@ users.where(name: 'John Doe').update(age: 31)
 users.where(age: 25).delete
 ```
 
+## Schema Management
+
+sequel-duckdb supports DuckDB's schema functionality for organizing database objects into logical namespaces.
+
+### Creating Schemas
+
+```ruby
+# Create a basic schema
+db.create_schema(:analytics)
+
+# Create schema with IF NOT EXISTS
+db.create_schema(:staging, if_not_exists: true)
+
+# Create or replace schema
+db.create_schema(:temp, or_replace: true)
+```
+
+### Dropping Schemas
+
+```ruby
+# Drop an empty schema
+db.drop_schema(:analytics)
+
+# Drop schema with IF EXISTS
+db.drop_schema(:staging, if_exists: true)
+
+# Drop schema with all objects using CASCADE
+db.drop_schema(:temp, cascade: true)
+```
+
+### Listing and Checking Schemas
+
+```ruby
+# List all schemas
+db.schemas  # => [:main, :analytics, :staging]
+
+# Check if schema exists
+db.schema_exists?(:analytics)  # => true
+```
+
+### Using Schemas with Tables
+
+```ruby
+# Create table in custom schema
+db.create_table(Sequel[:analytics][:sales]) do
+  primary_key :id
+  String :product
+  column :amount, "DECIMAL(10,2)"
+  Date :sale_date
+end
+
+# Query tables in custom schema
+db.fetch("SELECT * FROM analytics.sales WHERE sale_date > ?", [Date.today - 30]).all
+
+# List tables in specific schema
+db.tables(schema: "analytics")  # => [:sales, :metrics, ...]
+```
+
+### Schema Management Limitations
+
+DuckDB has some limitations compared to other databases:
+
+- **No Schema Ownership**: DuckDB doesn't support schema authorization or ownership
+- **No Schema Renaming**: `ALTER SCHEMA RENAME` is not supported
+- **View Dependencies**: Dependencies for views are not tracked by DuckDB
+- **No Database DDL**: DuckDB doesn't support `CREATE DATABASE` or `DROP DATABASE` commands. Instead, databases are created implicitly when you connect to a file path
+
+For attaching additional database files, use raw SQL:
+
+```ruby
+# Attach another database file
+db.run("ATTACH 'other.duckdb' AS other")
+
+# Query across attached databases
+db.fetch("SELECT * FROM other.schema_name.table_name").all
+
+# Detach database
+db.run("DETACH other")
+```
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies:

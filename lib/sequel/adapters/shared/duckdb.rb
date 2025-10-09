@@ -1168,6 +1168,140 @@ module Sequel
         4 # Default fallback
       end
 
+      public
+
+      # Schema management methods (Requirements: schema creation, deletion, introspection)
+
+      # Create a schema
+      #
+      # @param name [String, Symbol] Schema name
+      # @param opts [Hash] Options
+      # @option opts [Boolean] :if_not_exists Add IF NOT EXISTS clause
+      # @option opts [Boolean] :or_replace Add OR REPLACE clause (mutually exclusive with :if_not_exists)
+      # @return [void]
+      #
+      # @example Create a schema
+      #   db.create_schema(:analytics)
+      #
+      # @example Create with IF NOT EXISTS
+      #   db.create_schema(:staging, if_not_exists: true)
+      #
+      # @example Create with OR REPLACE
+      #   db.create_schema(:temp, or_replace: true)
+      def create_schema(name, opts = OPTS)
+        self << create_schema_sql(name, opts)
+      end
+
+      # Generate SQL for creating a schema
+      #
+      # @param name [String, Symbol] Schema name
+      # @param opts [Hash] Options
+      # @option opts [Boolean] :if_not_exists Add IF NOT EXISTS clause
+      # @option opts [Boolean] :or_replace Add OR REPLACE clause (mutually exclusive with :if_not_exists)
+      # @return [String] CREATE SCHEMA SQL
+      def create_schema_sql(name, opts = OPTS)
+        # DuckDB doesn't support both OR REPLACE and IF NOT EXISTS together
+        if opts[:or_replace] && opts[:if_not_exists]
+          raise Sequel::Error, "Cannot use both :or_replace and :if_not_exists options"
+        end
+
+        sql = "CREATE"
+        sql += " OR REPLACE" if opts[:or_replace]
+        sql += " SCHEMA"
+        sql += " IF NOT EXISTS" if opts[:if_not_exists]
+        sql += " #{quote_identifier(name)}"
+        sql
+      end
+
+      # Drop a schema
+      #
+      # @param name [String, Symbol] Schema name
+      # @param opts [Hash] Options
+      # @option opts [Boolean] :if_exists Add IF EXISTS clause
+      # @option opts [Boolean] :cascade Add CASCADE clause to drop dependent objects
+      # @return [void]
+      #
+      # @example Drop a schema
+      #   db.drop_schema(:analytics)
+      #
+      # @example Drop with IF EXISTS
+      #   db.drop_schema(:staging, if_exists: true)
+      #
+      # @example Drop with CASCADE
+      #   db.drop_schema(:temp, cascade: true)
+      def drop_schema(name, opts = OPTS)
+        self << drop_schema_sql(name, opts)
+        remove_all_cached_schemas
+      end
+
+      # Generate SQL for dropping a schema
+      #
+      # @param name [String, Symbol] Schema name
+      # @param opts [Hash] Options
+      # @option opts [Boolean] :if_exists Add IF EXISTS clause
+      # @option opts [Boolean] :cascade Add CASCADE clause to drop dependent objects
+      # @return [String] DROP SCHEMA SQL
+      def drop_schema_sql(name, opts = OPTS)
+        sql = "DROP SCHEMA"
+        sql += " IF EXISTS" if opts[:if_exists]
+        sql += " #{quote_identifier(name)}"
+        sql += " CASCADE" if opts[:cascade]
+        sql
+      end
+
+      # Remove all cached schema information
+      #
+      # Called after schema modifications to ensure cache consistency
+      #
+      # @return [void]
+      def remove_all_cached_schemas
+        @schema_cache = {}
+        @schemas = {}
+        @primary_keys = {}
+        @primary_key_sequences = {}
+      end
+
+      # List all schemas in the database
+      #
+      # @param opts [Hash] Options
+      # @option opts [String] :catalog Catalog name to filter by
+      # @return [Array<Symbol>] Array of schema names as symbols
+      #
+      # @example List all schemas
+      #   db.schemas  # => [:main, :analytics, :staging]
+      def schemas(opts = OPTS)
+        sql = "SELECT schema_name FROM information_schema.schemata"
+        sql += " WHERE catalog_name = ?" if opts[:catalog]
+
+        schemas = []
+        execute(sql, opts[:catalog] ? [opts[:catalog]] : []) do |row|
+          schemas << row[:schema_name].to_sym
+        end
+
+        schemas
+      end
+
+      # Check if a schema exists
+      #
+      # @param name [String, Symbol] Schema name
+      # @param opts [Hash] Options (reserved for future use)
+      # @return [Boolean] true if schema exists
+      #
+      # @example Check if schema exists
+      #   db.schema_exists?(:analytics)  # => true
+      def schema_exists?(name, opts = OPTS)
+        sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = ? LIMIT 1"
+
+        result = nil
+        execute(sql, [name.to_s]) do |_row|
+          result = true
+        end
+
+        !!result
+      end
+
+      private
+
       # Type conversion methods for DuckDB-specific handling
 
       # Convert DuckDB TIME values to Ruby time-only objects
