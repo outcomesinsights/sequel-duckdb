@@ -253,6 +253,66 @@ describe "Schema Management" do
     end
   end
 
+  describe "create_view" do
+    it "creates a basic view" do
+      @db.create_table(:test_data) do
+        Integer :id, primary_key: true
+        String :name
+      end
+
+      @db.create_view(:test_view, "SELECT * FROM test_data")
+      # Verify view exists by querying it
+      @db[:test_data].insert(id: 1, name: "test")
+      result = @db[:test_view].first
+      _(result[:id]).must_equal(1)
+      _(result[:name]).must_equal("test")
+    end
+
+    it "creates a temporary view" do
+      @db.create_table(:test_data) do
+        Integer :id, primary_key: true
+        String :name
+      end
+
+      @db.create_view(:temp_view, "SELECT * FROM test_data", temp: true)
+      @db[:test_data].insert(id: 1, name: "test")
+      result = @db[:temp_view].first
+      _(result[:id]).must_equal(1)
+    end
+
+    it "creates a view with OR REPLACE" do
+      @db.create_table(:test_data) do
+        Integer :id, primary_key: true
+        String :name
+      end
+
+      @db[:test_data].insert(id: 1, name: "test")
+      @db.create_view(:test_view, "SELECT id FROM test_data")
+      result = @db[:test_view].first
+      _(result.keys).must_equal([:id])
+
+      @db.create_view(:test_view, "SELECT * FROM test_data", replace: true)
+      result = @db[:test_view].first
+      _(result.keys.sort).must_equal([:id, :name])
+    end
+
+    it "creates a view with specified columns" do
+      @db.create_view(:test_view, "SELECT 1, 'test'", columns: [:col_a, :col_b])
+      result = @db[:test_view].first
+      _(result.keys.sort).must_equal([:col_a, :col_b])
+    end
+
+    it "generates correct SQL for parquet views" do
+      sql = @db.create_view_sql(:test_view, {}, using: "parquet", options: {path: "/path/to/file.parquet"})
+      _(sql).must_equal('CREATE VIEW "test_view" AS read_parquet(\'/path/to/file.parquet\')')
+    end
+
+    it "generates correct SQL for temporary parquet views" do
+      sql = @db.create_view_sql(:test_view, {}, temp: true, using: "parquet", options: {path: "/path/to/file.parquet"})
+      _(sql).must_equal('CREATE TEMPORARY VIEW "test_view" AS read_parquet(\'/path/to/file.parquet\')')
+    end
+  end
+
   describe "edge cases" do
     it "raises error for mutually exclusive options" do
       # DuckDB doesn't support both OR REPLACE and IF NOT EXISTS together

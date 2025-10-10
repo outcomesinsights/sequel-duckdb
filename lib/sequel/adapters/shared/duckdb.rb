@@ -662,6 +662,71 @@ module Sequel
         !!result
       end
 
+      # Override create_view_prefix_sql to support DuckDB options
+      #
+      # @param name [Symbol, String] View name
+      # @param options [Hash] View options
+      # @option options [Boolean] :temp Create a TEMPORARY view
+      # @option options [Boolean] :replace Use OR REPLACE
+      # @option options [Array<Symbol>] :columns Column names for the view
+      # @return [String] CREATE VIEW prefix SQL
+      def create_view_prefix_sql(name, options)
+        sql = String.new
+        sql << "CREATE "
+        sql << "OR REPLACE " if options[:replace]
+        sql << "TEMPORARY " if options[:temp]
+        sql << "VIEW #{quote_schema_table(name)}"
+
+        # Add columns if specified
+        if options[:columns]
+          sql << " ("
+          schema_utility_dataset.send(:identifier_list_append, sql, options[:columns])
+          sql << ")"
+        end
+
+        sql
+      end
+
+      # Override create_view_sql to handle DuckDB-specific view sources
+      #
+      # @param name [Symbol, String] View name
+      # @param source [String, Dataset, Hash] View source - can be SQL, Dataset, or Hash for parquet files
+      # @param options [Hash] View options
+      # @option options [String] :using Data source type (e.g., "parquet")
+      # @option options [Hash] :options Options for the data source (e.g., path for parquet)
+      # @return [String] CREATE VIEW SQL
+      def create_view_sql(name, source, options = OPTS)
+        # Handle DuckDB-specific source patterns
+        if source.is_a?(Hash) && options[:using]
+          # Build read_parquet or similar function call
+          case options[:using]
+          when "parquet"
+            path_option = options[:options]&.dig(:path)
+            raise Sequel::Error, "Missing :path in :options for parquet view" unless path_option
+
+            # Convert Pathname to string if needed
+            path_str = path_option.to_s
+
+            # Determine if we need glob pattern based on path
+            # DuckDB's read_parquet handles globs automatically
+            source = "read_parquet('#{path_str}')"
+          else
+            raise Sequel::Error, "Unsupported :using type: #{options[:using]}"
+          end
+        elsif source.is_a?(Dataset)
+          source = source.sql
+        end
+
+        sql = String.new
+        sql << "#{create_view_prefix_sql(name, options)} AS #{source}"
+
+        if check = options[:check]
+          sql << " WITH#{' LOCAL' if check == :local} CHECK OPTION"
+        end
+
+        sql
+      end
+
       private
 
       # Type conversion methods for DuckDB-specific handling
