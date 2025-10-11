@@ -797,6 +797,16 @@ module Sequel
         array struct map
       ].freeze
 
+      # DuckDB interval unit mapping for date arithmetic
+      DUCKDB_DURATION_UNITS = {
+        years: 'YEAR',
+        months: 'MONTH',
+        days: 'DAY',
+        hours: 'HOUR',
+        minutes: 'MINUTE',
+        seconds: 'SECOND'
+      }.freeze
+
       private
 
       # DuckDB uses lowercase identifiers
@@ -996,6 +1006,52 @@ module Sequel
       # Literal conversion for binary data (BLOB type)
       def literal_blob(blob)
         "'#{blob.unpack1("H*")}'"
+      end
+
+      # DuckDB-specific implementation of date arithmetic
+      # This will be called by Sequel's date_arithmetic extension
+      # via the `super` mechanism when the extension is loaded
+      def date_add_sql_append(sql, da)
+        expr = da.expr
+        interval_hash = da.interval
+        cast_type = da.cast_type
+
+        # Build expression with chained interval additions
+        result = expr
+        interval_hash.each do |unit, value|
+          sql_unit = DUCKDB_DURATION_UNITS[unit]
+          next unless sql_unit
+
+          # Create interval addition
+          interval = build_interval_literal(value, sql_unit)
+          result = Sequel.+(result, interval)
+        end
+
+        # Apply cast if specified or default to Time (TIMESTAMP)
+        # Note: DuckDB returns TIMESTAMP when adding intervals to DATE
+        result = Sequel.cast(result, cast_type || Time)
+
+        literal_append(sql, result)
+      end
+
+      private
+
+      def build_interval_literal(value, unit)
+        # If value is numeric, use direct syntax
+        # If value is expression, wrap in parentheses
+        if value.is_a?(Numeric)
+          # Direct numeric: INTERVAL 5 HOUR or INTERVAL (-5) HOUR for negatives
+          # DuckDB requires parentheses around negative numbers
+          if value < 0
+            Sequel.lit("INTERVAL (#{value}) #{unit}")
+          else
+            Sequel.lit(["INTERVAL ", " #{unit}"], value)
+          end
+        else
+          # Expression: INTERVAL (column_name) HOUR
+          # Note: expressions already include negation from date_sub
+          Sequel.lit(["INTERVAL (", ") #{unit}"], value)
+        end
       end
 
     end
