@@ -986,6 +986,28 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_includes log_output, "INSERT", "Debug logs should contain SQL statements"
   end
 
+  # Test read_something_sql via create_view
+  def test_create_view_with_path_reads_parquet
+    db = create_db
+    db.create_table(:source_data) do
+      Integer :id
+      String :name
+    end
+    db[:source_data].insert(id: 1, name: "Test")
+
+    temp_file = "/tmp/test_read_#{Time.now.to_i}.parquet"
+    db.copy_to(db[:source_data], temp_file)
+
+    db.create_view(:parquet_view, path: temp_file)
+    result = db[:parquet_view].all
+
+    assert_equal 1, result.count
+    assert_equal "Test", result.first[:name]
+
+    db.drop_view(:parquet_view)
+    File.delete(temp_file) if File.exist?(temp_file)
+  end
+
   private
 
   def create_db

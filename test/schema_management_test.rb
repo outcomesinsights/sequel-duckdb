@@ -14,6 +14,7 @@ describe "Schema Management" do
   describe "create_schema" do
     it "creates a basic schema" do
       @db.create_schema(:test_schema)
+
       _(@db.schemas).must_include(:test_schema)
     end
 
@@ -21,27 +22,32 @@ describe "Schema Management" do
       @db.create_schema(:test_schema, if_not_exists: true)
       # Should not raise error when creating again
       @db.create_schema(:test_schema, if_not_exists: true)
+
       _(@db.schemas).must_include(:test_schema)
     end
 
     it "creates schema with OR REPLACE" do
       @db.create_schema(:test_schema)
       @db.create_schema(:test_schema, or_replace: true)
+
       _(@db.schemas).must_include(:test_schema)
     end
 
     it "raises error for duplicate schema without options" do
       @db.create_schema(:test_schema)
+
       _ { @db.create_schema(:test_schema) }.must_raise(Sequel::DatabaseError)
     end
 
     it "handles schema names that require quoting" do
       @db.create_schema(:"test-schema")
+
       _(@db.schemas).must_include(:"test-schema")
     end
 
     it "handles schema names that are reserved words" do
       @db.create_schema(:order, if_not_exists: true)
+
       _(@db.schemas).must_include(:order)
     end
   end
@@ -49,21 +55,25 @@ describe "Schema Management" do
   describe "create_schema_sql" do
     it "generates basic CREATE SCHEMA SQL" do
       sql = @db.create_schema_sql(:test_schema)
+
       _(sql).must_equal('CREATE SCHEMA "test_schema"')
     end
 
     it "generates CREATE SCHEMA IF NOT EXISTS SQL" do
       sql = @db.create_schema_sql(:test_schema, if_not_exists: true)
+
       _(sql).must_equal('CREATE SCHEMA IF NOT EXISTS "test_schema"')
     end
 
     it "generates CREATE OR REPLACE SCHEMA SQL" do
       sql = @db.create_schema_sql(:test_schema, or_replace: true)
+
       _(sql).must_equal('CREATE OR REPLACE SCHEMA "test_schema"')
     end
 
     it "properly quotes schema names with special characters" do
       sql = @db.create_schema_sql(:"test-schema")
+
       _(sql).must_equal('CREATE SCHEMA "test-schema"')
     end
   end
@@ -72,6 +82,7 @@ describe "Schema Management" do
     it "drops an empty schema" do
       @db.create_schema(:test_schema)
       @db.drop_schema(:test_schema)
+
       _(@db.schemas).wont_include(:test_schema)
     end
 
@@ -88,6 +99,7 @@ describe "Schema Management" do
       end
 
       @db.drop_schema(:test_schema, cascade: true)
+
       _(@db.schemas).wont_include(:test_schema)
     end
 
@@ -114,6 +126,7 @@ describe "Schema Management" do
 
       # Verify table exists
       tables = @db.tables(schema: "test_schema")
+
       _(tables).must_include(:test_table)
 
       @db.drop_schema(:test_schema, cascade: true)
@@ -126,21 +139,25 @@ describe "Schema Management" do
   describe "drop_schema_sql" do
     it "generates basic DROP SCHEMA SQL" do
       sql = @db.drop_schema_sql(:test_schema)
+
       _(sql).must_equal('DROP SCHEMA "test_schema"')
     end
 
     it "generates DROP SCHEMA IF EXISTS SQL" do
       sql = @db.drop_schema_sql(:test_schema, if_exists: true)
+
       _(sql).must_equal('DROP SCHEMA IF EXISTS "test_schema"')
     end
 
     it "generates DROP SCHEMA CASCADE SQL" do
       sql = @db.drop_schema_sql(:test_schema, cascade: true)
+
       _(sql).must_equal('DROP SCHEMA "test_schema" CASCADE')
     end
 
     it "generates DROP SCHEMA IF EXISTS CASCADE SQL" do
       sql = @db.drop_schema_sql(:test_schema, if_exists: true, cascade: true)
+
       _(sql).must_equal('DROP SCHEMA IF EXISTS "test_schema" CASCADE')
     end
   end
@@ -148,6 +165,7 @@ describe "Schema Management" do
   describe "schemas" do
     it "lists all schemas including default main schema" do
       schemas = @db.schemas
+
       _(schemas).must_include(:main)
     end
 
@@ -156,6 +174,7 @@ describe "Schema Management" do
       @db.create_schema(:staging)
 
       schemas = @db.schemas
+
       _(schemas).must_include(:main)
       _(schemas).must_include(:analytics)
       _(schemas).must_include(:staging)
@@ -164,6 +183,7 @@ describe "Schema Management" do
     it "returns schemas as symbols" do
       @db.create_schema(:test_schema)
       schemas = @db.schemas
+
       _(schemas.all? { |s| s.is_a?(Symbol) }).must_equal(true)
     end
   end
@@ -179,17 +199,20 @@ describe "Schema Management" do
 
     it "returns true for custom schemas" do
       @db.create_schema(:test_schema)
+
       _(@db.schema_exists?(:test_schema)).must_equal(true)
     end
 
     it "returns false after schema is dropped" do
       @db.create_schema(:test_schema)
       @db.drop_schema(:test_schema)
+
       _(@db.schema_exists?(:test_schema)).must_equal(false)
     end
 
     it "handles string and symbol schema names" do
       @db.create_schema(:test_schema)
+
       _(@db.schema_exists?(:test_schema)).must_equal(true)
       _(@db.schema_exists?("test_schema")).must_equal(true)
     end
@@ -212,6 +235,7 @@ describe "Schema Management" do
       end
 
       tables = @db.tables(schema: "analytics")
+
       _(tables).must_include(:sales)
     end
 
@@ -233,6 +257,7 @@ describe "Schema Management" do
       @db.execute("INSERT INTO analytics.sales (id, product_id, amount) VALUES (1, 1, 99.99)")
 
       result = @db.fetch("SELECT * FROM analytics.sales").first
+
       _(result[:amount].to_f).must_be_close_to(99.99, 0.01)
     end
 
@@ -264,6 +289,7 @@ describe "Schema Management" do
       # Verify view exists by querying it
       @db[:test_data].insert(id: 1, name: "test")
       result = @db[:test_view].first
+
       _(result[:id]).must_equal(1)
       _(result[:name]).must_equal("test")
     end
@@ -277,6 +303,7 @@ describe "Schema Management" do
       @db.create_view(:temp_view, "SELECT * FROM test_data", temp: true)
       @db[:test_data].insert(id: 1, name: "test")
       result = @db[:temp_view].first
+
       _(result[:id]).must_equal(1)
     end
 
@@ -289,27 +316,32 @@ describe "Schema Management" do
       @db[:test_data].insert(id: 1, name: "test")
       @db.create_view(:test_view, "SELECT id FROM test_data")
       result = @db[:test_view].first
+
       _(result.keys).must_equal([:id])
 
       @db.create_view(:test_view, "SELECT * FROM test_data", replace: true)
       result = @db[:test_view].first
-      _(result.keys.sort).must_equal([:id, :name])
+
+      _(result.keys.sort).must_equal(%i[id name])
     end
 
     it "creates a view with specified columns" do
-      @db.create_view(:test_view, "SELECT 1, 'test'", columns: [:col_a, :col_b])
+      @db.create_view(:test_view, "SELECT 1, 'test'", columns: %i[col_a col_b])
       result = @db[:test_view].first
-      _(result.keys.sort).must_equal([:col_a, :col_b])
+
+      _(result.keys.sort).must_equal(%i[col_a col_b])
     end
 
     it "generates correct SQL for parquet views" do
-      sql = @db.create_view_sql(:test_view, {}, using: "parquet", options: {path: "/path/to/file.parquet"})
-      _(sql).must_equal('CREATE VIEW "test_view" AS read_parquet(\'/path/to/file.parquet\')')
+      sql = @db.create_view_sql(:test_view, using: "parquet", options: { path: "/path/to/file.parquet" })
+
+      _(sql).must_equal('CREATE VIEW "test_view" AS SELECT * FROM read_parquet([\'/path/to/file.parquet\'])')
     end
 
     it "generates correct SQL for temporary parquet views" do
-      sql = @db.create_view_sql(:test_view, {}, temp: true, using: "parquet", options: {path: "/path/to/file.parquet"})
-      _(sql).must_equal('CREATE TEMPORARY VIEW "test_view" AS read_parquet(\'/path/to/file.parquet\')')
+      sql = @db.create_view_sql(:test_view, temp: true, using: "parquet", options: { path: "/path/to/file.parquet" })
+
+      _(sql).must_equal('CREATE TEMPORARY VIEW "test_view" AS SELECT * FROM read_parquet([\'/path/to/file.parquet\'])')
     end
   end
 
@@ -321,12 +353,14 @@ describe "Schema Management" do
 
     it "handles schema names with underscores" do
       @db.create_schema(:my_test_schema)
+
       _(@db.schema_exists?(:my_test_schema)).must_equal(true)
       @db.drop_schema(:my_test_schema)
     end
 
     it "handles schema names with numbers" do
       @db.create_schema(:schema123)
+
       _(@db.schema_exists?(:schema123)).must_equal(true)
       @db.drop_schema(:schema123)
     end
@@ -348,6 +382,7 @@ describe "Schema Management" do
 
       # Verify schemas method still works after cache clear
       schemas = @db.schemas
+
       _(schemas).must_include(:test_schema)
     end
 
@@ -368,6 +403,7 @@ describe "Schema Management" do
 
       # Verify we can still work with the database
       tables = @db.tables(schema: "test_schema")
+
       _(tables).must_include(:test_table)
     end
 

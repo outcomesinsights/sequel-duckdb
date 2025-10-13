@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "duckdb"
+require_relative "../../../sequel/duckdb/helpers/pathifier"
 
 # Sequel is the database toolkit for Ruby
 module Sequel
@@ -696,38 +697,37 @@ module Sequel
       # @option options [Hash] :options Options for the data source (e.g., path for parquet)
       # @return [String] CREATE VIEW SQL
       def create_view_sql(name, source, options = OPTS)
+        options = source if source.is_a?(Hash)
+        some_paths = options[:path] || options[:paths] || options.dig(:options, :path) || options.dig(:options, :paths)
         # Handle DuckDB-specific source patterns
-        if source.is_a?(Hash) && options[:using]
-          # Build read_parquet or similar function call
-          case options[:using]
-          when "parquet"
-            path_option = options[:options]&.dig(:path)
-            raise Sequel::Error, "Missing :path in :options for parquet view" unless path_option
-
-            # Convert Pathname to string if needed
-            path_str = path_option.to_s
-
-            # Determine if we need glob pattern based on path
-            # DuckDB's read_parquet handles globs automatically
-            source = "read_parquet('#{path_str}')"
-          else
-            raise Sequel::Error, "Unsupported :using type: #{options[:using]}"
-          end
-        elsif source.is_a?(Dataset)
-          source = source.sql
-        end
+        source = if options[:using] || some_paths
+                   # Build read_parquet or similar function call
+                   read_something_sql(some_paths, options).then do |read_stmt|
+                     from(read_stmt)
+                   end.sql
+                 elsif source.is_a?(Dataset)
+                   source.sql
+                 elsif source.is_a?(String)
+                   source
+                 else
+                   raise Sequel::Error, "Unsupported source type: #{source.class}"
+                 end
 
         sql = String.new
         sql << "#{create_view_prefix_sql(name, options)} AS #{source}"
 
         if check = options[:check]
-          sql << " WITH#{' LOCAL' if check == :local} CHECK OPTION"
+          sql << " WITH#{" LOCAL" if check == :local} CHECK OPTION"
         end
 
         sql
       end
 
       private
+
+      def read_something_sql(paths, options = OPTS)
+        Sequel::DuckDB::Helpers::Pathifier.new(paths, options).to_sql
+      end
 
       # Type conversion methods for DuckDB-specific handling
 
