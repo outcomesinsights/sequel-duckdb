@@ -2,6 +2,7 @@
 
 require "duckdb"
 require_relative "../../../sequel/duckdb/helpers/pathifier"
+require_relative "../../../sequel/duckdb/helpers/copier"
 
 # Sequel is the database toolkit for Ruby
 module Sequel
@@ -721,6 +722,12 @@ module Sequel
         end
 
         sql
+      end
+
+      def copy_to(ds, path, options = Sequel::OPTS)
+        Sequel::DuckDB::Helpers::Copier.new(ds, path, options).then do |copier|
+          run(copier.to_sql)
+        end
       end
 
       private

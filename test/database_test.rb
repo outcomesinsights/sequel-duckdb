@@ -986,6 +986,40 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_includes log_output, "INSERT", "Debug logs should contain SQL statements"
   end
 
+  # Test copy_to method
+  def test_copy_to_exports_dataset_to_file
+    db = create_db
+    db.create_table(:test_data) do
+      Integer :id
+      String :name
+    end
+    db[:test_data].insert(id: 1, name: "Alice")
+    db[:test_data].insert(id: 2, name: "Bob")
+
+    temp_file = "/tmp/test_copy_#{Time.now.to_i}.parquet"
+    db.copy_to(db[:test_data], temp_file)
+
+    result = db.from(Sequel.function(:read_parquet, temp_file)).all
+    assert_equal 2, result.count
+
+    File.delete(temp_file) if File.exist?(temp_file)
+  end
+
+  def test_copy_to_with_format_options
+    db = create_db
+    db.create_table(:csv_test) do
+      Integer :id
+      String :value
+    end
+    db[:csv_test].insert(id: 1, value: "test")
+
+    temp_file = "/tmp/test_csv_#{Time.now.to_i}.csv"
+    db.copy_to(db[:csv_test], temp_file, format: "CSV", header: true)
+
+    assert File.exist?(temp_file)
+    File.delete(temp_file) if File.exist?(temp_file)
+  end
+
   # Test read_something_sql via create_view
   def test_create_view_with_path_reads_parquet
     db = create_db
