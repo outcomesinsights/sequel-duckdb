@@ -799,12 +799,12 @@ module Sequel
 
       # DuckDB interval unit mapping for date arithmetic
       DUCKDB_DURATION_UNITS = {
-        years: 'YEAR',
-        months: 'MONTH',
-        days: 'DAY',
-        hours: 'HOUR',
-        minutes: 'MINUTE',
-        seconds: 'SECOND'
+        years: "YEAR",
+        months: "MONTH",
+        days: "DAY",
+        hours: "HOUR",
+        minutes: "MINUTE",
+        seconds: "SECOND"
       }.freeze
 
       private
@@ -832,7 +832,6 @@ module Sequel
 
         DUCKDB_RESERVED_WORDS.include?(name.to_s.downcase)
       end
-
 
       # DuckDB capability flags
       def supports_window_functions?
@@ -864,7 +863,7 @@ module Sequel
       # DuckDB requires WITH RECURSIVE if any CTE is recursive
       # This follows the same pattern as PostgreSQL
       def select_with_sql_base
-        opts[:with].any?{|w| w[:recursive]} ? "WITH RECURSIVE " : "WITH "
+        opts[:with].any? { |w| w[:recursive] } ? "WITH RECURSIVE " : "WITH "
       end
 
       # DuckDB-specific SQL generation enhancements
@@ -1053,7 +1052,6 @@ module Sequel
           Sequel.lit(["INTERVAL (", ") #{unit}"], value)
         end
       end
-
     end
   end
 
