@@ -60,13 +60,6 @@ module Sequel
         true
       end
 
-      private
-
-      # DuckDB doesn't fold unquoted identifiers to uppercase
-      def folds_unquoted_identifiers_to_uppercase?
-        false
-      end
-
       # Error classification using DATABASE_ERROR_REGEXPS following SQLite pattern
       DATABASE_ERROR_REGEXPS = {
         /NOT NULL constraint failed/i => Sequel::NotNullConstraintViolation,
@@ -80,6 +73,13 @@ module Sequel
         DATABASE_ERROR_REGEXPS
       end
 
+      private
+
+      # DuckDB doesn't fold unquoted identifiers to uppercase
+      def folds_unquoted_identifiers_to_uppercase?
+        false
+      end
+
       # Schema introspection methods
 
       # Parse table list from database
@@ -89,7 +89,8 @@ module Sequel
       def schema_parse_tables(opts = {})
         schema_name = opts[:schema] || "main"
 
-        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = '#{schema_name}' AND table_type = 'BASE TABLE'"
+        sql = "SELECT table_name FROM information_schema.tables " \
+              "WHERE table_schema = '#{schema_name}' AND table_type = 'BASE TABLE'"
 
         tables = []
         execute(sql) do |row|
