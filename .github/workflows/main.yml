@@ -25,3 +25,21 @@ jobs:
           bundler-cache: true
       - name: Run the default task
         run: bundle exec rake
+
+  ci:
+    if: always()
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "CI failed"
+            exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "CI cancelled"
+            exit 1
+          fi
+          echo "All CI jobs passed"
+
