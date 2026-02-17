@@ -288,7 +288,8 @@ module Sequel
       def table_exists?(table_name, opts = {})
         schema_name = opts[:schema] || "main"
 
-        sql = "SELECT 1 FROM information_schema.tables WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}' LIMIT 1"
+        sql = "SELECT 1 FROM information_schema.tables " \
+              "WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}' LIMIT 1"
 
         result = nil
         execute(sql) do |_row|
@@ -548,8 +549,6 @@ module Sequel
         end
       end
 
-      public
-
       # Schema management methods (Requirements: schema creation, deletion, introspection)
 
       # Create a schema
@@ -653,7 +652,7 @@ module Sequel
       # @param opts [Hash] Options (reserved for future use)
       # @return [Boolean] true if schema exists
       #
-      def schema_exists?(name, opts = OPTS)
+      def schema_exists?(name, _opts = OPTS)
         sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = '#{name}' LIMIT 1"
 
         result = nil
@@ -717,15 +716,15 @@ module Sequel
         sql = String.new
         sql << "#{create_view_prefix_sql(name, options)} AS #{source}"
 
-        if check = options[:check]
+        if (check = options[:check])
           sql << " WITH#{" LOCAL" if check == :local} CHECK OPTION"
         end
 
         sql
       end
 
-      def copy_to(ds, path, options = Sequel::OPTS)
-        Sequel::DuckDB::Helpers::Copier.new(ds, path, options).then do |copier|
+      def copy_to(source, path, options = Sequel::OPTS)
+        Sequel::DuckDB::Helpers::Copier.new(source, path, options).then do |copier|
           run(copier.to_sql)
         end
       end
@@ -1017,10 +1016,10 @@ module Sequel
       # DuckDB-specific implementation of date arithmetic
       # This will be called by Sequel's date_arithmetic extension
       # via the `super` mechanism when the extension is loaded
-      def date_add_sql_append(sql, da)
-        expr = da.expr
-        interval_hash = da.interval
-        cast_type = da.cast_type
+      def date_add_sql_append(sql, date_arith)
+        expr = date_arith.expr
+        interval_hash = date_arith.interval
+        cast_type = date_arith.cast_type
 
         # Build expression with chained interval additions
         result = expr
@@ -1048,7 +1047,7 @@ module Sequel
         if value.is_a?(Numeric)
           # Direct numeric: INTERVAL 5 HOUR or INTERVAL (-5) HOUR for negatives
           # DuckDB requires parentheses around negative numbers
-          if value < 0
+          if value.negative?
             Sequel.lit("INTERVAL (#{value}) #{unit}")
           else
             Sequel.lit(["INTERVAL ", " #{unit}"], value)

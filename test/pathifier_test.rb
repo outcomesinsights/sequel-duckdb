@@ -11,7 +11,7 @@ class PathifierTest < SequelDuckDBTest::TestCase
   end
 
   def teardown
-    @db.disconnect if @db
+    @db&.disconnect
     super
   end
 
@@ -26,10 +26,10 @@ class PathifierTest < SequelDuckDBTest::TestCase
   # Test multiple parquet files
   def test_multiple_parquet_files_generates_read_parquet_sql
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new([
-      "/path/to/file1.parquet",
-      "/path/to/file2.parquet",
-      "/path/to/file3.parquet"
-    ])
+                                                         "/path/to/file1.parquet",
+                                                         "/path/to/file2.parquet",
+                                                         "/path/to/file3.parquet"
+                                                       ])
     sql_expr = pathifier.to_sql
 
     assert_equal "read_parquet(['/path/to/file1.parquet','/path/to/file2.parquet','/path/to/file3.parquet'])", @db.literal(sql_expr)
@@ -46,9 +46,9 @@ class PathifierTest < SequelDuckDBTest::TestCase
   # Test multiple CSV files
   def test_multiple_csv_files_generates_read_csv_sql
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new([
-      "/data/file1.csv",
-      "/data/file2.csv"
-    ])
+                                                         "/data/file1.csv",
+                                                         "/data/file2.csv"
+                                                       ])
     sql_expr = pathifier.to_sql
 
     assert_equal "read_csv(['/data/file1.csv','/data/file2.csv'])", @db.literal(sql_expr)
@@ -65,10 +65,10 @@ class PathifierTest < SequelDuckDBTest::TestCase
   # Test multiple JSON files
   def test_multiple_json_files_generates_read_json_sql
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new([
-      "/data/file1.json",
-      "/data/file2.json",
-      "/data/file3.json"
-    ])
+                                                         "/data/file1.json",
+                                                         "/data/file2.json",
+                                                         "/data/file3.json"
+                                                       ])
     sql_expr = pathifier.to_sql
 
     assert_equal "read_json(['/data/file1.json','/data/file2.json','/data/file3.json'])", @db.literal(sql_expr)
@@ -108,9 +108,9 @@ class PathifierTest < SequelDuckDBTest::TestCase
   def test_raises_error_when_multiple_different_extensions
     error = assert_raises(Sequel::Error) do
       Sequel::DuckDB::Helpers::Pathifier.new([
-        "/path/to/file.parquet",
-        "/path/to/file.csv"
-      ])
+                                               "/path/to/file.parquet",
+                                               "/path/to/file.csv"
+                                             ])
     end
 
     assert_includes error.message, "Multiple different file extensions provided"
@@ -143,10 +143,10 @@ class PathifierTest < SequelDuckDBTest::TestCase
   # Test that same extension files are allowed
   def test_allows_multiple_files_with_same_extension
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new([
-      "/data/file1.parquet",
-      "/data/file2.parquet",
-      "/data/file3.parquet"
-    ])
+                                                         "/data/file1.parquet",
+                                                         "/data/file2.parquet",
+                                                         "/data/file3.parquet"
+                                                       ])
 
     assert_nothing_raised do
       pathifier.to_sql
@@ -156,10 +156,10 @@ class PathifierTest < SequelDuckDBTest::TestCase
   # Test extnames method
   def test_extnames_returns_unique_extensions
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new([
-      "/data/file1.csv",
-      "/data/file2.csv",
-      "/data/file3.csv"
-    ])
+                                                         "/data/file1.csv",
+                                                         "/data/file2.csv",
+                                                         "/data/file3.csv"
+                                                       ])
 
     assert_equal [".csv"], pathifier.extnames
   end
@@ -168,9 +168,9 @@ class PathifierTest < SequelDuckDBTest::TestCase
     # This will fail validation, but we can test extnames before validation
     pathifier = Sequel::DuckDB::Helpers::Pathifier.allocate
     pathifier.instance_variable_set(:@paths, [
-      Pathname.new("/data/file1.csv"),
-      Pathname.new("/data/file2.parquet")
-    ])
+                                      Pathname.new("/data/file1.csv"),
+                                      Pathname.new("/data/file2.parquet")
+                                    ])
     pathifier.instance_variable_set(:@options, {})
 
     assert_equal [".csv", ".parquet"], pathifier.extnames

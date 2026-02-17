@@ -1,6 +1,9 @@
+# frozen_string_literal: true
+
 module Sequel
   module DuckDB
     module Helpers
+      # Builds COPY SQL statements for exporting DuckDB query results to files.
       class Copier
         def initialize(src, dst, options = Sequel::OPTS)
           @src = src
@@ -25,20 +28,17 @@ module Sequel
         end
 
         def options_str
-          opts_str = { format: format }
-                     .merge(@options)
-                     .map do |k, v|
-            k = k.to_s.upcase
-            if v.is_a?(TrueClass) || v.is_a?(FalseClass)
-              v ? k : nil
-            else
-              "#{k} #{v.to_s.upcase}"
-            end
-          end
-            .compact
-            .join(", ")
-            .strip
+          opts_str = { format: format }.merge(@options).map { |k, v| format_option(k, v) }.compact.join(", ").strip
           opts_str.empty? ? "" : "(#{opts_str})"
+        end
+
+        def format_option(key, value)
+          key = key.to_s.upcase
+          case value
+          when true then key
+          when false then nil
+          else "#{key} #{value.to_s.upcase}"
+          end
         end
 
         def format

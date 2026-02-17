@@ -189,8 +189,8 @@ module Sequel
       end
 
       # Execute SQL for SELECT queries
-      def execute(sql, opts = OPTS, &block)
-        _execute(:select, sql, opts, &block)
+      def execute(sql, opts = OPTS, &)
+        _execute(:select, sql, opts, &)
       end
 
       # Execute SQL for INSERT/UPDATE/DELETE queries

@@ -13,18 +13,21 @@ require "sequel"
 class MockAdapterTest < Minitest::Test
   def test_mock_duckdb_connection_succeeds
     db = Sequel.mock(host: "duckdb")
+
     refute_nil db
   end
 
   def test_pathifier_accessible_via_mock_adapter
     Sequel.mock(host: "duckdb")
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new("/data/test.parquet")
+
     refute_nil pathifier
   end
 
   def test_copier_accessible_via_mock_adapter
     Sequel.mock(host: "duckdb")
     copier = Sequel::DuckDB::Helpers::Copier.new("SELECT 1", "/tmp/out.parquet")
+
     refute_nil copier
   end
 end

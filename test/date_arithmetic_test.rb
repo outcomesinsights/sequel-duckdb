@@ -29,7 +29,7 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
   end
 
   def teardown
-    @db.disconnect if @db
+    @db&.disconnect
     super
   end
 
@@ -37,55 +37,61 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_years
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, years: 1).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, years: 1).as(:future_date))
+             .first
 
     expected = Time.new(2025, 1, 15)
+
     assert_equal expected, result[:future_date]
   end
 
   def test_date_add_months
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, months: 2).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, months: 2).as(:future_date))
+             .first
 
     expected = Time.new(2024, 3, 15)
+
     assert_equal expected, result[:future_date]
   end
 
   def test_date_add_days
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: 5).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: 5).as(:future_date))
+             .first
 
     expected = Time.new(2024, 1, 20)
+
     assert_equal expected, result[:future_date]
   end
 
   def test_date_add_hours
     result = @db[:events]
-      .select(Sequel.date_add(:created_at, hours: 5).as(:future_time))
-      .first
+             .select(Sequel.date_add(:created_at, hours: 5).as(:future_time))
+             .first
 
     expected = Time.new(2024, 1, 15, 15, 30, 0)
+
     assert_equal expected, result[:future_time]
   end
 
   def test_date_add_minutes
     result = @db[:events]
-      .select(Sequel.date_add(:created_at, minutes: 30).as(:future_time))
-      .first
+             .select(Sequel.date_add(:created_at, minutes: 30).as(:future_time))
+             .first
 
     expected = Time.new(2024, 1, 15, 11, 0, 0)
+
     assert_equal expected, result[:future_time]
   end
 
   def test_date_add_seconds
     result = @db[:events]
-      .select(Sequel.date_add(:created_at, seconds: 90).as(:future_time))
-      .first
+             .select(Sequel.date_add(:created_at, seconds: 90).as(:future_time))
+             .first
 
     expected = Time.new(2024, 1, 15, 10, 31, 30)
+
     assert_equal expected, result[:future_time]
   end
 
@@ -93,30 +99,32 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_multiple_units
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, years: 1, months: 2, days: 3).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, years: 1, months: 2, days: 3).as(:future_date))
+             .first
 
     expected = Time.new(2025, 3, 18)
+
     assert_equal expected, result[:future_date]
   end
 
   def test_date_add_time_units_combined
     result = @db[:events]
-      .select(Sequel.date_add(:created_at, hours: 2, minutes: 15, seconds: 30).as(:future_time))
-      .first
+             .select(Sequel.date_add(:created_at, hours: 2, minutes: 15, seconds: 30).as(:future_time))
+             .first
 
     expected = Time.new(2024, 1, 15, 12, 45, 30)
+
     assert_equal expected, result[:future_time]
   end
 
   def test_date_add_all_units
     result = @db[:events]
-      .select(Sequel.date_add(:created_at,
-        years: 1, months: 1, days: 1, hours: 1, minutes: 1, seconds: 1
-      ).as(:future_time))
-      .first
+             .select(Sequel.date_add(:created_at,
+                                     years: 1, months: 1, days: 1, hours: 1, minutes: 1, seconds: 1).as(:future_time))
+             .first
 
     expected = Time.new(2025, 2, 16, 11, 31, 1)
+
     assert_equal expected, result[:future_time]
   end
 
@@ -124,28 +132,31 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_sub_days
     result = @db[:events]
-      .select(Sequel.date_sub(:event_date, days: 5).as(:past_date))
-      .first
+             .select(Sequel.date_sub(:event_date, days: 5).as(:past_date))
+             .first
 
     expected = Time.new(2024, 1, 10)
+
     assert_equal expected, result[:past_date]
   end
 
   def test_date_sub_months
     result = @db[:events]
-      .select(Sequel.date_sub(:event_date, months: 1).as(:past_date))
-      .first
+             .select(Sequel.date_sub(:event_date, months: 1).as(:past_date))
+             .first
 
     expected = Time.new(2023, 12, 15)
+
     assert_equal expected, result[:past_date]
   end
 
   def test_date_sub_hours_and_minutes
     result = @db[:events]
-      .select(Sequel.date_sub(:created_at, hours: 2, minutes: 15).as(:past_time))
-      .first
+             .select(Sequel.date_sub(:created_at, hours: 2, minutes: 15).as(:past_time))
+             .first
 
     expected = Time.new(2024, 1, 15, 8, 15, 0)
+
     assert_equal expected, result[:past_time]
   end
 
@@ -153,8 +164,8 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_cast_to_date
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, {days: 7}, cast: :date).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, { days: 7 }, cast: :date).as(:future_date))
+             .first
 
     # Cast to date should return Date object
     assert_instance_of Date, result[:future_date]
@@ -163,8 +174,8 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_default_cast_to_timestamp
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: 1).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: 1).as(:future_date))
+             .first
 
     # Default cast should be timestamp (Time)
     assert_instance_of Time, result[:future_date]
@@ -174,19 +185,21 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_with_column_reference
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: Sequel[:duration_days]).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: Sequel[:duration_days]).as(:future_date))
+             .first
 
     expected = Time.new(2024, 1, 22)
+
     assert_equal expected, result[:future_date]
   end
 
   def test_date_add_with_expression
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: Sequel[:duration_days] * 2).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: Sequel[:duration_days] * 2).as(:future_date))
+             .first
 
     expected = Time.new(2024, 1, 29)
+
     assert_equal expected, result[:future_date]
   end
 
@@ -205,9 +218,9 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
     # Events where (now + 24 hours) >= expires_at AND created_at is recent
     # This ensures we only get the newly inserted event, not the old one from setup
     results = @db[:events]
-      .where(Sequel.date_add(Sequel::CURRENT_TIMESTAMP, hours: 24) >= :expires_at)
-      .where { created_at > Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, hours: 1) }
-      .all
+              .where(Sequel.date_add(Sequel::CURRENT_TIMESTAMP, hours: 24) >= :expires_at)
+              .where { created_at > Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, hours: 1) }
+              .all
 
     assert_equal 1, results.length
     assert_equal 2, results[0][:id]
@@ -225,8 +238,8 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
     # Events where created_at > (now - 1 hour)
     results = @db[:events]
-      .where { created_at > Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, hours: 1) }
-      .all
+              .where { created_at > Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, hours: 1) }
+              .all
 
     assert_equal 1, results.length
     assert_equal 3, results[0][:id]
@@ -236,20 +249,22 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_sql_generation_single_interval
     ds = @db[:events]
-      .select(Sequel.date_add(:created_at, days: 5).as(:result))
+         .select(Sequel.date_add(:created_at, days: 5).as(:result))
 
     sql = ds.sql
+
     assert_includes sql, "INTERVAL"
     assert_includes sql, "DAY"
     assert_includes sql, "CAST"
-    assert_match(/timestamp/i, sql)  # Case insensitive match for timestamp
+    assert_match(/timestamp/i, sql) # Case insensitive match for timestamp
   end
 
   def test_sql_generation_multiple_intervals
     ds = @db[:events]
-      .select(Sequel.date_add(:created_at, years: 1, months: 2).as(:result))
+         .select(Sequel.date_add(:created_at, years: 1, months: 2).as(:result))
 
     sql = ds.sql
+
     assert_includes sql, "INTERVAL"
     assert_includes sql, "YEAR"
     assert_includes sql, "MONTH"
@@ -257,7 +272,7 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_sql_generation_with_subtraction
     ds = @db[:events]
-      .select(Sequel.date_sub(:created_at, hours: 12).as(:result))
+         .select(Sequel.date_sub(:created_at, hours: 12).as(:result))
 
     sql = ds.sql
     # date_sub should generate negative interval
@@ -268,11 +283,12 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_sql_generation_with_cast
     ds = @db[:events]
-      .select(Sequel.date_add(:event_date, {days: 7}, cast: :date).as(:result))
+         .select(Sequel.date_add(:event_date, { days: 7 }, cast: :date).as(:result))
 
     sql = ds.sql
+
     assert_includes sql, "CAST"
-    assert_match(/date/i, sql)  # Case insensitive match for date
+    assert_match(/date/i, sql) # Case insensitive match for date
   end
 
   # Test edge cases
@@ -280,29 +296,32 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
   def test_date_add_zero_interval
     # Zero intervals should still work
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: 0).as(:same_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: 0).as(:same_date))
+             .first
 
     expected = Time.new(2024, 1, 15)
+
     assert_equal expected, result[:same_date]
   end
 
   def test_date_add_negative_value
     # Can use negative values with date_add
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: -5).as(:past_date))
-      .first
+             .select(Sequel.date_add(:event_date, days: -5).as(:past_date))
+             .first
 
     expected = Time.new(2024, 1, 10)
+
     assert_equal expected, result[:past_date]
   end
 
   def test_date_add_large_values
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, years: 100).as(:far_future))
-      .first
+             .select(Sequel.date_add(:event_date, years: 100).as(:far_future))
+             .first
 
     expected = Time.new(2124, 1, 15)
+
     assert_equal expected, result[:far_future]
   end
 
@@ -310,16 +329,16 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_on_date_column
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, days: 1).as(:tomorrow))
-      .first
+             .select(Sequel.date_add(:event_date, days: 1).as(:tomorrow))
+             .first
 
     assert_instance_of Time, result[:tomorrow]
   end
 
   def test_date_add_on_datetime_column
     result = @db[:events]
-      .select(Sequel.date_add(:created_at, days: 1).as(:tomorrow))
-      .first
+             .select(Sequel.date_add(:created_at, days: 1).as(:tomorrow))
+             .first
 
     assert_instance_of Time, result[:tomorrow]
   end
@@ -328,11 +347,12 @@ class DateArithmeticTest < SequelDuckDBTest::TestCase
 
   def test_date_add_weeks
     result = @db[:events]
-      .select(Sequel.date_add(:event_date, weeks: 2).as(:future_date))
-      .first
+             .select(Sequel.date_add(:event_date, weeks: 2).as(:future_date))
+             .first
 
     # 2 weeks = 14 days
     expected = Time.new(2024, 1, 29)
+
     assert_equal expected, result[:future_date]
   end
 end
