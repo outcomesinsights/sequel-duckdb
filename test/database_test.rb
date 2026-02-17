@@ -1000,9 +1000,10 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     db.copy_to(db[:test_data], temp_file)
 
     result = db.from(Sequel.function(:read_parquet, temp_file)).all
+
     assert_equal 2, result.count
 
-    File.delete(temp_file) if File.exist?(temp_file)
+    FileUtils.rm_f(temp_file)
   end
 
   def test_copy_to_with_format_options
@@ -1016,8 +1017,8 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     temp_file = "/tmp/test_csv_#{Time.now.to_i}.csv"
     db.copy_to(db[:csv_test], temp_file, format: "CSV", header: true)
 
-    assert File.exist?(temp_file)
-    File.delete(temp_file) if File.exist?(temp_file)
+    assert_path_exists temp_file
+    FileUtils.rm_f(temp_file)
   end
 
   # Test read_something_sql via create_view
@@ -1039,7 +1040,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal "Test", result.first[:name]
 
     db.drop_view(:parquet_view)
-    File.delete(temp_file) if File.exist?(temp_file)
+    FileUtils.rm_f(temp_file)
   end
 
   private

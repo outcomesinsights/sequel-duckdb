@@ -189,8 +189,8 @@ module Sequel
       end
 
       # Execute SQL for SELECT queries
-      def execute(sql, opts = OPTS, &block)
-        _execute(:select, sql, opts, &block)
+      def execute(sql, opts = OPTS, &)
+        _execute(:select, sql, opts, &)
       end
 
       # Execute SQL for INSERT/UPDATE/DELETE queries
@@ -215,36 +215,33 @@ module Sequel
         synchronize(opts[:server]) do |conn|
           case type
           when :select
-            log_connection_yield(sql, conn) do
-              result = conn.query(sql)
-              if block
-                # Convert rows to hash format for direct execute(sql) { |row| } calls
-                columns = result.columns
-                result.each do |row_array|
-                  row_hash = {}
-                  columns.each_with_index do |column, index|
-                    column_name = column.respond_to?(:name) ? column.name : column.to_s
-                    row_hash[column_name.to_sym] = row_array[index]
-                  end
-                  yield row_hash
-                end
-              end
-              result
-            end
-          when :insert
-            log_connection_yield(sql, conn) do
-              result = conn.query(sql)
-              result.rows_changed
-            end
-          when :update
-            log_connection_yield(sql, conn) do
-              result = conn.query(sql)
-              result.rows_changed
-            end
+            execute_select(sql, conn, &block)
+          when :insert, :update
+            log_connection_yield(sql, conn) { conn.query(sql).rows_changed }
           end
         end
       rescue ::DuckDB::Error => e
         raise_error(e, opts)
+      end
+
+      def execute_select(sql, conn, &block)
+        log_connection_yield(sql, conn) do
+          result = conn.query(sql)
+          yield_rows(result, &block) if block
+          result
+        end
+      end
+
+      def yield_rows(result)
+        columns = result.columns
+        result.each do |row_array|
+          row_hash = {}
+          columns.each_with_index do |column, index|
+            column_name = column.respond_to?(:name) ? column.name : column.to_s
+            row_hash[column_name.to_sym] = row_array[index]
+          end
+          yield row_hash
+        end
       end
     end
 

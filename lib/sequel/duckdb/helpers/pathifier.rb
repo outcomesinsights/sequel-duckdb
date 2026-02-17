@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Sequel
   module DuckDB
     module Helpers
@@ -122,18 +124,16 @@ module Sequel
             Sequel::LiteralString.new("[#{paths_arr}]")
           end
 
-          read_function = case to_format
-                          when :parquet
-                            :read_parquet
-                          when :csv
-                            :read_csv
-                          when :json
-                            :read_json
-                          else
-                            raise Sequel::Error, "Unsupported :using type: #{to_format}"
-                          end
+          Sequel.function(read_function_name, paths_sql)
+        end
 
-          Sequel.function(read_function, paths_sql)
+        def read_function_name
+          case to_format
+          when :parquet then :read_parquet
+          when :csv then :read_csv
+          when :json then :read_json
+          else raise Sequel::Error, "Unsupported :using type: #{to_format}"
+          end
         end
       end
     end
