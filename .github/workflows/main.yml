@@ -1,21 +1,34 @@
-name: Ruby
+name: CI
 
 on:
   push:
     branches:
       - main
-
   pull_request:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    name: Ruby ${{ matrix.ruby }}
-    strategy:
-      matrix:
-        ruby:
-          - '3.4.4'
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.2', '3.3', '3.4', '4.0']
+    name: Test Ruby ${{ matrix.ruby }}
     steps:
       - uses: actions/checkout@v6
       - name: Install DuckDB C library
@@ -27,28 +40,26 @@ jobs:
           sudo mv libduckdb/duckdb.* /usr/local/include/
           sudo mv libduckdb/libduckdb.so /usr/local/lib/
           sudo ldconfig /usr/local/lib
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - name: Run the default task
-        run: bundle exec rake
+      - name: Run Tests
+        run: bundle exec rake test
 
   ci:
     if: always()
-    needs: [build]
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - name: Check CI status
         run: |
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "CI failed"
+            echo "One or more CI jobs failed"
             exit 1
           fi
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "CI cancelled"
+            echo "One or more CI jobs were cancelled"
             exit 1
           fi
           echo "All CI jobs passed"
-
