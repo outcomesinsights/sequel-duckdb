@@ -2,5 +2,8 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in sequel-duckdb.gemspec
 gemspec
+
+group :development do
+  gem "overcommit", "~> 0.68"
+end

@@ -1,103 +1,161 @@
+inherit_from: .rubocop_todo.yml
+
 plugins:
   - rubocop-minitest
   - rubocop-rake
   - rubocop-sequel
 
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 4.0
   NewCops: enable
-
-Gemspec/DevelopmentDependencies:
-  Enabled: false
-
-# Disable complexity violations for database adapter code
-Metrics/ModuleLength:
-  Enabled: true
+  SuggestExtensions: false
   Exclude:
-    - lib/sequel/adapters/shared/duckdb.rb
+    - 'vendor/**/*'
+    - 'bin/**/*'
+    - 'tmp/**/*'
 
-Metrics/MethodLength:
-  Enabled: true
-  Exclude:
-    - lib/sequel/adapters/shared/duckdb.rb
-    - test/**/*
-    - test/type_test.rb
+inherit_mode:
+  merge:
+    - Exclude
 
-Metrics/ClassLength:
-  Enabled: true
-  Exclude:
-    - test/**/*
-    - test/type_test.rb
-
-Metrics/BlockLength:
-  Enabled: true
-  Exclude:
-    - test/**/*
-    - test/type_test.rb
-    - sequel-duckdb.gemspec
-
-Metrics/AbcSize:
-  Enabled: true
-  Exclude:
-    - lib/sequel/adapters/shared/duckdb.rb
-    - test/**/*
-    - test/type_test.rb
-
-Metrics/CyclomaticComplexity:
-  Enabled: true
-  Exclude:
-    - lib/sequel/adapters/shared/duckdb.rb
-    - test/**/*
-    - test/type_test.rb
-
-Metrics/PerceivedComplexity:
-  Enabled: true
-  Exclude:
-    - lib/sequel/adapters/shared/duckdb.rb
-    - test/**/*
-    - test/type_test.rb
-
-# Disable line length for generated SQL and complex expressions
-Layout/LineLength:
-  Enabled: true
-  Exclude:
-    - test/**/*
-    - test/type_test.rb
-    - sequel-duckdb.gemspec
-
-Minitest/MultipleAssertions:
-  Enabled: false
-
-# Allow duplicate branches for error handling patterns
-Lint/DuplicateBranch:
-  Enabled: true
-
-# Allow database adapter naming patterns
-Naming/MethodParameterName:
-  Enabled: true
-
-Naming/AccessorMethodName:
-  Enabled: true
-
-Naming/VariableNumber:
-  Enabled: true
-  Exclude:
-    - test/**/*
-
-# Allow database adapter patterns
-Lint/EmptyBlock:
-  Enabled: true
-  Exclude:
-    - test/**/*
-
-Lint/DuplicateMethods:
-  Enabled: true
-
-Style/TrivialAccessors:
-  Enabled: true
+Layout/IndentationWidth:
+  Width: 2
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+Style/DefWithParentheses:
+  Enabled: false
+
+Style/MethodCallWithoutArgsParentheses:
+  Enabled: true
+
+Layout/LineLength:
+  Max: 120
+  AllowedPatterns: ['\A\s*#']
+  Exclude:
+    - '*.gemspec'
+    - 'test/**/*'
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/Lambda:
+  Enabled: false
+
+Style/ParallelAssignment:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: true
+
+Style/IfUnlessModifier:
+  Enabled: true
+
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/ModuleLength:
+  Max: 200
+
+Metrics/BlockLength:
+  Max: 50
+  Exclude:
+    - 'test/**/*'
+    - '*.gemspec'
+    - 'Rakefile'
+
+Style/ZeroLengthPredicate:
+  Enabled: false
+
+Naming/MemoizedInstanceVariableName:
+  Enabled: false
+
+Naming/MethodParameterName:
+  MinNameLength: 1
+
+Style/MultilineBlockChain:
+  Enabled: false
+
+Metrics/AbcSize:
+  Max: 35
+  Exclude:
+    - 'test/**/*'
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+Metrics/PerceivedComplexity:
+  Max: 12
+
+Metrics/BlockNesting:
+  Max: 4
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Style/HashSyntax:
+  EnforcedStyle: ruby19
+  EnforcedShorthandSyntax: either
+
+Minitest/AssertEqual:
+  Enabled: true
+
+Minitest/RefuteEqual:
+  Enabled: true
+
+Minitest/MultipleAssertions:
+  Enabled: false
+
+Layout/EmptyLinesAroundClassBody:
+  EnforcedStyle: empty_lines_except_namespace
+
+Layout/EmptyLinesAroundModuleBody:
+  EnforcedStyle: empty_lines_except_namespace
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+Style/HashLikeCase:
+  Exclude:
+    - 'test/**/*'
+
+Lint/DuplicateBranch:
+  Exclude:
+    - 'test/**/*'
+
+Style/StringConcatenation:
+  Exclude:
+    - 'test/**/*'
+
+Naming/VariableNumber:
+  Exclude:
+    - 'test/**/*'
+
+Lint/EmptyBlock:
+  Exclude:
+    - 'test/**/*'
+
+Style/TrivialAccessors:
+  Enabled: true
+
+Lint/DuplicateMethods:
+  Enabled: true
