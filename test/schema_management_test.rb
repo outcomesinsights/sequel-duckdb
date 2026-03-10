@@ -184,7 +184,7 @@ describe "Schema Management" do
       @db.create_schema(:test_schema)
       schemas = @db.schemas
 
-      _(schemas.all? { |s| s.is_a?(Symbol) }).must_equal(true)
+      _(schemas.all?(Symbol)).must_equal(true)
     end
   end
 
