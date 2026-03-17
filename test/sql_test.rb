@@ -122,6 +122,14 @@ class SqlTest < SequelDuckDBTest::TestCase
     assert_sql expected_sql, dataset
   end
 
+  def test_select_with_schema_qualified_wildcard
+    dataset = mock_dataset(Sequel[:analytics][:users]).select(Sequel[:analytics][:users].*)
+
+    expected_sql = 'SELECT "users".* FROM "analytics"."users"'
+
+    assert_sql expected_sql, dataset
+  end
+
   def test_select_with_left_join
     dataset = mock_dataset(:users).left_join(:profiles, user_id: :id)
 

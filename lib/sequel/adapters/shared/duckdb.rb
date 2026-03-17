@@ -293,11 +293,18 @@ module Sequel
 
       # Check if table exists
       #
-      # @param table_name [Symbol, String] Name of the table
+      # @param table_name [Symbol, String, Sequel::SQL::QualifiedIdentifier] Name of the table
       # @param opts [Hash] Options
       # @return [Boolean] true if table exists
       def table_exists?(table_name, opts = {})
-        schema_name = opts[:schema] || "main"
+        # Handle qualified identifiers (e.g., Sequel[:schema][:table])
+        if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
+          schema_name = table_name.table.to_s
+          table_name = table_name.column.to_s
+        else
+          schema_name = opts[:schema] || "main"
+          table_name = table_name.to_s
+        end
 
         sql = "SELECT 1 FROM information_schema.tables " \
               "WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}' LIMIT 1"
@@ -318,15 +325,36 @@ module Sequel
         schema_parse_tables(opts)
       end
 
+      # Get list of views
+      #
+      # @param opts [Hash] Options
+      # @return [Array<Symbol>] Array of view names
+      def views(opts = {})
+        schema_name = opts[:schema] || "main"
+
+        sql = "SELECT table_name FROM information_schema.tables " \
+              "WHERE table_schema = '#{schema_name}' AND table_type = 'VIEW'"
+
+        views = []
+        execute(sql) do |row|
+          views << row[:table_name].to_sym
+        end
+
+        views
+      end
+
       # Get schema information for a table
       #
-      # @param table_name [Symbol, String, Dataset] Name of the table or dataset
+      # @param table_name [Symbol, String, Dataset, QualifiedIdentifier] Name of the table or dataset
       # @param opts [Hash] Options
       # @return [Array<Array>] Schema information
       def schema(table_name, opts = {})
-        # Handle case where Sequel passes a Dataset object instead of table name
-        if table_name.is_a?(Sequel::Dataset)
-          # Extract table name from dataset
+        # Handle qualified identifiers (e.g., Sequel[:schema][:table])
+        if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
+          opts = opts.merge(schema: table_name.table.to_s)
+          actual_table_name = table_name.column.to_s.to_sym
+        elsif table_name.is_a?(Sequel::Dataset)
+          # Handle case where Sequel passes a Dataset object instead of table name
           if table_name.opts[:from]&.first
             actual_table_name = table_name.opts[:from].first
             # Handle case where table name is wrapped in an identifier
@@ -337,7 +365,6 @@ module Sequel
             raise Sequel::Error, "Cannot determine table name from dataset: #{table_name}" unless sql =~ /FROM\s+(\w+)/i
 
             actual_table_name = ::Regexp.last_match(1).to_sym
-
           end
         else
           actual_table_name = table_name
@@ -851,6 +878,16 @@ module Sequel
         return true if super
 
         DUCKDB_RESERVED_WORDS.include?(name.to_s.downcase)
+      end
+
+      # DuckDB doesn't support "schema"."table".* syntax.
+      # Strip the schema qualifier so it generates "table".* instead.
+      def column_all_sql_append(sql, ca)
+        table = ca.table
+        if table.is_a?(Sequel::SQL::QualifiedIdentifier)
+          table = table.column
+        end
+        qualified_identifier_sql_append(sql, table, Sequel::LiteralString.new("*"))
       end
 
       # DuckDB capability flags

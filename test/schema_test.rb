@@ -235,6 +235,20 @@ class SchemaTest < SequelDuckDBTest::TestCase
     assert db.table_exists?(:exists_test), "Existing table should return true"
   end
 
+  def test_table_exists_method_with_qualified_identifier
+    db = create_db
+    db.create_schema(:reporting)
+    db.create_table(Sequel[:reporting][:exists_test]) do
+      primary_key :id
+      String :name
+    end
+
+    assert db.table_exists?(Sequel[:reporting][:exists_test]),
+           "Qualified existing table should return true"
+    refute db.table_exists?(Sequel[:reporting][:missing_test]),
+           "Qualified non-existent table should return false"
+  end
+
   def test_multiple_tables
     db = create_db
 

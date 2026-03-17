@@ -84,6 +84,20 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     assert_includes tables1, :consistency_test, "Should consistently include created table"
   end
 
+  def test_views_method_with_schema_option
+    @db.create_schema(:reporting)
+    @db.create_table(:users) do
+      primary_key :id
+      String :name
+    end
+    @db.create_view(Sequel[:reporting][:active_users], @db[:users].select(:id, :name))
+
+    views = @db.views(schema: "reporting")
+
+    assert_instance_of Array, views, "views() should return an array"
+    assert_includes views, :active_users, "Should include view created in explicit schema"
+  end
+
   # Tests for schema method
   def test_schema_method_basic_usage
     @db.create_table(:schema_test) do
@@ -244,6 +258,20 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
 
     # Results should be consistent
     assert_equal schema1.length, schema2.length, "Should have same number of columns"
+  end
+
+  def test_schema_method_with_qualified_identifier
+    @db.create_schema(:analytics)
+    @db.create_table(Sequel[:analytics][:events]) do
+      primary_key :id
+      String :name
+    end
+
+    schema = @db.schema(Sequel[:analytics][:events])
+    column_names = schema.map(&:first)
+
+    assert_includes column_names, :id, "Should introspect qualified table primary key"
+    assert_includes column_names, :name, "Should introspect qualified table columns"
   end
 
   def test_schema_method_error_handling
