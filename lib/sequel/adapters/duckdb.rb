@@ -243,6 +243,13 @@ module Sequel
           yield row_hash
         end
       end
+
+      # Return column names from a DuckDB result object
+      def result_column_names(result)
+        result.columns.map do |c|
+          c.respond_to?(:name) ? c.name.to_s : c.to_s
+        end
+      end
     end
 
     # Dataset class for DuckDB adapter
@@ -297,18 +304,29 @@ module Sequel
     class Dataset < Sequel::Dataset
       include Sequel::DuckDB::DatasetMethods
 
-      # Fetch rows from database following SQLite pattern
+      # Fetch rows from database, following the SQLite adapter pattern.
+      # Gets the DuckDB result object directly to extract column names
+      # before iterating rows. This ensures columns are set even when
+      # the query returns 0 rows (e.g. LIMIT 0 for column introspection).
       def fetch_rows(sql)
-        # execute already converts rows to hashes when a block is given
-        # We just need to set the columns and pass through
-        first_row = true
-        execute(sql) do |row|
-          if first_row
-            self.columns = row.keys.map { |k| output_identifier(k) }
-            first_row = false
+        db.synchronize(opts[:server]) do |conn|
+          result = db.send(:log_connection_yield, sql, conn) { conn.query(sql) }
+
+          # Set columns from result metadata (works even with 0 rows)
+          col_names = db.send(:result_column_names, result)
+          self.columns = col_names.map { |c| output_identifier(c) }
+
+          # Yield each row as a hash
+          result.each do |row_array|
+            row_hash = {}
+            col_names.each_with_index do |col_name, i|
+              row_hash[output_identifier(col_name)] = row_array[i]
+            end
+            yield row_hash
           end
-          yield row
         end
+      rescue ::DuckDB::Error => e
+        raise Sequel::DatabaseError, e.message
       end
     end
   end

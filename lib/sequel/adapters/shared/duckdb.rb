@@ -73,6 +73,16 @@ module Sequel
         DATABASE_ERROR_REGEXPS
       end
 
+      # Return a dataset that represents a VALUES clause with the given rows.
+      # DuckDB supports standard SQL VALUES syntax like PostgreSQL.
+      #
+      #   DB.values([[1, 2], [3, 4]])
+      #   # VALUES ((1, 2), (3, 4))
+      def values(v)
+        raise Error, "Cannot provide an empty array for values" if v.empty?
+        @default_dataset.clone(:values=>v)
+      end
+
       private
 
       # DuckDB doesn't fold unquoted identifiers to uppercase
@@ -814,6 +824,9 @@ module Sequel
         seconds: "SECOND"
       }.freeze
 
+      # Override select SQL clause order to support VALUES
+      Dataset.def_sql_method(self, :select, [['if opts[:values]', %w'values compounds order limit'], ['else', %w'with select distinct columns from join where group having compounds order limit lock']])
+
       private
 
       # DuckDB uses lowercase identifiers
@@ -871,6 +884,18 @@ module Sequel
       # This follows the same pattern as PostgreSQL
       def select_with_sql_base
         opts[:with].any? { |w| w[:recursive] } ? "WITH RECURSIVE " : "WITH "
+      end
+
+      # Support VALUES clause instead of SELECT to return rows.
+      def select_values_sql(sql)
+        sql << "VALUES "
+        expression_list_append(sql, opts[:values])
+      end
+
+      # Return true if this dataset uses a VALUES clause (not a real table query).
+      def empty?
+        return false if @opts[:values]
+        super
       end
 
       # DuckDB-specific SQL generation enhancements

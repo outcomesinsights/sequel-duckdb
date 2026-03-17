@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "sequel_duckdb",
+  "project_id": "5883e5bf-a919-4ca8-b7ee-d1cb7e08dfa5"
+}

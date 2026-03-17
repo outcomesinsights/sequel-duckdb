@@ -9,3 +9,7 @@
 .specstory/
 .claude/
 sequel-duckdb-0.1.0.gem
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
