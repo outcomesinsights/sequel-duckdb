@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "sequel"
+require "duckdb"
 require_relative "shared/duckdb"
 
 # Sequel is a database toolkit for Ruby that provides a powerful ORM and database abstraction layer.
@@ -52,6 +53,130 @@ module Sequel
   #
   # @since 0.1.0
   module DuckDB
+    module DriverDatabaseMethods
+      def connect(server) # rubocop:disable Metrics/MethodLength
+        opts = server_opts(server)
+        database_path = opts[:database]
+
+        begin
+          if database_path == ":memory:" || database_path.nil?
+            db = ::DuckDB::Database.open(":memory:")
+          else
+            database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+            db = ::DuckDB::Database.open(database_path)
+          end
+
+          db.connect
+        rescue ::DuckDB::Error => e
+          raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
+        rescue StandardError => e
+          raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
+        end
+      end
+
+      def disconnect_connection(conn)
+        return unless conn
+
+        begin
+          conn.close
+        rescue ::DuckDB::Error
+        end
+      end
+
+      def valid_connection?(conn)
+        return false unless conn
+
+        begin
+          conn.query("SELECT 1")
+          true
+        rescue ::DuckDB::Error
+          false
+        end
+      end
+
+      def execute(sql, opts = OPTS, &)
+        _execute(:select, sql, opts, &)
+      end
+
+      def execute_dui(sql, opts = OPTS)
+        _execute(:update, sql, opts)
+      end
+
+      def execute_insert(sql, opts = OPTS)
+        _execute(:insert, sql, opts)
+      end
+
+      def dataset_class_default
+        Dataset
+      end
+
+      private
+
+      def database_error_classes
+        [::DuckDB::Error]
+      end
+
+      def _execute(type, sql, opts, &block)
+        synchronize(opts[:server]) do |conn|
+          case type
+          when :select
+            execute_select(sql, conn, &block)
+          when :insert, :update
+            log_connection_yield(sql, conn) { conn.query(sql).rows_changed }
+          end
+        end
+      rescue ::DuckDB::Error => e
+        raise_error(e, opts)
+      end
+
+      def execute_select(sql, conn, &block)
+        log_connection_yield(sql, conn) do
+          result = conn.query(sql)
+          yield_rows(result, &block) if block
+          result
+        end
+      end
+
+      def yield_rows(result)
+        columns = result.columns
+        result.each do |row_array|
+          row_hash = {}
+          columns.each_with_index do |column, index|
+            column_name = column.respond_to?(:name) ? column.name : column.to_s
+            row_hash[column_name.to_sym] = row_array[index]
+          end
+          yield row_hash
+        end
+      end
+
+      def result_column_names(result)
+        result.columns.map do |column|
+          column.respond_to?(:name) ? column.name.to_s : column.to_s
+        end
+      end
+    end
+
+    module DriverDatasetMethods
+      def fetch_rows(sql)
+        db.synchronize(opts[:server]) do |conn|
+          result = db.send(:log_connection_yield, sql, conn) { conn.query(sql) }
+
+          col_names = db.send(:result_column_names, result)
+          self.columns = col_names.map { |c| output_identifier(c) }
+
+          result.each do |row_array|
+            row_hash = {}
+            col_names.each_with_index do |col_name, i|
+              row_hash[output_identifier(col_name)] = row_array[i]
+            end
+            yield row_hash
+          end
+        end
+      rescue ::DuckDB::Error => e
+        raise Sequel::DatabaseError, e.message
+      end
+    end
+
     # Database class for DuckDB adapter
     #
     # This class extends Sequel::Database to provide DuckDB-specific functionality.
@@ -86,170 +211,11 @@ module Sequel
     # @since 0.1.0
     class Database < Sequel::Database
       include Sequel::DuckDB::DatabaseMethods
+      include Sequel::DuckDB::DriverDatabaseMethods
 
       # Set the adapter scheme for DuckDB
       # This allows Sequel.connect('duckdb://...') to work
       set_adapter_scheme :duckdb
-
-      # Connect to a DuckDB database
-      #
-      # Creates a connection to either a file-based or in-memory DuckDB database.
-      # This method handles the low-level connection establishment and error handling.
-      #
-      # @param server [Hash] Server configuration options from Sequel
-      # @option server [String] :database Database path or ':memory:' for in-memory database
-      # @option server [Hash] :config DuckDB-specific configuration options
-      # @option server [Boolean] :readonly Whether to open database in read-only mode
-      #
-      # @return [::DuckDB::Connection] Active DuckDB database connection
-      #
-      # @raise [Sequel::DatabaseConnectionError] If connection fails due to:
-      #   - Invalid database path
-      #   - Insufficient permissions
-      #   - DuckDB library errors
-      #   - Configuration errors
-      #
-      # @example Connect to in-memory database
-      #   conn = connect(database: ':memory:')
-      #
-      # @example Connect to file database
-      #   conn = connect(database: '/path/to/database.duckdb')
-      #
-      # @example Connect with configuration
-      #   conn = connect(
-      #     database: '/path/to/database.duckdb',
-      #     config: { memory_limit: '2GB', threads: 4 }
-      #   )
-      #
-      # @see disconnect_connection
-      # @see valid_connection?
-      # @since 0.1.0
-      def connect(server) # rubocop:disable Metrics/MethodLength
-        opts = server_opts(server)
-        database_path = opts[:database]
-
-        begin
-          if database_path == ":memory:" || database_path.nil?
-            # Create in-memory database and return connection
-            db = ::DuckDB::Database.open(":memory:")
-          else
-            # Fix URI parsing issue - add leading slash if missing for absolute paths
-            database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
-
-            # Create file-based database (will create file if it doesn't exist) and return connection
-            db = ::DuckDB::Database.open(database_path)
-          end
-          db.connect
-        rescue ::DuckDB::Error => e
-          raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
-        rescue StandardError => e
-          raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
-        end
-      end
-
-      # Disconnect from a DuckDB database connection
-      #
-      # @param conn [::DuckDB::Connection] The database connection to close
-      # @return [void]
-      def disconnect_connection(conn)
-        return unless conn
-
-        begin
-          conn.close
-        rescue ::DuckDB::Error
-          # Ignore errors during disconnect - connection may already be closed
-        end
-      end
-
-      # Check if a DuckDB connection is valid and open
-      #
-      # @param conn [::DuckDB::Connection] The database connection to check
-      # @return [Boolean] true if connection is valid and open, false otherwise
-      def valid_connection?(conn)
-        return false unless conn
-
-        begin
-          # Try a simple query to check if the connection is still valid
-          conn.query("SELECT 1")
-          true
-        rescue ::DuckDB::Error
-          false
-        end
-      end
-
-      # Return the default dataset class for this database
-      #
-      # This method is called by Sequel to determine which Dataset class
-      # to use when creating new datasets for this database connection.
-      #
-      # @return [Class] The Dataset class to use for this database (always DuckDB::Dataset)
-      # @see Dataset
-      def dataset_class_default
-        Dataset
-      end
-
-      # Execute SQL for SELECT queries
-      def execute(sql, opts = OPTS, &)
-        _execute(:select, sql, opts, &)
-      end
-
-      # Execute SQL for INSERT/UPDATE/DELETE queries
-      def execute_dui(sql, opts = OPTS)
-        _execute(:update, sql, opts)
-      end
-
-      # Execute SQL for INSERT queries
-      def execute_insert(sql, opts = OPTS)
-        _execute(:insert, sql, opts)
-      end
-
-      private
-
-      # Get database error classes for exception conversion
-      def database_error_classes
-        [::DuckDB::Error]
-      end
-
-      # Core execution method following SQLite pattern
-      def _execute(type, sql, opts, &block)
-        synchronize(opts[:server]) do |conn|
-          case type
-          when :select
-            execute_select(sql, conn, &block)
-          when :insert, :update
-            log_connection_yield(sql, conn) { conn.query(sql).rows_changed }
-          end
-        end
-      rescue ::DuckDB::Error => e
-        raise_error(e, opts)
-      end
-
-      def execute_select(sql, conn, &block)
-        log_connection_yield(sql, conn) do
-          result = conn.query(sql)
-          yield_rows(result, &block) if block
-          result
-        end
-      end
-
-      def yield_rows(result)
-        columns = result.columns
-        result.each do |row_array|
-          row_hash = {}
-          columns.each_with_index do |column, index|
-            column_name = column.respond_to?(:name) ? column.name : column.to_s
-            row_hash[column_name.to_sym] = row_array[index]
-          end
-          yield row_hash
-        end
-      end
-
-      # Return column names from a DuckDB result object
-      def result_column_names(result)
-        result.columns.map do |c|
-          c.respond_to?(:name) ? c.name.to_s : c.to_s
-        end
-      end
     end
 
     # Dataset class for DuckDB adapter
@@ -303,42 +269,7 @@ module Sequel
     # @since 0.1.0
     class Dataset < Sequel::Dataset
       include Sequel::DuckDB::DatasetMethods
-
-      # Fetch rows from database, following the SQLite adapter pattern.
-      # Gets the DuckDB result object directly to extract column names
-      # before iterating rows. This ensures columns are set even when
-      # the query returns 0 rows (e.g. LIMIT 0 for column introspection).
-      def fetch_rows(sql)
-        db.synchronize(opts[:server]) do |conn|
-          result = db.send(:log_connection_yield, sql, conn) { conn.query(sql) }
-
-          # Set columns from result metadata (works even with 0 rows)
-          col_names = db.send(:result_column_names, result)
-          self.columns = col_names.map { |c| output_identifier(c) }
-
-          # Yield each row as a hash
-          result.each do |row_array|
-            row_hash = {}
-            col_names.each_with_index do |col_name, i|
-              row_hash[output_identifier(col_name)] = row_array[i]
-            end
-            yield row_hash
-          end
-        end
-      rescue ::DuckDB::Error => e
-        raise Sequel::DatabaseError, e.message
-      end
+      include Sequel::DuckDB::DriverDatasetMethods
     end
   end
 end
-
-# Register the DuckDB adapter with Sequel
-# This registration allows Sequel.connect("duckdb://...") to automatically
-# use the DuckDB adapter and create DuckDB::Database instances.
-#
-# @example Connection string usage
-#   db = Sequel.connect('duckdb::memory:')
-#   db = Sequel.connect('duckdb:///path/to/database.duckdb')
-#
-# @see Sequel::DuckDB::Database
-Sequel::Database.set_shared_adapter_scheme :duckdb, Sequel::DuckDB

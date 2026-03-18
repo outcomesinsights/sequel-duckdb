@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "duckdb"
+require_relative "../../../sequel/duckdb"
 require_relative "../../../sequel/duckdb/helpers/pathifier"
 require_relative "../../../sequel/duckdb/helpers/copier"
 
