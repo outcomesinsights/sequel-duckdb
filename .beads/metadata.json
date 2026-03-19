@@ -3,7 +3,7 @@
   "backend": "dolt",
   "dolt_mode": "server",
   "dolt_server_host": "127.0.0.1",
-  "dolt_server_port": 43005,
+  "dolt_server_port": 3308,
   "dolt_database": "sequel_duckdb",
   "project_id": "5883e5bf-a919-4ca8-b7ee-d1cb7e08dfa5"
 }
