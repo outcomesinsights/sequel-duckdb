@@ -34,7 +34,12 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Core dependencies
-  spec.add_dependency "duckdb", "~> 1.0", ">= 1.0.0"
+  # NOTE: the duckdb C extension is NOT a gemspec dependency.  The shared
+  # adapter (SQL dialect, quoting, mock support) is pure Ruby and useful
+  # without the native library.  The actual `require "duckdb"` only happens
+  # in lib/sequel/adapters/duckdb.rb when establishing a real connection.
+  # Consumers that need live DuckDB connections should add `gem "duckdb"` to
+  # their own Gemfile.
   spec.add_dependency "sequel", "~> 5.0", ">= 5.0"
 
   # Development dependencies
