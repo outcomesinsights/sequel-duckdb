@@ -97,10 +97,15 @@ module Sequel
       # @param opts [Hash] Options for table parsing
       # @return [Array<Symbol>] Array of table names as symbols
       def schema_parse_tables(opts = {})
-        schema_name = opts[:schema] || "main"
+        schema_ref = opts[:schema] || "main"
 
-        sql = "SELECT table_name FROM information_schema.tables " \
-              "WHERE table_schema = '#{schema_name}' AND table_type = 'BASE TABLE'"
+        sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
+                "SELECT table_name FROM information_schema.tables " \
+                "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'BASE TABLE'"
+              else
+                "SELECT table_name FROM information_schema.tables " \
+                "WHERE table_schema = '#{schema_ref}' AND table_type = 'BASE TABLE'"
+              end
 
         tables = []
         execute(sql) do |row|
@@ -330,10 +335,15 @@ module Sequel
       # @param opts [Hash] Options
       # @return [Array<Symbol>] Array of view names
       def views(opts = {})
-        schema_name = opts[:schema] || "main"
+        schema_ref = opts[:schema] || "main"
 
-        sql = "SELECT table_name FROM information_schema.tables " \
-              "WHERE table_schema = '#{schema_name}' AND table_type = 'VIEW'"
+        sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
+                "SELECT table_name FROM information_schema.tables " \
+                "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'VIEW'"
+              else
+                "SELECT table_name FROM information_schema.tables " \
+                "WHERE table_schema = '#{schema_ref}' AND table_type = 'VIEW'"
+              end
 
         views = []
         execute(sql) do |row|

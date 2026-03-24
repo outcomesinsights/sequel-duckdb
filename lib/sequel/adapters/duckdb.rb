@@ -59,14 +59,17 @@ module Sequel
         database_path = opts[:database]
 
         begin
-          if database_path == ":memory:" || database_path.nil?
-            db = ::DuckDB::Database.open(":memory:")
-          else
-            database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
-            db = ::DuckDB::Database.open(database_path)
-          end
+          # Share the DuckDB::Database instance across all pool connections.
+          # DuckDB supports multiple connections from one Database, and ATTACH/schema
+          # state is per-Database, not per-Connection.
+          @duckdb_database ||= if database_path == ":memory:" || database_path.nil?
+                                  ::DuckDB::Database.open(":memory:")
+                                else
+                                  database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+                                  ::DuckDB::Database.open(database_path)
+                                end
 
-          db.connect
+          @duckdb_database.connect
         rescue ::DuckDB::Error => e
           raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
         rescue StandardError => e
