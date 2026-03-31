@@ -21,7 +21,7 @@ class MockAdapterTest < Minitest::Test
   def test_mock_duckdb_dataset_supports_ctes
     db = Sequel.mock(host: :duckdb)
 
-    assert_equal true, db.dataset.send(:supports_cte?)
+    assert db.dataset.send(:supports_cte?)
   end
 
   def test_mock_duckdb_uses_duckdb_interval_sql

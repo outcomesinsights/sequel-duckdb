@@ -65,7 +65,9 @@ module Sequel
         @duckdb_database = if database_path == ":memory:" || database_path.nil?
                              ::DuckDB::Database.open(":memory:")
                            else
-                             database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+                             if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+                               database_path = "/#{database_path}"
+                             end
                              ::DuckDB::Database.open(database_path)
                            end
       rescue ::DuckDB::Error => e
@@ -87,7 +89,7 @@ module Sequel
 
         begin
           conn.close
-        rescue ::DuckDB::Error
+        rescue ::DuckDB::Error # rubocop:disable Lint/SuppressedException -- best-effort cleanup on disconnect
         end
       end
 

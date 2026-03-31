@@ -5,19 +5,20 @@ require "open3"
 require "rbconfig"
 
 class MockWithoutDriverTest < Minitest::Test
+
   RUBY = RbConfig.ruby
 
   def run_ruby(code)
     Open3.capture3(
       {
         "RUBYOPT" => nil.to_s,
-        "BUNDLE_GEMFILE" => nil.to_s
+        "BUNDLE_GEMFILE" => nil.to_s,
       },
       RUBY,
       "-Ilib",
       "-e",
       code,
-      chdir: File.expand_path("..", __dir__)
+      chdir: File.expand_path("..", __dir__),
     )
   end
 
@@ -44,7 +45,8 @@ class MockWithoutDriverTest < Minitest::Test
 
     stdout, stderr, status = run_ruby(code)
 
-    assert status.success?, "stdout=#{stdout}\nstderr=#{stderr}"
+    assert_predicate status, :success?, "stdout=#{stdout}\nstderr=#{stderr}"
     assert_includes stdout, 'WITH "x" AS'
   end
+
 end

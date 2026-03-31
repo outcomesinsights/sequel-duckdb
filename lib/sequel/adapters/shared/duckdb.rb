@@ -80,7 +80,8 @@ module Sequel
       #   # VALUES ((1, 2), (3, 4))
       def values(v)
         raise Error, "Cannot provide an empty array for values" if v.empty?
-        @default_dataset.clone(:values=>v)
+
+        @default_dataset.clone(values: v)
       end
 
       private
@@ -101,10 +102,10 @@ module Sequel
 
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
-                "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'BASE TABLE'"
+                  "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'BASE TABLE'"
               else
                 "SELECT table_name FROM information_schema.tables " \
-                "WHERE table_schema = '#{schema_ref}' AND table_type = 'BASE TABLE'"
+                  "WHERE table_schema = '#{schema_ref}' AND table_type = 'BASE TABLE'"
               end
 
         tables = []
@@ -339,10 +340,10 @@ module Sequel
 
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
-                "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'VIEW'"
+                  "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'VIEW'"
               else
                 "SELECT table_name FROM information_schema.tables " \
-                "WHERE table_schema = '#{schema_ref}' AND table_type = 'VIEW'"
+                  "WHERE table_schema = '#{schema_ref}' AND table_type = 'VIEW'"
               end
 
         views = []
@@ -862,7 +863,7 @@ module Sequel
       }.freeze
 
       # Override select SQL clause order to support VALUES
-      Dataset.def_sql_method(self, :select, [['if opts[:values]', %w'values compounds order limit'], ['else', %w'with select distinct columns from join where group having compounds order limit lock']])
+      Dataset.def_sql_method(self, :select, [["if opts[:values]", %w[values compounds order limit]], ["else", %w[with select distinct columns from join where group having compounds order limit lock]]])
 
       private
 
@@ -894,9 +895,7 @@ module Sequel
       # Strip the schema qualifier so it generates "table".* instead.
       def column_all_sql_append(sql, ca)
         table = ca.table
-        if table.is_a?(Sequel::SQL::QualifiedIdentifier)
-          table = table.column
-        end
+        table = table.column if table.is_a?(Sequel::SQL::QualifiedIdentifier)
         qualified_identifier_sql_append(sql, table, Sequel::LiteralString.new("*"))
       end
 
@@ -942,6 +941,7 @@ module Sequel
       # Return true if this dataset uses a VALUES clause (not a real table query).
       def empty?
         return false if @opts[:values]
+
         super
       end
 
