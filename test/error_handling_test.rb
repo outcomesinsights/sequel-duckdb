@@ -34,11 +34,9 @@ class ErrorHandlingTest < SequelDuckDBTest::TestCase
       Sequel.connect("duckdb:///invalid/path/that/does/not/exist/database.db")
     end
 
-    # Test with invalid connection string format
-    db = Sequel.connect("duckdb::memory:")
+    # Test with another invalid path
     assert_raises(Sequel::DatabaseConnectionError, "Invalid connection format should raise DatabaseConnectionError") do
-      # Force connection with invalid parameters
-      db.send(:connect, { database: "/dev/null/invalid" })
+      Sequel.connect("duckdb:///dev/null/invalid")
     end
   end
 
