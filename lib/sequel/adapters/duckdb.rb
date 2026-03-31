@@ -54,27 +54,32 @@ module Sequel
   # @since 0.1.0
   module DuckDB
     module DriverDatabaseMethods
-      def connect(server) # rubocop:disable Metrics/MethodLength
-        opts = server_opts(server)
+      private
+
+      # Open the DuckDB::Database once during Sequel::Database initialization.
+      # DuckDB's ATTACH/schema state is per-Database, not per-Connection, so all
+      # pool connections must share one Database instance.
+      def adapter_initialize
         database_path = opts[:database]
 
-        begin
-          # Share the DuckDB::Database instance across all pool connections.
-          # DuckDB supports multiple connections from one Database, and ATTACH/schema
-          # state is per-Database, not per-Connection.
-          @duckdb_database ||= if database_path == ":memory:" || database_path.nil?
-                                  ::DuckDB::Database.open(":memory:")
-                                else
-                                  database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
-                                  ::DuckDB::Database.open(database_path)
-                                end
+        @duckdb_database = if database_path == ":memory:" || database_path.nil?
+                             ::DuckDB::Database.open(":memory:")
+                           else
+                             database_path = "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+                             ::DuckDB::Database.open(database_path)
+                           end
+      rescue ::DuckDB::Error => e
+        raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
+      rescue StandardError => e
+        raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
+      end
 
-          @duckdb_database.connect
-        rescue ::DuckDB::Error => e
-          raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
-        rescue StandardError => e
-          raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
-        end
+      public
+
+      def connect(_server)
+        @duckdb_database.connect
+      rescue ::DuckDB::Error => e
+        raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
       end
 
       def disconnect_connection(conn)
