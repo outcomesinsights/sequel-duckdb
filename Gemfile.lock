@@ -8,7 +8,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
-    bigdecimal (4.1.0)
+    bigdecimal (4.1.1)
     childprocess (5.1.0)
       logger (~> 1.5)
     date (3.5.1)
@@ -28,10 +28,10 @@ GEM
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
-    minitest (6.0.2)
+    minitest (6.0.3)
       drb (~> 2.0)
       prism (~> 1.5)
-    overcommit (0.68.0)
+    overcommit (0.69.0)
       childprocess (>= 0.6.3, < 6)
       iniparse (~> 1.4)
       rexml (>= 3.3.9)
@@ -82,7 +82,7 @@ GEM
       lint_roller (~> 1.1)
       rubocop (>= 1.72.1, < 2)
     ruby-progressbar (1.13.0)
-    sequel (5.102.0)
+    sequel (5.103.0)
       bigdecimal
     simplecov (0.22.0)
       docile (~> 1.1)
@@ -105,7 +105,7 @@ DEPENDENCIES
   irb
   logger
   minitest (~> 6.0)
-  overcommit (~> 0.68)
+  overcommit (~> 0.69)
   rake (~> 13.0)
   rubocop (~> 1.21)
   rubocop-minitest (~> 0.39.1)
