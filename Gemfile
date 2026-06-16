@@ -5,4 +5,4 @@ source "https://rubygems.org"
 gemspec
 
 gem "duckdb", "~> 1.5"
-gem "overcommit", "~> 0.70"
+gem "overcommit", "~> 0.71"

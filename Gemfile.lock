@@ -31,7 +31,7 @@ GEM
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
-    overcommit (0.70.0)
+    overcommit (0.71.0)
       childprocess (>= 0.6.3, < 6)
       iniparse (~> 1.4)
       rexml (>= 3.3.9)
@@ -105,7 +105,7 @@ DEPENDENCIES
   irb
   logger
   minitest (~> 6.0)
-  overcommit (~> 0.70)
+  overcommit (~> 0.71)
   rake (~> 13.0)
   rubocop (~> 1.21)
   rubocop-minitest (~> 0.39.1)
