@@ -14,7 +14,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
@@ -39,7 +39,7 @@ jobs:
         ruby: ['3.2', '3.3', '3.4', '4.0']
     name: Test Ruby ${{ matrix.ruby }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
