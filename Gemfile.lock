@@ -12,7 +12,6 @@ GEM
     childprocess (5.1.0)
       logger (~> 1.5)
     date (3.5.1)
-    docile (1.4.1)
     drb (2.2.3)
     duckdb (1.5.4.0)
       bigdecimal (>= 3.1.4)
@@ -84,12 +83,7 @@ GEM
     ruby-progressbar (1.13.0)
     sequel (5.106.0)
       bigdecimal
-    simplecov (0.22.0)
-      docile (~> 1.1)
-      simplecov-html (~> 0.11)
-      simplecov_json_formatter (~> 0.1)
-    simplecov-html (0.13.2)
-    simplecov_json_formatter (0.1.4)
+    simplecov (1.0.0)
     stringio (3.2.0)
     tsort (0.2.0)
     unicode-display_width (3.2.0)
@@ -112,7 +106,7 @@ DEPENDENCIES
   rubocop-rake (~> 0.7.1)
   rubocop-sequel (~> 0.4.1)
   sequel-duckdb!
-  simplecov (~> 0.22)
+  simplecov (~> 1.0)
 
 BUNDLED WITH
    2.7.0

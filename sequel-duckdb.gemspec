@@ -51,5 +51,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop-minitest", "~> 0.39.1"
   spec.add_development_dependency "rubocop-rake", "~> 0.7.1"
   spec.add_development_dependency "rubocop-sequel", "~> 0.4.1"
-  spec.add_development_dependency "simplecov", "~> 0.22"
+  spec.add_development_dependency "simplecov", "~> 1.0"
 end
