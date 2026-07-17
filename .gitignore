@@ -16,3 +16,6 @@ sequel-duckdb-0.1.0.gem
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Claude agent scratch (test logs, etc.) — not for commit
+claude_stuff/
