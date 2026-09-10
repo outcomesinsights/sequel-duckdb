@@ -19,3 +19,7 @@ sequel-duckdb-0.1.0.gem
 
 # Claude agent scratch (test logs, etc.) — not for commit
 claude_stuff/
+
+# Beads export — derived. The Dolt remote at refs/dolt/data is the store
+# and the backup; this file is kept on disk for local grep only.
+.beads/issues.jsonl
