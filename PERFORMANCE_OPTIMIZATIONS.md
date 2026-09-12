@@ -18,16 +18,19 @@ This guide provides comprehensive strategies for optimizing performance when usi
 DuckDB is designed as an analytical database with several key characteristics that affect performance optimization:
 
 ### Columnar Storage
+
 - Data is stored column-wise, making analytical queries very efficient
 - SELECT queries that access few columns are much faster
 - Aggregations and analytical functions are highly optimized
 
 ### Vectorized Execution
+
 - Operations are performed on batches of data (vectors) rather than row-by-row
 - This reduces function call overhead and improves CPU cache utilization
 - Particularly beneficial for analytical workloads
 
 ### In-Memory Processing
+
 - DuckDB can efficiently process data that fits in memory
 - Automatic memory management with spill-to-disk for larger datasets
 - Memory-mapped files for efficient file-based database access

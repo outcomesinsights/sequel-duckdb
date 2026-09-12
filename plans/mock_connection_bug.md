@@ -18,6 +18,7 @@ The `execute_statement` method in [duckdb.rb:906-965](../lib/sequel/adapters/sha
 2. **Line 928**: `conn.query(sql)` - Calls DuckDB::Connection#query
 
 However, `Sequel::Mock::Connection` only implements:
+
 - `execute(sql)` - Delegates to the mock database's `_execute` method
 - No `query()` method
 - No `prepare()` method
@@ -46,6 +47,7 @@ end
 ### Why It Happens
 
 The adapter assumes it will always receive a `::DuckDB::Connection` object, which has:
+
 - `query(sql)` - Execute SQL and return results
 - `prepare(sql)` - Create a prepared statement
 - `execute()` - Execute a prepared statement
@@ -57,6 +59,7 @@ But when using `Sequel.mock('duckdb://...')`, the connection pool contains `Sequ
 This bug prevents using the DuckDB adapter with Sequel's mock testing framework. Any test code that uses `Sequel.mock` with the DuckDB adapter will fail when attempting to execute queries.
 
 The error manifests in the test suite when:
+
 1. Using `Sequel.mock` to create a mock DuckDB database
 2. Attempting any query operation (SELECT, INSERT, UPDATE, DELETE)
 3. The `execute_statement` method tries to call `conn.query()` or `conn.prepare()`
@@ -68,12 +71,14 @@ The error manifests in the test suite when:
 **The Answer:** SQLite's adapter **DOES NOT** call adapter-specific connection methods directly in its `execute_statement`-equivalent code. Instead, it uses a completely different architecture.
 
 **Key Files:**
+
 - `sequel-5.96.0/lib/sequel/adapters/sqlite.rb` (lines 169-176, 251-270)
 - `sequel-5.96.0/lib/sequel/adapters/mock.rb` (lines 7-30, 111-113, 143-173)
 
 **How SQLite Works:**
 
 1. **Database-level execute methods** (sqlite.rb:169-176):
+
    ```ruby
    # Public database methods that route through _execute
    def execute(sql, opts=OPTS, &block)
@@ -89,7 +94,8 @@ The error manifests in the test suite when:
    end
    ```
 
-2. **Private _execute method** (sqlite.rb:251-270):
+2. **Private \_execute method** (sqlite.rb:251-270):
+
    ```ruby
    def _execute(type, sql, opts, &block)
      synchronize(opts[:server]) do |conn|
@@ -106,6 +112,7 @@ The error manifests in the test suite when:
    ```
 
 3. **How Mock Database overrides this** (mock.rb:111-113):
+
    ```ruby
    # Mock::Database OVERRIDES execute to bypass _execute!
    def execute(sql, opts=OPTS, &block)
@@ -114,6 +121,7 @@ The error manifests in the test suite when:
    ```
 
 4. **Mock::Connection delegation** (mock.rb:27-29):
+
    ```ruby
    # When conn.execute(sql) is called, it goes back to database
    def execute(sql)
@@ -124,6 +132,7 @@ The error manifests in the test suite when:
 **The Critical Difference:**
 
 **SQLite approach:**
+
 - Database has `execute()`, `execute_dui()`, `execute_insert()` methods
 - These call private `_execute(type, sql, opts)`
 - `_execute` calls `synchronize` which yields the connection
@@ -131,6 +140,7 @@ The error manifests in the test suite when:
 - **Mock::Database OVERRIDES the public execute() methods**, so `_execute` never calls `conn.query()`!
 
 **DuckDB current approach (BROKEN):**
+
 - DuckDB's **shared** adapter defines `execute()` (unlike SQLite's shared adapter which doesn't)
 - This `execute()` calls `synchronize(){|conn| execute_statement(conn, ...)}`
 - `execute_statement` DIRECTLY calls `conn.query()` and `conn.prepare()`
@@ -182,12 +192,14 @@ end
 ```
 
 **Why `is_a?(Sequel::Mock::Connection)` instead of `respond_to?`:**
+
 - SQLite doesn't need this check because Mock::Database overrides at database level
 - DuckDB has connection-level logic, so we need to detect mocks explicitly
 - `is_a?` is clearer about intent: "handle mocks differently"
 - `respond_to?(:query)` could give false negatives if DuckDB adds new connection types
 
 **Why this pattern works:**
+
 - Mock connections have a special delegation pattern that needs early detection
 - Real connections get the full DuckDB-specific optimizations
 - Follows the principle: "Detect special cases early, handle normal cases normally"
@@ -223,6 +235,7 @@ After implementation, verify:
 **Comparison:**
 
 **SQLite adapter:**
+
 - 461 lines total
 - 27 methods
 - Simple execution logic (no custom logging, basic error handling)
@@ -230,6 +243,7 @@ After implementation, verify:
 - Shared adapter only has schema introspection (no execute methods)
 
 **DuckDB adapter:**
+
 - 2,483 lines in shared adapter alone
 - 141 methods
 - Sophisticated execution features:
@@ -241,26 +255,31 @@ After implementation, verify:
   - Result type detection (::DuckDB::Result)
 
 **Why DuckDB's execution logic is in shared adapter:**
+
 1. **Code reuse** - Both real adapter AND mock need the same sophisticated error handling
 2. **Testing** - Mocks should get the same error messages, logging, etc.
 3. **Architecture** - Real adapter is minimal (just connection lifecycle), shared adapter is the "brain"
 
 **What's DuckDB-specific that can't be shared:**
+
 - Everything in execute_statement references `::DuckDB::Connection`, `::DuckDB::Result`, `::DuckDB::Error`
 - These types don't exist when mocking
 
 **Could we move execute() to real adapter?**
+
 - Yes, technically possible
 - Would require duplicating all the error handling, logging, parameter binding logic
 - OR would require the shared adapter to still have helper methods that call `conn.query()`
 - Either way, we'd still need Mock::Connection detection somewhere
 
 **~~Better~~ Band-aid solution:**
+
 - ~~Keep architecture as-is (it's well-designed)~~
 - ~~Add Mock::Connection detection to `execute_statement()`~~
 - ~~This is a 3-line fix vs restructuring the entire adapter~~
 
 **ACTUAL Better solution:**
+
 - The adapter is over-engineered (see [over_engineering_analysis.md](over_engineering_analysis.md))
 - DuckDB reimplements what Sequel already provides (logging, error handling, timing)
 - SQLite uses `log_connection_yield()` in ONE LINE - handles all logging/timing/errors
@@ -272,9 +291,10 @@ After implementation, verify:
 **Root Cause:** The DuckDB adapter calls adapter-specific connection methods (`conn.query()`, `conn.prepare()`) in a helper method that receives pre-obtained connections. Mock::Connection doesn't implement these methods.
 
 **Why SQLite works:**
+
 - Real SQLite adapter (sqlite.rb:169-270) defines `execute()` and `_execute()` that call `conn.query()`
 - **Shared SQLite adapter (shared/sqlite.rb) does NOT define execute methods** - only schema introspection
-- Mock::Database (mock.rb:111-113, 143-173) **overrides execute() and provides its own _execute()** that NEVER calls connection methods
+- Mock::Database (mock.rb:111-113, 143-173) **overrides execute() and provides its own \_execute()** that NEVER calls connection methods
 - So when mocking, Mock::Database's execute() is used, which bypasses all adapter-specific connection method calls
 
 **Why DuckDB breaks (architectural difference):**
@@ -282,17 +302,20 @@ After implementation, verify:
 DuckDB uses a different adapter architecture than SQLite:
 
 **SQLite architecture:**
+
 - Real adapter (sqlite.rb) defines `execute()` and `_execute()` - contains ALL execution logic
 - Shared adapter (shared/sqlite.rb) defines ZERO execution methods - only schema introspection
 - When mocking, Mock::Database's execute() is used, bypassing the real adapter entirely
 
 **DuckDB architecture:**
+
 - Real adapter (duckdb.rb) defines ONLY connection lifecycle methods (`connect`, `disconnect_connection`)
 - **Shared adapter (shared/duckdb.rb:75) defines ALL execution logic including `execute()`**
 - Real adapter includes the shared adapter's DatabaseMethods module
 - Both real AND mock use the same execute() from the shared adapter
 
 **The breakage:**
+
 - When you call `Sequel.mock('duckdb://...')`, Mock::Database extends shared/duckdb.rb
 - Mock::Database gets the shared adapter's `execute()` method
 - This execute() calls `synchronize(){|conn| execute_statement(conn, ...)}`
@@ -300,6 +323,7 @@ DuckDB uses a different adapter architecture than SQLite:
 - Mock::Connection doesn't implement query() → NoMethodError
 
 **Why this architecture was chosen:**
+
 - All execution logic in shared adapter = code reuse
 - Real adapter only handles DuckDB-specific connection details
 - But this means the shared adapter MUST handle mocking too

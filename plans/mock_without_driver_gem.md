@@ -45,12 +45,14 @@ DuckDB should follow that pattern.
 Split the current adapter into two layers:
 
 1. Shared layer
+
    - pure SQL generation
    - mock adapter setup
    - helper-module load order
    - no `require "duckdb"`
 
 2. Driver-backed layer
+
    - `require "duckdb"`
    - real `connect`, `disconnect_connection`, `valid_connection?`, execution methods
    - anything that directly references `::DuckDB::*`

@@ -5,6 +5,7 @@
 The DuckDB adapter is over-engineered, containing ~1200 lines of unnecessary code that reimplements functionality already provided by Sequel.
 
 **File Structure:**
+
 - `adapters/duckdb.rb` (257 lines) - Real adapter
 - `adapters/shared/duckdb.rb` (2484 lines) - Shared adapter
 - **Total: ~2741 lines**
@@ -16,6 +17,7 @@ The DuckDB adapter is over-engineered, containing ~1200 lines of unnecessary cod
 ### What's Right
 
 1. **Simple connection (Lines 127-148):**
+
    ```ruby
    def connect(server)
      opts = server_opts(server)
@@ -32,10 +34,12 @@ The DuckDB adapter is over-engineered, containing ~1200 lines of unnecessary cod
      raise Sequel::DatabaseConnectionError, "Failed to connect: #{e.message}"
    end
    ```
+
    **Good:** Simple, clear, returns connection.
    **Problem:** Should use `raise_error(e)` not manual exception creation.
 
 2. **Minimal structure:**
+
    - Database class includes DatabaseMethods
    - Dataset class includes DatasetMethods
    - Properly registered with Sequel
@@ -155,6 +159,7 @@ end
 ```
 
 **Problem:**
+
 1. Should use `database_error_regexps` pattern (declarative)
 2. `database_exception_message` is unnecessary - Sequel formats messages
 3. `handle_constraint_violation` is never used properly - should just use `raise_error`
@@ -239,6 +244,7 @@ end
 ```
 
 **Problem:**
+
 1. Manual timing - `log_connection_yield` does this
 2. Manual logging - `log_connection_yield` does this
 3. Manual error handling - `raise_error` does this
@@ -321,6 +327,7 @@ end
 ```
 
 **Problem:**
+
 1. Parameter handling is complex and non-standard
 2. SQL parsing to determine type is fragile
 3. Should use type-dispatch pattern like SQLite
@@ -349,6 +356,7 @@ end
 **Current Implementation:**
 
 Lines of "optimization" code including:
+
 - Custom batch processing in `each`
 - Memory usage tracking
 - Custom streaming
@@ -359,6 +367,7 @@ Lines of "optimization" code including:
 - Parallel execution hints
 
 **Problem:**
+
 1. Most of this is premature optimization
 2. Sequel already handles batching/streaming
 3. DuckDB handles parallelization automatically
@@ -386,6 +395,7 @@ end
 **Current Implementation:**
 
 Custom transaction handling including:
+
 - `begin_transaction`
 - `commit_transaction`
 - `rollback_transaction`
@@ -394,6 +404,7 @@ Custom transaction handling including:
 - Feature detection methods
 
 **Problem:**
+
 1. DuckDB doesn't support savepoints - the code admits this but implements it anyway
 2. DuckDB doesn't support isolation levels - the code admits this but implements it anyway
 3. Should use Sequel's default transaction handling
@@ -475,6 +486,7 @@ connection_pragmas.each{|s| log_connection_yield(s, conn){conn.execute(s)}}
 **Current Implementation:**
 
 Completely reimplements:
+
 - insert_sql
 - update_sql
 - delete_sql
@@ -490,6 +502,7 @@ Most of this is standard SQL that Sequel already generates. Only override if Duc
 **Should Be:**
 
 Override only what's different:
+
 ```ruby
 # Only override if DuckDB has different syntax
 def complex_expression_sql_append(sql, op, args)
@@ -570,6 +583,7 @@ end
 ```
 
 Delete:
+
 - `database_exception_class` (45 lines)
 - `database_exception_message` (10 lines)
 - `handle_constraint_violation` (7 lines)
@@ -579,11 +593,13 @@ Delete:
 ### Step 3: Simplify Dataset Methods
 
 Keep only DuckDB-specific overrides:
+
 - ILIKE emulation (if needed)
 - Regex operators (if syntax differs)
 - Type literals (if DuckDB types differ)
 
 Delete:
+
 - All custom SQL generation that matches Sequel default
 - All "optimization" code
 - All index hint code
@@ -604,6 +620,7 @@ end
 ```
 
 Delete:
+
 - set_pragma
 - configure_duckdb
 - configure_parallel_execution
@@ -619,7 +636,7 @@ Test if DuckDB uses standard CREATE SCHEMA / DROP SCHEMA syntax. If yes, delete 
 ### Real Adapter (~300 lines)
 
 - Connection: 30 lines
-- Execution: 40 lines (with _execute)
+- Execution: 40 lines (with \_execute)
 - Type conversion: 50 lines (if needed for DuckDB types)
 - Dataset: 50 lines (fetch_rows)
 - Comments: 130 lines
@@ -630,7 +647,7 @@ Test if DuckDB uses standard CREATE SCHEMA / DROP SCHEMA syntax. If yes, delete 
 - Schema introspection: 150 lines (information_schema queries)
 - SQL generation overrides: 80 lines (only what differs)
 - Configuration: 15 lines (connection_pragmas)
-- Feature detection: 50 lines (supports_* methods)
+- Feature detection: 50 lines (supports\_\* methods)
 - Helper methods: 50 lines
 - Comments/structure: 145 lines
 
@@ -640,15 +657,15 @@ Test if DuckDB uses standard CREATE SCHEMA / DROP SCHEMA syntax. If yes, delete 
 
 ## Lines to Delete by Category
 
-1. **Custom Logging**: 80 lines → 0 lines (**-80**)
-2. **Custom Error Handling**: 80 lines → 10 lines (**-70**)
-3. **execute_statement**: 70 lines → 0 lines (**-70**)
-4. **Public execute**: 45 lines → 0 lines (**-45**, moved to real adapter as _execute)
-5. **Performance Code**: 500 lines → 50 lines (**-450**)
-6. **Transaction Code**: 190 lines → 10 lines (**-180**)
-7. **Schema Management**: 130 lines → 30 lines (**-100**)
-8. **Type Conversion**: 50 lines → 30 lines (**-20**)
-9. **Configuration**: 85 lines → 15 lines (**-70**)
+01. **Custom Logging**: 80 lines → 0 lines (**-80**)
+02. **Custom Error Handling**: 80 lines → 10 lines (**-70**)
+03. **execute_statement**: 70 lines → 0 lines (**-70**)
+04. **Public execute**: 45 lines → 0 lines (**-45**, moved to real adapter as \_execute)
+05. **Performance Code**: 500 lines → 50 lines (**-450**)
+06. **Transaction Code**: 190 lines → 10 lines (**-180**)
+07. **Schema Management**: 130 lines → 30 lines (**-100**)
+08. **Type Conversion**: 50 lines → 30 lines (**-20**)
+09. **Configuration**: 85 lines → 15 lines (**-70**)
 10. **SQL Generation**: 330 lines → 80 lines (**-250**)
 
 **Total Lines Deleted: 1335 lines**
@@ -669,6 +686,7 @@ Plus another ~600 lines of comments, whitespace, and documentation for deleted f
 ## Risk Assessment
 
 **Low Risk Deletions** (do immediately):
+
 - Custom logging (100% safe)
 - Custom error message formatting (100% safe)
 - execute_statement complexity (100% safe)
@@ -676,11 +694,13 @@ Plus another ~600 lines of comments, whitespace, and documentation for deleted f
 - Transaction features DuckDB doesn't support (100% safe)
 
 **Medium Risk Deletions** (test thoroughly):
+
 - SQL generation that looks standard (test against DuckDB)
 - Schema operations (verify DuckDB syntax)
 - Type conversion (verify DuckDB type handling)
 
 **Requires Research**:
+
 - Does DuckDB support prepared statements? (Current code attempts to use them)
 - Does DuckDB return rows_changed? (Current code assumes yes)
 - What's the exact syntax for DuckDB pragmas?

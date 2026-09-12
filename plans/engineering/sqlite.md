@@ -5,6 +5,7 @@
 The SQLite adapter is a masterclass in simplicity and proper use of Sequel's built-in features. Written by Jeremy Evans (Sequel's author), it demonstrates the "right way" to implement a Sequel adapter.
 
 **File Structure:**
+
 - `adapters/sqlite.rb` (462 lines) - Real adapter
 - `adapters/shared/sqlite.rb` (1074 lines) - Shared adapter
 - **Total: ~1536 lines**
@@ -16,6 +17,7 @@ The SQLite adapter is a masterclass in simplicity and proper use of Sequel's bui
 SQLite stores everything as strings/blobs, so type conversion is critical.
 
 **Pattern:** Callable objects in a hash
+
 ```ruby
 boolean = Object.new
 def boolean.call(s)
@@ -37,6 +39,7 @@ SQLITE_TYPES = {
 ### Database Class (Lines 85-354)
 
 **Connection (Lines 128-154):**
+
 ```ruby
 def connect(server)
   opts = server_opts(server)
@@ -54,6 +57,7 @@ end
 ```
 
 **Key Points:**
+
 - Returns raw driver connection object
 - Configuration via pragmas, not API calls
 - Uses `log_connection_yield` even for setup
@@ -103,6 +107,7 @@ end
 ```
 
 **What It Does:**
+
 1. `synchronize` - Get connection from pool
 2. Check for prepared statement (Symbol sql)
 3. Extract arguments
@@ -112,6 +117,7 @@ end
 7. Rescue and use `raise_error` for conversion
 
 **What It Doesn't Do:**
+
 - No manual timing (log_connection_yield does it)
 - No manual logging (log_connection_yield does it)
 - No manual error classification (raise_error does it)
@@ -123,6 +129,7 @@ end
 ### Dataset Class (Lines 356-459)
 
 **Type Conversion During Fetch (Lines 406-428):**
+
 ```ruby
 def fetch_rows(sql)
   execute(sql) do |result|
@@ -149,6 +156,7 @@ end
 ```
 
 **Pattern:**
+
 1. Build type conversion proc array from column types
 2. Build column name array with output identifiers
 3. Set `self.columns` for Sequel
@@ -161,12 +169,14 @@ end
 ### DatabaseMethods (Lines 24-580)
 
 **Configuration (Lines 24-65):**
+
 - Transaction modes (deferred/immediate/exclusive)
 - Integer booleans setting
 - UTC timestamp setting
 - All via accessors, no complex logic
 
 **Schema Introspection (Lines 69-187):**
+
 - Uses SQLite PRAGMA statements
 - `foreign_key_list` - PRAGMA foreign_key_list
 - `indexes` - PRAGMA index_list + index_info
@@ -210,6 +220,7 @@ end
 **That's it. 33 lines total. Handles all error cases.**
 
 **Pattern:**
+
 1. Try error codes first (most reliable)
 2. Fall back to regex (for older sqlite3 gem versions)
 3. Always call `super` for unmatched cases
@@ -217,6 +228,7 @@ end
 **ALTER TABLE Support (Lines 237-294):**
 
 SQLite has limited ALTER TABLE support, so the adapter implements `duplicate_table` pattern:
+
 1. Rename table to backup
 2. Create new table with changes
 3. Copy data from backup to new table
@@ -227,6 +239,7 @@ This is complex but isolated to one method. Good separation of concerns.
 ### DatasetMethods (Lines 582-1072)
 
 **SQL Generation Customizations:**
+
 - CURRENT_TIMESTAMP in UTC → convert to localtime
 - LIKE operator → no ESCAPE clause needed
 - Exponentiation → emulate with multiplication
@@ -234,6 +247,7 @@ This is complex but isolated to one method. Good separation of concerns.
 - Multi-row VALUES → support since 3.7.11
 
 **All handled via:**
+
 - Override specific `_sql` methods
 - Override `complex_expression_sql_append`
 - Override `literal_*` methods
@@ -270,13 +284,14 @@ def insert_conflict_sql(sql)
 end
 ```
 
-**Clean separation:** Configuration via dataset options, generation via _sql methods.
+**Clean separation:** Configuration via dataset options, generation via \_sql methods.
 
 ## Key Architectural Patterns
 
 ### 1. Minimal Real Adapter
 
 The real adapter contains ONLY:
+
 - Type conversions (SQLite-specific)
 - Connection management (sqlite3 gem API)
 - Execution dispatch (sqlite3 gem methods)
@@ -286,6 +301,7 @@ No schema operations, no SQL generation.
 ### 2. Declarative Error Handling
 
 Error classification is DATA:
+
 ```ruby
 DATABASE_ERROR_REGEXPS = {
   /pattern/ => ExceptionClass,
@@ -298,6 +314,7 @@ Not procedural code with 45-line case statements.
 ### 3. Single Execution Path
 
 One `_execute` method handles all SQL types. Benefits:
+
 - Single place for logging
 - Single place for connection management
 - Single place for error handling
@@ -306,6 +323,7 @@ One `_execute` method handles all SQL types. Benefits:
 ### 4. Trust Sequel
 
 Don't reimplement:
+
 - Logging → `log_connection_yield`
 - Timing → `log_connection_yield`
 - Connection pooling → `synchronize`
@@ -316,6 +334,7 @@ These are battle-tested and optimized.
 ### 5. Override Only What's Different
 
 Dataset SQL generation:
+
 - Inherit 90% from Sequel::Dataset
 - Override only SQLite-specific syntax
 - Use specific methods: `literal_date`, `complex_expression_sql_append`
@@ -324,12 +343,14 @@ Dataset SQL generation:
 ## Complexity Budget
 
 **Real Adapter Complexity:**
+
 - Connection: 15 lines
 - Execution: 20 lines
 - Dataset: 30 lines
 - Type conversion: 100 lines (necessary for SQLite)
 
 **Shared Adapter Complexity:**
+
 - Error handling: 33 lines (declarative)
 - Schema introspection: 150 lines (PRAGMA queries)
 - SQL generation overrides: ~200 lines (only what differs)
@@ -343,6 +364,7 @@ Dataset SQL generation:
 ### What to Copy
 
 1. **Execution pattern:**
+
    ```ruby
    def _execute(type, sql, opts, &block)
      synchronize(opts[:server]) do |conn|
@@ -358,6 +380,7 @@ Dataset SQL generation:
    ```
 
 2. **Error classification:**
+
    ```ruby
    DATABASE_ERROR_REGEXPS = {
      /unique.*constraint/i => UniqueConstraintViolation,
@@ -373,6 +396,7 @@ Dataset SQL generation:
    ```
 
 3. **Connection setup:**
+
    ```ruby
    def connect(server)
      opts = server_opts(server)
@@ -416,6 +440,7 @@ Shared Adapter (1074 lines):
 ## Summary
 
 **SQLite adapter is simple because it:**
+
 1. Uses `log_connection_yield` for all execution
 2. Uses `raise_error` for all error handling
 3. Uses declarative error classification

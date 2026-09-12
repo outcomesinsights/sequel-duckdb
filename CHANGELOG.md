@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Performance optimization documentation
 - Migration examples and patterns
 - Comprehensive API documentation with YARD
@@ -15,12 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for DuckDB-specific features (JSON, arrays, window functions)
 
 ### Changed
+
 - Enhanced README with comprehensive usage examples
 - Improved documentation structure and organization
 
 ## [0.1.0] - 2025-07-21
 
 ### Added
+
 - Initial release of Sequel DuckDB adapter
 - Complete Database and Dataset class implementation
 - Connection management for file-based and in-memory databases
@@ -43,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance tuning guide
 
 ### Database Features
+
 - File-based database support with automatic creation
 - In-memory database support for testing and temporary data
 - Connection validation and automatic reconnection
@@ -50,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for DuckDB configuration options (memory_limit, threads, etc.)
 
 ### SQL Generation
+
 - Complete SQL generation for all standard operations
 - DuckDB-optimized query generation
 - Support for complex queries with JOINs, subqueries, and CTEs
@@ -58,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parameter binding for prepared statements
 
 ### Schema Operations
+
 - Table creation, modification, and deletion
 - Column operations (add, drop, modify, rename)
 - Index management (create, drop, unique, partial indexes)
@@ -66,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schema introspection with detailed metadata
 
 ### Data Types
+
 - Complete Ruby ↔ DuckDB type mapping
 - Support for all standard SQL types
 - DuckDB-specific types (JSON, ARRAY, MAP)
@@ -75,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UUID type support
 
 ### Performance Features
+
 - Columnar storage optimization awareness
 - Vectorized execution support
 - Memory-efficient result set processing
@@ -84,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming result sets for large datasets
 
 ### Error Handling
+
 - Comprehensive error mapping to Sequel exceptions
 - Detailed error messages with context
 - Proper handling of constraint violations
@@ -92,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Database-specific error categorization
 
 ### Testing
+
 - Complete test suite using Minitest
 - Mock database testing for SQL generation
 - Integration testing with real DuckDB databases
@@ -101,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data type conversion testing
 
 ### Documentation
+
 - Comprehensive README with usage examples
 - Complete API documentation with YARD
 - Migration examples and patterns
@@ -109,12 +120,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version compatibility matrix
 
 ### Dependencies
+
 - Ruby 3.1.0+ support
 - Sequel 5.0+ compatibility
 - DuckDB 0.8.0+ support
 - ruby-duckdb 1.0.0+ integration
 
 ### Fixed
+
 - Proper adapter registration with Sequel
 - Connection string parsing for file paths
 - Memory management for large result sets
@@ -124,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error message formatting and context
 
 ### Security
+
 - SQL injection prevention through parameter binding
 - Proper identifier quoting
 - Connection string sanitization

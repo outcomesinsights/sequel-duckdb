@@ -1,23 +1,29 @@
 # Date Arithmetic Extension Implementation Plan
 
 ## Overview
+
 Add support for Sequel's `date_arithmetic` extension to the DuckDB adapter, enabling database-independent date/timestamp interval arithmetic operations.
 
 ## Research Summary
 
 ### Sequel's date_arithmetic Extension
+
 The extension provides two primary methods:
+
 - `Sequel.date_add(expr, interval, opts)` - Adds interval to date/timestamp
 - `Sequel.date_sub(expr, interval, opts)` - Subtracts interval from date/timestamp
 
 **Supported interval units:**
+
 - `years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`
 
 **Input formats:**
+
 1. Hash: `{years: 1, months: 2, days: 3}`
 2. ActiveSupport::Duration: `1.year + 2.months + 3.days`
 
 **Key features:**
+
 - Database-independent API
 - Optional cast type override via `:cast` option
 - Weeks automatically converted to days (weeks × 7)
@@ -27,6 +33,7 @@ The extension provides two primary methods:
 ### DuckDB's Interval Arithmetic
 
 **Native interval syntax:**
+
 ```sql
 -- Direct addition with INTERVAL keyword
 DATE '2024-01-15' + INTERVAL 1 YEAR
@@ -40,12 +47,14 @@ DATE '2024-01-15' + INTERVAL (value) YEAR
 ```
 
 **Important characteristics:**
+
 1. Adding INTERVAL to DATE returns TIMESTAMP (even for day-only intervals)
 2. Three basis units: months, days, microseconds
 3. Supports both unit keywords and string literals
 4. Parentheses required for variable/expression values
 
 **Interval construction patterns:**
+
 - Single unit: `INTERVAL 5 DAY`
 - Multiple units in string: `INTERVAL '1 month 5 days 3 hours'`
 - Expression-based: `INTERVAL (column_value) MONTH`
@@ -63,26 +72,32 @@ DATE '2024-01-15' + INTERVAL (value) YEAR
 The method should follow DuckDB's two supported approaches:
 
 #### Option A: Multiple INTERVAL additions (Recommended)
+
 Build expression by chaining interval additions:
+
 ```ruby
 # For date_add(:created_at, years: 1, months: 2, days: 5)
 # Generate: created_at + INTERVAL 1 YEAR + INTERVAL 2 MONTH + INTERVAL 5 DAY
 ```
 
 **Advantages:**
+
 - Simple, straightforward SQL generation
 - Handles dynamic/expression values naturally
 - Each interval component is explicit
 - Follows DuckDB's native syntax
 
 #### Option B: Single composite INTERVAL string
+
 Build a single interval string with multiple components:
+
 ```ruby
 # For date_add(:created_at, years: 1, months: 2, days: 5)
 # Generate: created_at + INTERVAL '1 years 2 months 5 days'
 ```
 
 **Challenges:**
+
 - Requires literal values only (no expressions)
 - More complex string building
 - Less flexible for dynamic intervals
@@ -90,6 +105,7 @@ Build a single interval string with multiple components:
 ### 3. Unit Mapping
 
 **Sequel → DuckDB unit mapping:**
+
 ```ruby
 DUCKDB_DURATION_UNITS = {
   years: 'YEAR',
@@ -106,6 +122,7 @@ Note: Weeks already converted to days by `DateAdd` initialization.
 ### 4. Handling Cast Types
 
 DuckDB returns TIMESTAMP when adding intervals to dates. Handle the `:cast` option:
+
 - If `cast_type` specified: wrap result in `CAST(... AS cast_type)`
 - Default cast_type: `Time` (TIMESTAMP)
 - For date-only results: user can specify `cast: :date`
@@ -113,12 +130,14 @@ DuckDB returns TIMESTAMP when adding intervals to dates. Handle the `:cast` opti
 ### 5. Value Handling
 
 Support both literal values and SQL expressions:
+
 - Numeric literals: `1`, `2.5` → direct interpolation
 - SQL expressions: `Sequel.lit(...)`, column references → use parentheses
 
 ### 6. Implementation Code Structure
 
 **Important:** No registration needed in sequel-duckdb! Sequel's date_arithmetic extension already handles registration (line 253 of date_arithmetic.rb):
+
 ```ruby
 Dataset.register_extension(:date_arithmetic, SQL::DateAdd::DatasetMethods)
 ```
@@ -128,20 +147,24 @@ The default implementation checks for adapter overrides via `if defined?(super)`
 **Key Implementation Details:**
 
 1. **DateAdd structure** (confirmed from source):
+
    - `da.expr` - the expression/column being added to
    - `da.interval` - Hash with symbol keys (e.g., `{hours: 5, minutes: -2}`)
    - `da.cast_type` - nil or a symbol (e.g., `:date`, `:timestamptz`)
 
 2. **date_sub handling**: Sequel's `date_sub` automatically negates values before creating DateAdd:
+
    - Numeric values: negated directly (`hours: 5` → `hours: -5`)
    - Expressions: wrapped in negation (`Sequel::SQL::NumericExpression.new(:*, v, -1)`)
    - Adapter only needs to implement `date_add_sql_append` - negation is handled upstream
 
 3. **Value types**:
+
    - `Numeric` (includes Integer, Float, BigDecimal) - can be used directly
    - Expressions (Sequel::LiteralString, Sequel::SQL::Expression, etc.) - need parentheses
 
 4. **Sequel.lit with placeholders**: For SQL injection prevention, use array syntax:
+
    ```ruby
    Sequel.lit(["INTERVAL ", " HOUR"], value)  # Safe - value is parameterized
    # NOT: Sequel.lit("INTERVAL #{value} HOUR")  # Unsafe string interpolation
@@ -220,25 +243,30 @@ end
 ### Unit Tests Required
 
 1. **Basic addition/subtraction:**
+
    - Single unit intervals (years, months, days, hours, minutes, seconds)
    - Multiple unit intervals combined
    - Verify weeks → days conversion
 
 2. **Value types:**
+
    - Numeric literals
    - SQL expressions (column references, calculations)
    - Zero values (should be skipped)
 
 3. **Cast handling:**
+
    - Default cast to timestamp
    - Explicit cast to date
    - Explicit cast to timestamptz
 
 4. **ActiveSupport::Duration support:**
+
    - Verify `1.year + 2.months` syntax works
    - Mixed duration objects
 
 5. **Edge cases:**
+
    - Empty intervals
    - Negative values (via date_sub)
    - Large values
@@ -246,6 +274,7 @@ end
 ### Integration Tests
 
 Test against actual DuckDB database:
+
 ```ruby
 DB.extension :date_arithmetic
 
@@ -273,31 +302,37 @@ result = DB[:events]
 ## SQL Output Examples
 
 **Input:**
+
 ```ruby
 Sequel.date_add(:created_at, years: 1, months: 2, days: 5)
 ```
 
 **Generated SQL:**
+
 ```sql
 CAST(created_at + INTERVAL 1 YEAR + INTERVAL 2 MONTH + INTERVAL 5 DAY AS TIMESTAMP)
 ```
 
 **Input:**
+
 ```ruby
 Sequel.date_sub(:expires_at, hours: 12, minutes: 30)
 ```
 
 **Generated SQL:**
+
 ```sql
 CAST(expires_at + INTERVAL -12 HOUR + INTERVAL -30 MINUTE AS TIMESTAMP)
 ```
 
 **Input:**
+
 ```ruby
 Sequel.date_add(:start_date, {days: :duration_column}, cast: :date)
 ```
 
 **Generated SQL:**
+
 ```sql
 CAST(start_date + INTERVAL (duration_column) DAY AS DATE)
 ```
@@ -305,6 +340,7 @@ CAST(start_date + INTERVAL (duration_column) DAY AS DATE)
 ## Files to Modify
 
 1. **`lib/sequel/adapters/shared/duckdb.rb`**
+
    - Add `DatasetMethods` module with `date_add_sql_append`
    - Add `DUCKDB_DURATION_UNITS` constant
    - Add `build_interval_literal` helper method
@@ -312,37 +348,44 @@ CAST(start_date + INTERVAL (duration_column) DAY AS DATE)
    - NO registration needed - Sequel's extension handles it
 
 2. **`spec/sequel/adapters/date_arithmetic_spec.rb`** (create new)
+
    - Unit tests for date_add_sql_append
    - Integration tests with actual database
    - Edge case coverage
 
 3. **`README.md`** (optional documentation)
+
    - Add date_arithmetic to supported extensions list
    - Include usage examples
 
 ## Potential Issues & Considerations
 
 1. **Type casting behavior:**
+
    - DuckDB returns TIMESTAMP when adding intervals to DATE
    - Users expecting DATE output need explicit `cast: :date`
    - Document this behavior clearly
 
 2. **Expression vs literal handling:**
+
    - Literals can be used directly: `INTERVAL 5 DAY`
    - Expressions need parentheses: `INTERVAL (column) DAY`
    - Distinguish between Numeric and other values
 
 3. **Interval order:**
+
    - Hash iteration order in Ruby 1.9+ is insertion order
    - DateAdd initializes with `Hash.new(0)` then converts to Hash
    - Order shouldn't matter for interval addition (commutative)
 
 4. **PostgreSQL compatibility:**
+
    - DuckDB's interval syntax is similar to PostgreSQL
    - Can reference PostgreSQL implementation for patterns
    - Differences: DuckDB doesn't have make_interval function
 
 5. **Extension loading:**
+
    - Extension must be loaded at Database level: `DB.extension :date_arithmetic`
    - Sequel's extension registers its `DatasetMethods` automatically
    - The `if defined?(super)` check in Sequel's implementation will call DuckDB's override

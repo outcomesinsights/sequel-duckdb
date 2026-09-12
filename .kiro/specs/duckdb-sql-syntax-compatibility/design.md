@@ -162,6 +162,7 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 ## Testing Strategy
 
 ### 1. SQL Generation Unit Tests
+
 - Test all SQL generation methods using Sequel's mock database functionality
 - Verify exact SQL syntax matches expected Sequel patterns
 - Test LIKE clauses generate clean SQL without ESCAPE clauses
@@ -171,12 +172,14 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 - Test subquery column references use standard SQL format
 
 ### 2. Integration Tests
+
 - Ensure actual database operations work correctly with generated SQL
 - Verify functional correctness alongside syntactic correctness
 - Test correlated subqueries with proper column references
 - Test complex queries with multiple SQL generation features
 
 ### 3. Test Infrastructure Consistency
+
 - Fix SQL test infrastructure to use proper dataset creation
 - Ensure tests expect standard SQL syntax consistently
 - Maintain comprehensive test coverage for all SQL generation patterns
@@ -185,41 +188,50 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 ## Design Decisions and Rationales
 
 ### 1. Fix Adapter SQL Generation
+
 **Decision**: Fix the root cause SQL generation issues in the adapter
 **Rationale**: The adapter is generating non-standard SQL that doesn't follow Sequel conventions. Tests are correct to expect standard SQL.
 
 ### 2. Targeted Method Overrides
+
 **Decision**: Override specific SQL generation methods in DatasetMethods
 **Rationale**: Surgical fixes to specific issues without disrupting the overall adapter architecture.
 
 ### 3. Standard SQL Compliance
+
 **Decision**: Generate SQL that follows standard SQL and Sequel conventions
 **Rationale**: Ensures compatibility with existing Sequel patterns and makes the adapter more predictable.
 
 ### 4. Maintain Test Coverage
+
 **Decision**: Keep all existing tests, fix the adapter to make them pass
 **Rationale**: Tests are validating correct behavior; the adapter should conform to expected patterns.
 
 ## Implementation Phases
 
 ### Phase 1: Fix LIKE and Complex Expression Generation
+
 - Override `complex_expression_sql_append` to fix LIKE, ILIKE, and regex generation
 - Add proper parentheses to all complex expressions
 - Remove unwanted ESCAPE clauses from LIKE statements
 
 ### Phase 2: Fix Table Alias Generation
+
 - Override table alias methods to use standard `AS` syntax
 - Ensure aliases work correctly in JOIN operations
 
 ### Phase 3: Fix Qualified Column References
+
 - Override qualified identifier methods to use dot notation
 - Ensure subqueries use proper column references
 
 ### Phase 4: Fix SQL Test Infrastructure
+
 - Fix dataset creation issues in SQL tests
 - Ensure tests use proper mock datasets
 
 ### Phase 5: Verification and Documentation
+
 - Run all tests to ensure they pass with fixed adapter
 - Document the SQL generation patterns used by the adapter
 - Create comprehensive documentation of DuckDB-specific SQL patterns
@@ -228,6 +240,7 @@ Use existing Sequel error handling patterns. No special error handling needed fo
 ## Documentation Strategy
 
 ### SQL Pattern Documentation
+
 To address Requirement 7, the adapter will include comprehensive documentation of SQL generation patterns:
 
 **Location**: `API_DOCUMENTATION.md` and inline code comments
@@ -239,6 +252,7 @@ To address Requirement 7, the adapter will include comprehensive documentation o
 5. **DuckDB-Specific Optimizations**: Document any DuckDB-specific SQL optimizations used
 
 **Example Documentation Structure**:
+
 ```ruby
 # SQL Generation Patterns for DuckDB Adapter
 #

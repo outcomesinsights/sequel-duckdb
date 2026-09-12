@@ -1,16 +1,19 @@
 # DuckDB Adapter Refactoring Summary
 
 ## Overview
+
 Simplified the DuckDB adapter by removing over-engineered code and following Sequel conventions (SQLite adapter pattern).
 
 ## Results
 
 ### Code Reduction
+
 - **Before:** 2,741 lines (257 real adapter + 2,484 shared adapter)
 - **After:** 1,637 lines (327 real adapter + 1,310 shared adapter)
 - **Removed:** 1,104 lines (40% reduction)
 
 ### Test Status
+
 - **Passing:** 510/539 tests (94.6%)
 - **Failures:** 18 (mostly message format expectations)
 - **Errors:** 11 (mostly deleted method references in tests)
@@ -19,13 +22,16 @@ Simplified the DuckDB adapter by removing over-engineered code and following Seq
 ## Changes Made
 
 ### Phase 1: Execution Simplification (~270 lines removed)
+
 **Moved to real adapter (lib/sequel/adapters/duckdb.rb):**
+
 - Added `execute`, `execute_dui`, `execute_insert` wrappers
 - Added `_execute` method following SQLite pattern
 - Added `Dataset#fetch_rows` following SQLite pattern
 - Added `database_error_classes`
 
 **Deleted from shared adapter:**
+
 - `execute` method (45 lines)
 - `execute_statement` method (70 lines)
 - `execute_insert`, `execute_update` methods (60 lines)
@@ -39,7 +45,9 @@ Simplified the DuckDB adapter by removing over-engineered code and following Seq
 **Pattern:** Uses `log_connection_yield` for all SQL execution (built-in logging/timing)
 
 ### Phase 2: Error Handling Simplification (~80 lines removed)
+
 **Replaced:**
+
 ```ruby
 # Old: Procedural error classification
 def database_exception_class(exception, _opts)
@@ -53,6 +61,7 @@ end
 ```
 
 **With:**
+
 ```ruby
 # New: Declarative error classification
 DATABASE_ERROR_REGEXPS = {
@@ -63,6 +72,7 @@ DATABASE_ERROR_REGEXPS = {
 ```
 
 **Deleted:**
+
 - `database_exception_class` (45 lines)
 - `database_exception_message` (10 lines)
 - `handle_constraint_violation` (7 lines)
@@ -72,7 +82,9 @@ DATABASE_ERROR_REGEXPS = {
 **Pattern:** Uses `raise_error` and `DATABASE_ERROR_REGEXPS` (Sequel built-in)
 
 ### Phase 3: Transaction Over-Engineering (~190 lines removed)
+
 **Deleted:**
+
 - `savepoint_transaction` (~50 lines) - DuckDB doesn't support savepoints
 - `isolation_transaction` (~50 lines) - DuckDB doesn't support isolation levels
 - `begin_transaction`, `commit_transaction`, `rollback_transaction` (~25 lines) - Sequel handles these
@@ -80,6 +92,7 @@ DATABASE_ERROR_REGEXPS = {
 - Other transaction helper methods (~50 lines)
 
 **Kept:**
+
 - Feature detection methods (3 lines):
   - `supports_savepoints?` (returns false)
   - `supports_transaction_isolation_level?` (returns false)
@@ -88,7 +101,9 @@ DATABASE_ERROR_REGEXPS = {
 **Pattern:** Let Sequel handle standard BEGIN/COMMIT/ROLLBACK
 
 ### Phase 4: Performance Over-Engineering (~100 lines removed)
+
 **Deleted:**
+
 - `explain_query`, `query_plan`, `analyze_query` (~40 lines) - premature optimization
 - `set_config_value`, `get_config_value` (~20 lines) - not needed
 - `configure_parallel_execution` (~15 lines) - DuckDB handles this automatically
@@ -97,13 +112,16 @@ DATABASE_ERROR_REGEXPS = {
 - `cpu_count` helper (~5 lines)
 
 **Kept:**
+
 - `set_pragma` - useful for user configuration
 - `configure_duckdb` - convenience wrapper for set_pragma
 
 **Pattern:** Trust DuckDB's automatic optimizations
 
 ### Phase 5: Miscellaneous (~464 lines already removed)
+
 **Previously deleted (from performance optimization analysis):**
+
 - Custom batching methods
 - Memory tracking
 - Custom streaming
@@ -115,18 +133,21 @@ DATABASE_ERROR_REGEXPS = {
 ## Benefits
 
 ### 1. Maintainability
+
 - ✅ Follows Sequel conventions (matches SQLite adapter)
 - ✅ Less code = fewer bugs
 - ✅ Easier for contributors to understand
 - ✅ Uses battle-tested Sequel features
 
 ### 2. Correctness
+
 - ✅ Uses Sequel's logging system (proper timing, SQL log levels)
 - ✅ Uses Sequel's error classification (proper exception hierarchy)
 - ✅ Uses Sequel's connection pooling (thread-safe)
 - ✅ Lets DuckDB handle optimization (better than custom code)
 
 ### 3. Simplicity
+
 - ✅ Declarative error patterns (vs procedural logic)
 - ✅ Standard execution pattern (vs custom complexity)
 - ✅ No premature optimization
@@ -135,7 +156,9 @@ DATABASE_ERROR_REGEXPS = {
 ## Test Impact
 
 ### Passing Tests (510/539 = 94.6%)
+
 All core functionality works:
+
 - ✅ Connection management
 - ✅ Schema introspection (tables, columns, indexes)
 - ✅ CRUD operations (insert, update, delete, select)
@@ -146,18 +169,22 @@ All core functionality works:
 - ✅ Model integration
 
 ### Test Failures (18)
+
 Most are about deleted custom features:
+
 - Error message format (expected "DuckDB error:" prefix from custom error handling)
 - Custom method calls (tests checking for deleted helper methods)
 - Message enhancement (tests expecting custom error context)
 
 ### Test Errors (11)
+
 - Method not found (e.g., `database_exception_class`, `database_exception_message`)
 - Parameter handling edge cases
 
 ## Remaining Code Structure
 
 ### Real Adapter (327 lines)
+
 ```
 lib/sequel/adapters/duckdb.rb
 ├── Connection management (30 lines)
@@ -173,6 +200,7 @@ lib/sequel/adapters/duckdb.rb
 ```
 
 ### Shared Adapter (1,310 lines)
+
 ```
 lib/sequel/adapters/shared/duckdb.rb
 ├── DatabaseMethods (~700 lines)
@@ -193,11 +221,13 @@ lib/sequel/adapters/shared/duckdb.rb
 ## Next Steps
 
 ### Optional Further Cleanup
+
 1. **SQL Generation:** Test if Sequel's defaults work for INSERT/UPDATE/DELETE (potential 200+ line reduction)
 2. **Schema CREATE/DROP:** Test if Sequel has built-in support (potential 100 line reduction)
 3. **Test Updates:** Update tests to match new patterns (remove expectations for deleted methods)
 
 ### Recommended
+
 1. ✅ Keep current implementation - it's clean and functional
 2. Run extended test suite with real applications
 3. Document migration guide for users relying on deleted methods
@@ -205,6 +235,7 @@ lib/sequel/adapters/shared/duckdb.rb
 ## Comparison: Before vs After
 
 ### Before (Over-Engineered)
+
 - Custom logging with timing
 - Custom error handling with message enhancement
 - Savepoint transactions (not supported by DuckDB)
@@ -217,6 +248,7 @@ lib/sequel/adapters/shared/duckdb.rb
 - **2,741 lines**
 
 ### After (Simplified)
+
 - Uses `log_connection_yield` (Sequel built-in)
 - Uses `DATABASE_ERROR_REGEXPS` (Sequel pattern)
 - Basic transaction support only

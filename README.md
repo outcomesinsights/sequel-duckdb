@@ -269,6 +269,7 @@ The gem is available as open source under the terms of the [MIT License](https:/
 - [Jeremy Evans](https://github.com/jeremyevans) for creating and maintaining Sequel
 - The [DuckDB team](https://duckdb.org/docs/api/ruby) for the excellent database engine and Ruby client
 - Contributors to [sequel-hexspace](https://github.com/hexspace/sequel-hexspace) and other Sequel adapters for implementation patterns
+
 ## Connection Options
 
 ### Connection Strings
@@ -660,6 +661,7 @@ db[:users].where(active: true).all
 ### Query Optimization
 
 1. **Select only needed columns**: DuckDB's columnar storage makes this very efficient
+
    ```ruby
    # Good
    db[:users].select(:id, :name).where(active: true)
@@ -669,12 +671,14 @@ db[:users].where(active: true).all
    ```
 
 2. **Use appropriate indexes**: Especially for frequently queried columns
+
    ```ruby
    db.add_index :users, :email
    db.add_index :orders, [:user_id, :status]
    ```
 
 3. **Leverage DuckDB's analytical capabilities**: Use window functions and aggregations
+
    ```ruby
    # Efficient analytical query
    db[:sales]
@@ -689,6 +693,7 @@ db[:users].where(active: true).all
 ### Memory Management
 
 1. **Use streaming for large result sets**:
+
    ```ruby
    db[:large_table].paged_each(rows_per_fetch: 1000) do |row|
      # Process row by row
@@ -696,6 +701,7 @@ db[:users].where(active: true).all
    ```
 
 2. **Configure DuckDB memory limits**:
+
    ```ruby
    db = Sequel.connect(
      adapter: 'duckdb',
@@ -710,6 +716,7 @@ db[:users].where(active: true).all
 ### Bulk Operations
 
 1. **Use multi_insert for bulk data loading**:
+
    ```ruby
    # Efficient bulk insert
    data = 1000.times.map { |i| {name: "User #{i}", email: "user#{i}@example.com"} }
@@ -717,6 +724,7 @@ db[:users].where(active: true).all
    ```
 
 2. **Use transactions for multiple operations**:
+
    ```ruby
    db.transaction do
      # Multiple related operations
@@ -747,6 +755,7 @@ The sequel-duckdb adapter generates SQL optimized for DuckDB while maintaining S
 - **Proper parentheses**: Consistent expression grouping
 
 Example SQL patterns:
+
 ```ruby
 # LIKE patterns
 dataset.where(Sequel.like(:name, "%John%"))

@@ -17,12 +17,12 @@ This document provides comprehensive API documentation for the Sequel DuckDB ada
 
 ### Supported Versions
 
-| Component | Minimum Version | Recommended Version | Notes |
-|-----------|----------------|-------------------|-------|
-| Ruby | 3.1.0 | 3.2.0+ | Required for modern syntax and performance |
-| Sequel | 5.0.0 | 5.70.0+ | Core ORM functionality |
-| DuckDB | 0.8.0 | 0.9.0+ | Database engine |
-| ruby-duckdb | 1.0.0 | 1.0.0+ | Ruby client library |
+| Component   | Minimum Version | Recommended Version | Notes                                      |
+| ----------- | --------------- | ------------------- | ------------------------------------------ |
+| Ruby        | 3.1.0           | 3.2.0+              | Required for modern syntax and performance |
+| Sequel      | 5.0.0           | 5.70.0+             | Core ORM functionality                     |
+| DuckDB      | 0.8.0           | 0.9.0+              | Database engine                            |
+| ruby-duckdb | 1.0.0           | 1.0.0+              | Ruby client library                        |
 
 ### Ruby Version Support
 
@@ -63,6 +63,7 @@ db = Sequel.connect('duckdb:///path/to/database.duckdb?readonly=true')
 ```
 
 **Parameters:**
+
 - `connection_string` (String): DuckDB connection string
 
 **Returns:** `Sequel::DuckDB::Database` instance
@@ -87,6 +88,7 @@ db = Sequel.connect(
 ```
 
 **Parameters:**
+
 - `options_hash` (Hash): Configuration options
   - `:adapter` (String): Must be 'duckdb'
   - `:database` (String): Database path or ':memory:'
@@ -111,6 +113,7 @@ db.tables(schema: 'main')
 ```
 
 **Parameters:**
+
 - `options` (Hash): Optional parameters
   - `:schema` (String): Schema name (default: 'main')
 
@@ -130,6 +133,7 @@ db.schema(:users)
 ```
 
 **Parameters:**
+
 - `table_name` (Symbol/String): Name of the table
 - `options` (Hash): Optional parameters
   - `:schema` (String): Schema name (default: 'main')
@@ -137,6 +141,7 @@ db.schema(:users)
 **Returns:** Array of `[column_name, column_info]` pairs
 
 **Column Info Hash:**
+
 - `:type` (Symbol): Sequel type (:integer, :string, :boolean, etc.)
 - `:db_type` (String): DuckDB native type
 - `:primary_key` (Boolean): Whether column is part of primary key
@@ -162,6 +167,7 @@ db.indexes(:users)
 ```
 
 **Parameters:**
+
 - `table_name` (Symbol/String): Name of the table
 - `options` (Hash): Optional parameters
 
@@ -177,6 +183,7 @@ db.table_exists?(:nonexistent)  # => false
 ```
 
 **Parameters:**
+
 - `table_name` (Symbol/String): Name of the table
 - `options` (Hash): Optional parameters
 
@@ -202,6 +209,7 @@ end
 ```
 
 **Parameters:**
+
 - `sql` (String): SQL statement to execute
 - `options` (Hash/Array): Parameters or options
   - If Array: Parameters for prepared statement
@@ -218,6 +226,7 @@ db.execute_insert("INSERT INTO users (name, email) VALUES (?, ?)", ['John', 'joh
 ```
 
 **Parameters:**
+
 - `sql` (String): INSERT SQL statement
 - `options` (Hash): Options for execution
 
@@ -232,6 +241,7 @@ affected_rows = db.execute_update("UPDATE users SET active = ? WHERE age > ?", [
 ```
 
 **Parameters:**
+
 - `sql` (String): UPDATE SQL statement
 - `options` (Hash): Options for execution
 
@@ -268,6 +278,7 @@ end
 ```
 
 **Parameters:**
+
 - `options` (Hash): Transaction options
   - `:savepoint` (Boolean): Use savepoint for nested transaction
   - `:isolation` (Symbol): Transaction isolation level
@@ -276,6 +287,7 @@ end
 **Returns:** Result of the block
 
 **Raises:**
+
 - `Sequel::Rollback`: To rollback transaction
 - `Sequel::DatabaseError`: On transaction errors
 
@@ -324,6 +336,7 @@ users.where(Sequel.like(:name, 'John%') & (Sequel[:age] > 25))
 ```
 
 **Parameters:**
+
 - `conditions`: Various condition formats (Hash, String, Block, Sequel expressions)
 
 **Returns:** New Dataset with WHERE clause added
@@ -346,6 +359,7 @@ users.select(:id, Sequel.function(:upper, :name).as(:name_upper))
 ```
 
 **Parameters:**
+
 - `columns`: Column names, expressions, or functions
 
 **Returns:** New Dataset with SELECT clause
@@ -371,6 +385,7 @@ users.order(:name, Sequel.desc(:created_at))
 ```
 
 **Parameters:**
+
 - `columns`: Column names or ordering expressions
 
 **Returns:** New Dataset with ORDER BY clause
@@ -393,6 +408,7 @@ users.paginate(page: 2, per_page: 10)
 ```
 
 **Parameters:**
+
 - `count` (Integer): Maximum number of rows
 - `offset` (Integer): Number of rows to skip
 
@@ -416,6 +432,7 @@ orders.group(:status).select(:status, Sequel.count(:id).as(:count))
 ```
 
 **Parameters:**
+
 - `columns`: Column names to group by
 
 **Returns:** New Dataset with GROUP BY clause
@@ -433,6 +450,7 @@ orders.group(:user_id)
 ```
 
 **Parameters:**
+
 - `conditions`: Conditions for HAVING clause
 
 **Returns:** New Dataset with HAVING clause
@@ -457,6 +475,7 @@ users.join(:orders, Sequel[:orders][:user_id] => Sequel[:users][:id])
 ```
 
 **Parameters:**
+
 - `table`: Table to join (Symbol/String)
 - `conditions`: Join conditions (Hash or Sequel expression)
 - `options`: Join options
@@ -543,6 +562,7 @@ end
 ```
 
 **Parameters:**
+
 - `block`: Block to execute for each record
 
 **Returns:** Dataset (for chaining)
@@ -558,6 +578,7 @@ end
 ```
 
 **Parameters:**
+
 - `options` (Hash): Paging options
   - `:rows_per_fetch` (Integer): Batch size (default: 1000)
 - `block`: Block to execute for each record
@@ -577,6 +598,7 @@ user_id = db[:users].insert(
 ```
 
 **Parameters:**
+
 - `values` (Hash): Column values to insert
 
 **Returns:** Inserted record ID (if available)
@@ -594,6 +616,7 @@ db[:users].multi_insert([
 ```
 
 **Parameters:**
+
 - `array` (Array): Array of record hashes
 
 **Returns:** Number of inserted records
@@ -609,6 +632,7 @@ affected_rows = db[:users]
 ```
 
 **Parameters:**
+
 - `values` (Hash): Column values to update
 
 **Returns:** Number of affected rows
@@ -788,56 +812,56 @@ end
 
 ### Error Types
 
-| Sequel Exception | DuckDB Error Patterns | Description |
-|------------------|----------------------|-------------|
-| `NotNullConstraintViolation` | `violates not null`, `null value not allowed` | NOT NULL constraint violations |
-| `UniqueConstraintViolation` | `unique constraint`, `duplicate key` | UNIQUE constraint violations |
-| `ForeignKeyConstraintViolation` | `foreign key constraint`, `violates foreign key` | Foreign key violations |
-| `CheckConstraintViolation` | `check constraint`, `violates check` | CHECK constraint violations |
-| `ConstraintViolation` | `constraint violation` | Generic constraint violations |
-| `DatabaseConnectionError` | `connection`, `cannot open`, `database not found` | Connection-related errors |
-| `DatabaseError` | `syntax error`, `parse error`, `table does not exist` | General database errors |
+| Sequel Exception                | DuckDB Error Patterns                                 | Description                    |
+| ------------------------------- | ----------------------------------------------------- | ------------------------------ |
+| `NotNullConstraintViolation`    | `violates not null`, `null value not allowed`         | NOT NULL constraint violations |
+| `UniqueConstraintViolation`     | `unique constraint`, `duplicate key`                  | UNIQUE constraint violations   |
+| `ForeignKeyConstraintViolation` | `foreign key constraint`, `violates foreign key`      | Foreign key violations         |
+| `CheckConstraintViolation`      | `check constraint`, `violates check`                  | CHECK constraint violations    |
+| `ConstraintViolation`           | `constraint violation`                                | Generic constraint violations  |
+| `DatabaseConnectionError`       | `connection`, `cannot open`, `database not found`     | Connection-related errors      |
+| `DatabaseError`                 | `syntax error`, `parse error`, `table does not exist` | General database errors        |
 
 ## Data Type Mappings
 
 ### Ruby to DuckDB Type Mapping
 
-| Ruby Type | DuckDB Type | Notes |
-|-----------|-------------|-------|
-| `String` | `VARCHAR` | Default string type |
-| `String` (large) | `TEXT` | For long text content |
-| `Integer` | `INTEGER` | 32-bit signed integer |
-| `Integer` (large) | `BIGINT` | 64-bit signed integer |
-| `Float` | `DOUBLE` | Double precision floating point |
-| `BigDecimal` | `DECIMAL` | Exact numeric with precision/scale |
-| `TrueClass/FalseClass` | `BOOLEAN` | Native boolean type |
-| `Date` | `DATE` | Date without time |
-| `Time/DateTime` | `TIMESTAMP` | Date and time |
-| `Time` (time-only) | `TIME` | Time without date |
-| `String` (binary) | `BLOB` | Binary data |
-| `Array` | `ARRAY` | DuckDB array types |
-| `Hash` | `JSON` | JSON data type |
+| Ruby Type              | DuckDB Type | Notes                              |
+| ---------------------- | ----------- | ---------------------------------- |
+| `String`               | `VARCHAR`   | Default string type                |
+| `String` (large)       | `TEXT`      | For long text content              |
+| `Integer`              | `INTEGER`   | 32-bit signed integer              |
+| `Integer` (large)      | `BIGINT`    | 64-bit signed integer              |
+| `Float`                | `DOUBLE`    | Double precision floating point    |
+| `BigDecimal`           | `DECIMAL`   | Exact numeric with precision/scale |
+| `TrueClass/FalseClass` | `BOOLEAN`   | Native boolean type                |
+| `Date`                 | `DATE`      | Date without time                  |
+| `Time/DateTime`        | `TIMESTAMP` | Date and time                      |
+| `Time` (time-only)     | `TIME`      | Time without date                  |
+| `String` (binary)      | `BLOB`      | Binary data                        |
+| `Array`                | `ARRAY`     | DuckDB array types                 |
+| `Hash`                 | `JSON`      | JSON data type                     |
 
 ### DuckDB to Ruby Type Mapping
 
-| DuckDB Type | Ruby Type | Conversion Notes |
-|-------------|-----------|------------------|
-| `INTEGER`, `INT4` | `Integer` | 32-bit integer |
-| `BIGINT`, `INT8` | `Integer` | 64-bit integer |
-| `SMALLINT`, `INT2` | `Integer` | 16-bit integer |
-| `TINYINT`, `INT1` | `Integer` | 8-bit integer |
-| `REAL`, `FLOAT4` | `Float` | Single precision |
-| `DOUBLE`, `FLOAT8` | `Float` | Double precision |
-| `DECIMAL`, `NUMERIC` | `BigDecimal` | Exact numeric |
-| `VARCHAR`, `TEXT` | `String` | Text data |
-| `BOOLEAN` | `TrueClass/FalseClass` | Boolean values |
-| `DATE` | `Date` | Date only |
-| `TIMESTAMP` | `Time` | Date and time |
-| `TIME` | `Time` | Time only |
-| `BLOB`, `BYTEA` | `String` | Binary data as string |
-| `JSON` | `String` | JSON as string (parse manually) |
-| `ARRAY` | `Array` | Native array support |
-| `UUID` | `String` | UUID as string |
+| DuckDB Type          | Ruby Type              | Conversion Notes                |
+| -------------------- | ---------------------- | ------------------------------- |
+| `INTEGER`, `INT4`    | `Integer`              | 32-bit integer                  |
+| `BIGINT`, `INT8`     | `Integer`              | 64-bit integer                  |
+| `SMALLINT`, `INT2`   | `Integer`              | 16-bit integer                  |
+| `TINYINT`, `INT1`    | `Integer`              | 8-bit integer                   |
+| `REAL`, `FLOAT4`     | `Float`                | Single precision                |
+| `DOUBLE`, `FLOAT8`   | `Float`                | Double precision                |
+| `DECIMAL`, `NUMERIC` | `BigDecimal`           | Exact numeric                   |
+| `VARCHAR`, `TEXT`    | `String`               | Text data                       |
+| `BOOLEAN`            | `TrueClass/FalseClass` | Boolean values                  |
+| `DATE`               | `Date`                 | Date only                       |
+| `TIMESTAMP`          | `Time`                 | Date and time                   |
+| `TIME`               | `Time`                 | Time only                       |
+| `BLOB`, `BYTEA`      | `String`               | Binary data as string           |
+| `JSON`               | `String`               | JSON as string (parse manually) |
+| `ARRAY`              | `Array`                | Native array support            |
+| `UUID`               | `String`               | UUID as string                  |
 
 ### Custom Type Handling
 

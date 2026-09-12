@@ -13,6 +13,7 @@ The sequel-duckdb adapter generates SQL that is optimized for DuckDB's analytica
 The adapter generates clean LIKE clauses without unnecessary ESCAPE clauses, following DuckDB's simplified syntax requirements.
 
 #### Standard LIKE Patterns
+
 ```ruby
 # Sequel Code
 dataset.where(Sequel.like(:name, "%John%"))
@@ -22,6 +23,7 @@ SELECT * FROM users WHERE (name LIKE '%John%')
 ```
 
 #### NOT LIKE Patterns
+
 ```ruby
 # Sequel Code
 dataset.exclude(Sequel.like(:name, "%John%"))
@@ -31,6 +33,7 @@ SELECT * FROM users WHERE (name NOT LIKE '%John%')
 ```
 
 #### Pattern Variations
+
 ```ruby
 # Prefix matching
 dataset.where(Sequel.like(:name, "John%"))
@@ -52,6 +55,7 @@ dataset.where(Sequel.like(:name, "%John%"))
 Since DuckDB doesn't have native ILIKE support, the adapter converts ILIKE operations to UPPER() LIKE UPPER() patterns with proper parentheses.
 
 #### ILIKE Conversion
+
 ```ruby
 # Sequel Code
 dataset.where(Sequel.ilike(:name, "%john%"))
@@ -61,6 +65,7 @@ SELECT * FROM users WHERE (UPPER(name) LIKE UPPER('%john%'))
 ```
 
 #### NOT ILIKE Conversion
+
 ```ruby
 # Sequel Code
 dataset.exclude(Sequel.ilike(:name, "%john%"))
@@ -76,6 +81,7 @@ SELECT * FROM users WHERE (UPPER(name) NOT LIKE UPPER('%john%'))
 The adapter uses DuckDB's `regexp_matches()` function for reliable regex operations, with proper parentheses for expression grouping.
 
 #### Basic Regex Matching
+
 ```ruby
 # Sequel Code
 dataset.where(name: /^John/)
@@ -85,6 +91,7 @@ SELECT * FROM users WHERE (regexp_matches(name, '^John'))
 ```
 
 #### Case-Insensitive Regex
+
 ```ruby
 # Sequel Code
 dataset.where(name: /john/i)
@@ -94,6 +101,7 @@ SELECT * FROM users WHERE (regexp_matches(name, 'john', 'i'))
 ```
 
 #### Complex Regex Patterns
+
 ```ruby
 # Sequel Code
 dataset.where(name: /^John.*Doe$/)
@@ -109,6 +117,7 @@ SELECT * FROM users WHERE (regexp_matches(name, '^John.*Doe$'))
 The adapter uses standard SQL dot notation for qualified column references, ensuring compatibility with SQL standards and DuckDB's expectations.
 
 #### Table.Column Format
+
 ```ruby
 # Sequel Code
 dataset.join(:profiles, user_id: :id)
@@ -118,6 +127,7 @@ SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id)
 ```
 
 #### Subquery Column References
+
 ```ruby
 # Sequel Code
 subquery = db[:orders].select(:count).where(user_id: :users__id)
@@ -134,6 +144,7 @@ SELECT name, (SELECT count FROM orders WHERE (user_id = users.id)) AS order_coun
 The adapter supports all standard JOIN types with proper syntax generation for DuckDB.
 
 #### INNER JOIN
+
 ```ruby
 # Sequel Code
 dataset.join(:profiles, user_id: :id)
@@ -143,6 +154,7 @@ SELECT * FROM users INNER JOIN profiles ON (profiles.user_id = users.id)
 ```
 
 #### LEFT JOIN
+
 ```ruby
 # Sequel Code
 dataset.left_join(:profiles, user_id: :id)
@@ -152,6 +164,7 @@ SELECT * FROM users LEFT JOIN profiles ON (profiles.user_id = users.id)
 ```
 
 #### JOIN USING Clause
+
 ```ruby
 # Sequel Code (using internal JOIN USING clause)
 join_clause = Sequel::SQL::JoinUsingClause.new([:user_id], :inner, :profiles)
@@ -162,6 +175,7 @@ SELECT * FROM users INNER JOIN profiles USING (user_id)
 ```
 
 #### Multiple Column USING
+
 ```ruby
 # Generated SQL for multiple columns
 SELECT * FROM users INNER JOIN profiles USING (user_id, company_id)
@@ -174,6 +188,7 @@ SELECT * FROM users INNER JOIN profiles USING (user_id, company_id)
 The adapter automatically detects recursive CTEs and generates appropriate WITH RECURSIVE syntax.
 
 #### Regular CTE
+
 ```ruby
 # Sequel Code
 cte = db[:users].select(:id, :name).where(active: true)
@@ -184,6 +199,7 @@ WITH active_users AS (SELECT id, name FROM users WHERE (active IS TRUE)) SELECT 
 ```
 
 #### Recursive CTE (Auto-detected)
+
 ```ruby
 # Sequel Code
 base_case = db.select(Sequel.as(1, :n))
@@ -202,6 +218,7 @@ WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE (n < 10))
 The adapter formats literals according to DuckDB's expectations for optimal type handling.
 
 #### String Literals
+
 ```ruby
 # Sequel Code
 dataset.where(name: "John's Name")
@@ -211,6 +228,7 @@ SELECT * FROM users WHERE (name = 'John''s Name')
 ```
 
 #### Date/Time Literals
+
 ```ruby
 # Date literal
 dataset.where(birth_date: Date.new(2023, 5, 15))
@@ -226,6 +244,7 @@ dataset.where(start_time: Time.local(1970, 1, 1, 9, 30, 0))
 ```
 
 #### Boolean Literals
+
 ```ruby
 # Sequel Code
 dataset.where(active: true)
@@ -235,6 +254,7 @@ SELECT * FROM users WHERE (active IS TRUE)
 ```
 
 #### NULL Literals
+
 ```ruby
 # Sequel Code
 dataset.where(deleted_at: nil)
@@ -250,6 +270,7 @@ SELECT * FROM users WHERE (deleted_at IS NULL)
 The adapter ensures proper parentheses around complex expressions for correct operator precedence and readability.
 
 #### Expression Grouping
+
 ```ruby
 # All complex expressions are wrapped in parentheses
 # LIKE: (name LIKE '%John%')
@@ -266,6 +287,7 @@ The adapter ensures proper parentheses around complex expressions for correct op
 The adapter supports DuckDB's comprehensive window function capabilities.
 
 #### Basic Window Function
+
 ```ruby
 # Sequel Code
 dataset.select(:name, Sequel.function(:row_number).over(order: :name))
@@ -275,6 +297,7 @@ SELECT name, row_number() OVER (ORDER BY name) FROM users
 ```
 
 #### Partitioned Window Function
+
 ```ruby
 # Sequel Code
 dataset.select(
@@ -294,6 +317,7 @@ SELECT product_id, amount, rank() OVER (PARTITION BY category ORDER BY amount DE
 The adapter generates standard aggregate function syntax optimized for DuckDB's columnar storage.
 
 #### Standard Aggregates
+
 ```ruby
 # Sequel Code
 dataset.select(
@@ -311,12 +335,15 @@ SELECT count(*) AS total_count, avg(age) AS avg_age, max(age) AS max_age FROM us
 ## Performance Optimizations
 
 ### 1. Columnar Projection
+
 The adapter optimizes SELECT statements for DuckDB's columnar storage by generating efficient column projections.
 
 ### 2. Parallel Execution Hints
+
 For complex queries, the adapter can include hints for DuckDB's parallel execution engine.
 
 ### 3. Bulk Operations
+
 The adapter uses DuckDB's efficient bulk loading capabilities for multi-insert operations.
 
 ## Error Handling Patterns
@@ -331,6 +358,7 @@ The adapter maps DuckDB errors to appropriate Sequel exception types:
 ## Best Practices for Developers
 
 ### 1. Use Appropriate Data Types
+
 ```ruby
 # Prefer specific types for better performance
 create_table :events do
@@ -344,6 +372,7 @@ end
 ```
 
 ### 2. Leverage DuckDB's Analytical Features
+
 ```ruby
 # Use window functions for analytical queries
 sales_with_rank = db[:sales]
@@ -364,6 +393,7 @@ result = db.with(:monthly, monthly_sales)
 ```
 
 ### 3. Optimize for Columnar Storage
+
 ```ruby
 # Select only needed columns for better performance
 db[:large_table].select(:id, :name, :amount).where(active: true)
@@ -379,28 +409,36 @@ db[:sales].group(:category).select(
 ## Troubleshooting Common Issues
 
 ### 1. LIKE Clause Issues
+
 If LIKE clauses aren't working as expected, ensure you're not expecting ESCAPE clause behavior:
+
 ```ruby
 # Correct - no ESCAPE needed
 dataset.where(Sequel.like(:name, "%John%"))
 ```
 
 ### 2. Case-Insensitive Matching
+
 Use ILIKE for case-insensitive matching:
+
 ```ruby
 # Case-insensitive search
 dataset.where(Sequel.ilike(:name, "%john%"))
 ```
 
 ### 3. Regular Expression Matching
+
 Use Ruby regex syntax for pattern matching:
+
 ```ruby
 # Regex matching
 dataset.where(name: /^John.*Doe$/)
 ```
 
 ### 4. Qualified Column References
+
 Use standard Sequel syntax for qualified columns:
+
 ```ruby
 # Correct qualified reference
 dataset.join(:profiles, user_id: :id)

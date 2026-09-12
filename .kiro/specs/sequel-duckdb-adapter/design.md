@@ -105,6 +105,7 @@ end
 **Purpose:** Main database class that handles connections, transactions, and schema operations, following sequel-hexspace structure.
 
 **Key Methods for Mock Database Compatibility:**
+
 ```ruby
 # lib/sequel/adapters/duckdb.rb
 class Sequel::DuckDB::Database < Sequel::Database
@@ -191,6 +192,7 @@ end
 **Purpose:** SQL generation and query execution, fully compatible with Sequel's mock database testing, following sequel-hexspace structure.
 
 **Key Methods for SQL Generation Testing:**
+
 ```ruby
 # lib/sequel/adapters/duckdb.rb
 class Sequel::DuckDB::Dataset < Sequel::Dataset
@@ -423,6 +425,7 @@ test/
 ### Test Categories and Requirements
 
 1. **SQL Generation Tests (Unit Tests)**:
+
    - Use Sequel's mock database functionality
    - Test every SQL generation method
    - Verify correct SQL syntax and structure
@@ -430,6 +433,7 @@ test/
    - Must be fast and not require database connections
 
 2. **Integration Tests**:
+
    - Use real DuckDB in-memory databases
    - Test actual database operations
    - Verify data persistence and retrieval
@@ -437,6 +441,7 @@ test/
    - Test transaction behavior
 
 3. **Schema Tests**:
+
    - Test table creation, modification, and deletion
    - Test index operations
    - Test schema introspection accuracy
@@ -444,6 +449,7 @@ test/
    - Test various DuckDB-specific schema features
 
 4. **Type Conversion Tests**:
+
    - Test Ruby ↔ DuckDB type mapping for all supported types
    - Test edge cases and null handling
    - Test precision and scale for numeric types
@@ -451,6 +457,7 @@ test/
    - Test binary data and text encoding
 
 5. **Error Handling Tests**:
+
    - Test proper Sequel exception mapping
    - Test connection failure scenarios
    - Test SQL syntax error handling
