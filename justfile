@@ -1,4 +1,9 @@
-test:
+import? '.just/standard.just'
+
+# Logged, so a failure can be READ rather than reproduced.
+test: (_logged "test" "just _test")
+
+_test:
     bundle exec rake test
 
 lint:
