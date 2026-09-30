@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/outcomesinsights/sequel-duckdb/compare/v0.1.0...v0.2.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removed parameterized query support, custom error handling methods, and other over-engineered features. Adapter now follows Sequel conventions using built-in features.
+* Removed custom error message formatting methods (database_exception_message, database_exception_class, handle_constraint_violation) in favor of Sequel's built-in patterns.
+
+### Features
+
+* add Database#copy_to support ([17ce698](https://github.com/outcomesinsights/sequel-duckdb/commit/17ce6981fca43653ecd50c29f83b50bcf7e5b23b))
+* add schema methods ([fcd11fd](https://github.com/outcomesinsights/sequel-duckdb/commit/fcd11fd99b267b925888ef8accfc7bc7dbad87ad))
+* add support for date_arithmetic ([fc0dde7](https://github.com/outcomesinsights/sequel-duckdb/commit/fc0dde71c542f3a1cb23310a12b8529065b9baf6))
+* additional options for create_view ([7f19ad2](https://github.com/outcomesinsights/sequel-duckdb/commit/7f19ad2efe3ea7c1074b5e9e8a1c918216958701))
+* share DuckDB::Database instance and support cross-database schema queries ([564cb47](https://github.com/outcomesinsights/sequel-duckdb/commit/564cb4767471f0a5183e7219bf6008e57e644fec))
+* support different read_* functions in CREATE VIEW ([98eba2e](https://github.com/outcomesinsights/sequel-duckdb/commit/98eba2ed486d1f775508ea4bac0dc6f7cd62a37e))
+
+
+### Bug Fixes
+
+* bump minimum Ruby to 3.2 and upgrade minitest to 6.x ([55b874d](https://github.com/outcomesinsights/sequel-duckdb/commit/55b874d96f49684f3a4f13eccb7c6af5fc83e6b8))
+* **ci:** install DuckDB C library for native extension ([#7](https://github.com/outcomesinsights/sequel-duckdb/issues/7)) ([7af7437](https://github.com/outcomesinsights/sequel-duckdb/commit/7af7437c8b4db151e913087e558d3950bed34601))
+* formatting for date_arithmetic ([835ad7e](https://github.com/outcomesinsights/sequel-duckdb/commit/835ad7e6a9de7fd0b6c441ee394aa8ff54cc0612))
+* move DuckDB::Database init from connect to adapter_initialize ([e06e0f2](https://github.com/outcomesinsights/sequel-duckdb/commit/e06e0f2958b958ae368948a80234af058a24b7cd))
+* remove hard duckdb C extension dependency from gemspec ([7c598ac](https://github.com/outcomesinsights/sequel-duckdb/commit/7c598ac53534c7d29567bdf6c2fe1170162fa216))
+* use nested module syntax for Helpers to support mock adapter loading ([7962262](https://github.com/outcomesinsights/sequel-duckdb/commit/7962262dd9c45369815404a2c325f67f2820295f))
+
+
+### Code Refactoring
+
+* simplify adapter execution and error handling ([e812777](https://github.com/outcomesinsights/sequel-duckdb/commit/e812777acd815466cebbd58cc1f54b8254fcabfd))
+
+
+### Tests
+
+* remove tests for deleted features and fix remaining failures ([b056ec8](https://github.com/outcomesinsights/sequel-duckdb/commit/b056ec89ddc48957a35f8ecf302eddc07e47b959))
+
 ## [0.1.0] - 2025-07-21
 
 ### Added
