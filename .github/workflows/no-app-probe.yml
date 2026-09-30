@@ -1,0 +1,56 @@
+# THROWAWAY: tests whether a GITHUB_TOKEN-only release flow can satisfy the
+# required `ci` check on a PR it opened. Delete with the probe branch.
+name: no-app-probe
+
+on:
+  push:
+    branches: [probe/no-app]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_BRANCH: probe/no-app-pr
+    steps:
+      - uses: actions/checkout@v7
+      - name: Push a PR branch with GITHUB_TOKEN
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$PR_BRANCH"
+          date -u > probe.txt
+          git add probe.txt
+          git commit -m "test: no-App probe marker (do not merge)"
+          git push -f origin "$PR_BRANCH"
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Open the PR with GITHUB_TOKEN
+        run: |
+          gh pr create --base main --head "$PR_BRANCH" \
+            --title "test: no-App release probe (DO NOT MERGE)" \
+            --body "Throwaway probe for sequel-duckdb-4zy. Will be closed and deleted."
+      - name: Leg 1 - does pull_request fire for a GITHUB_TOKEN PR?
+        run: |
+          sleep 60
+          echo "--- runs for $SHA before dispatch:"
+          gh run list --commit "$SHA" --json databaseId,event,workflowName,status
+          echo "--- merge state before dispatch:"
+          gh pr view "$PR_BRANCH" --json mergeStateStatus,statusCheckRollup
+      - name: Leg 2 - dispatch CI on the PR branch
+        run: |
+          gh workflow run main.yml --ref "$PR_BRANCH"
+          for i in $(seq 1 60); do
+            sleep 20
+            run=$(gh run list --commit "$SHA" --event workflow_dispatch --json databaseId,status,conclusion --jq '.[0]')
+            echo "$i $run"
+            [ -n "$run" ] && [ "$(echo "$run" | jq -r .status)" = completed ] && break
+          done
+          sleep 20
+          echo "--- merge state after dispatch:"
+          gh pr view "$PR_BRANCH" --json mergeStateStatus,mergeable,statusCheckRollup
