@@ -1,0 +1,103 @@
+# Releases are cut here and nowhere else.
+#
+# On every push to main, release-please keeps a release PR up to date from the
+# conventional commits since the last release. When that PR is merged (by the
+# weekly release-merge.yml, or by hand), the push it creates runs this workflow
+# again: release-please tags the release and the publish job pushes the gem.
+#
+# The FILE NAME is load-bearing: the rubygems.org trusted publisher for
+# sequel-duckdb is registered to this repository and `release.yml`, with no
+# environment. Renaming this file, moving the publish job out of it, or adding
+# `environment:` to that job makes rubygems refuse the token.
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      # An App token, not GITHUB_TOKEN: a PR opened with GITHUB_TOKEN gets
+      # pull_request runs that execute no jobs, so the required `ci` check never
+      # reports and the release PR can never merge.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - name: Refuse unless the tag matches Sequel::DuckDB::VERSION
+        run: |
+          version=$(ruby -e 'require "./lib/sequel/duckdb/version"; print Sequel::DuckDB::VERSION')
+          echo "tag=$TAG version.rb=$version"
+          if [[ "$TAG" != "v$version" ]]; then
+            echo "::error::Tag $TAG does not match Sequel::DuckDB::VERSION $version; refusing to publish"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Install DuckDB C library
+        run: |
+          DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
+          echo "Installing DuckDB v${DUCKDB_VERSION}"
+          wget -q "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
+          unzip libduckdb-linux-amd64.zip -d libduckdb
+          sudo mv libduckdb/duckdb.* /usr/local/include/
+          sudo mv libduckdb/libduckdb.so /usr/local/lib/
+          sudo ldconfig /usr/local/lib
+          rm -rf libduckdb libduckdb-linux-amd64.zip
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - name: Run the full suite against the tagged commit
+        run: bundle exec rake test
+      - name: Build the gem
+        run: gem build sequel-duckdb.gemspec --output "sequel-duckdb-${VERSION}.gem"
+      # Trusted publishing: exchanges this job's OIDC token for a short-lived
+      # rubygems API key. No key is stored anywhere.
+      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      # No retry. A failed push fails the run; investigate before re-running.
+      - name: Push to rubygems.org
+        run: gem push "sequel-duckdb-${VERSION}.gem"
+      # The run's colour is not the evidence; the version on rubygems.org is.
+      - name: Confirm rubygems.org serves the new version
+        run: |
+          for i in $(seq 1 30); do
+            latest=$(curl -fsS https://rubygems.org/api/v1/versions/sequel-duckdb/latest.json | jq -r .version || true)
+            echo "attempt $i: rubygems latest=$latest"
+            [[ "$latest" == "$VERSION" ]] && exit 0
+            sleep 10
+          done
+          echo "::error::rubygems.org still does not report $VERSION as latest"
+          exit 1
