@@ -1,0 +1,57 @@
+# THROWAWAY: can a GITHUB_TOKEN-only job satisfy the required `ci` check on a PR
+# it opened by posting a commit STATUS (not a check run) with context `ci`?
+# Delete with the probe branch.
+name: status-probe
+
+on:
+  push:
+    branches: [probe/status-ci]
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_BRANCH: probe/status-ci-pr
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Push a PR branch and open the PR with GITHUB_TOKEN
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$PR_BRANCH"
+          date -u > probe.txt
+          git add probe.txt
+          git commit -m "test: status probe marker (do not merge)"
+          git push -f origin "$PR_BRANCH"
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          gh pr create --base main --head "$PR_BRANCH" \
+            --title "test: commit-status probe (DO NOT MERGE)" \
+            --body "Throwaway probe for sequel-duckdb-4zy.4. Will be closed and deleted."
+      - name: Before - merge state with no ci
+        run: |
+          sleep 45
+          gh pr view "$PR_BRANCH" --json number,mergeStateStatus,mergeable,statusCheckRollup
+          gh api "repos/$REPO/commits/$SHA/status" --jq '{state, statuses:[.statuses[]|{context,state}]}'
+      - name: Post commit status ci=success with GITHUB_TOKEN
+        run: |
+          gh api -X POST "repos/$REPO/statuses/$SHA" \
+            -f state=success -f context=ci \
+            -f description="status-probe: posted by GITHUB_TOKEN" \
+            --jq '{id, context, state, creator: .creator.login}'
+      - name: After - merge state with the posted status
+        run: |
+          for i in 1 2 3 4 5 6; do
+            sleep 15
+            s=$(gh pr view "$PR_BRANCH" --json mergeStateStatus --jq .mergeStateStatus)
+            echo "$i mergeStateStatus=$s"
+            [ "$s" = CLEAN ] && break
+          done
+          gh pr view "$PR_BRANCH" --json number,mergeStateStatus,mergeable,statusCheckRollup
+          gh api "repos/$REPO/commits/$SHA/status" --jq '{state, statuses:[.statuses[]|{context,state,creator:.creator.login}]}'
