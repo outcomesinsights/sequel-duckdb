@@ -1,0 +1,69 @@
+# Weekly release cadence: on Monday, merge the open release-please PR if its
+# `ci` check is green. The PR stays open all week, collecting merged work. The
+# merge is a push to main, which runs release.yml to tag and publish.
+#
+# workflow_dispatch is the escape hatch for an urgent release, not a chore.
+#
+# HAZARD: GitHub disables scheduled workflows in a public repository after 60
+# days with no repository activity, without notice. A quiet week-on-week gem
+# relies on Dependabot merges to count as activity; nothing here can detect
+# its own disablement.
+name: Release merge
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      # The App token, not GITHUB_TOKEN: a merge pushed by GITHUB_TOKEN does not
+      # trigger release.yml, so nothing would be tagged or published.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+      - name: Merge the release PR if ci is green
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          prs=$(gh pr list -R "$REPO" --base main --state open --label "autorelease: pending" \
+            --json number,headRefOid,title)
+          count=$(jq length <<<"$prs")
+          if [[ "$count" -eq 0 ]]; then
+            echo "No open release PR: nothing has changed that warrants a release."
+            exit 0
+          fi
+          if [[ "$count" -gt 1 ]]; then
+            echo "::error::$count open release PRs; expected at most one"
+            exit 1
+          fi
+          number=$(jq -r '.[0].number' <<<"$prs")
+          sha=$(jq -r '.[0].headRefOid' <<<"$prs")
+          title=$(jq -r '.[0].title' <<<"$prs")
+
+          # Read the check run GitHub Actions produced, not any status named
+          # `ci`: a commit status with that context can be posted by anything
+          # with statuses:write and would pass having run nothing.
+          ci=$(gh api "repos/$REPO/commits/$sha/check-runs?check_name=ci" \
+            --jq '[.check_runs[] | select(.app.slug == "github-actions")]
+                  | sort_by(.started_at) | last | (.conclusion // .status // "missing")')
+          if [[ "$ci" != "success" ]]; then
+            echo "::error::Release PR #$number ($title): ci on $sha is '$ci', not success. The release waits until ci is green; dispatch this workflow once it is."
+            exit 1
+          fi
+
+          gh pr merge "$number" -R "$REPO" --squash --match-head-commit "$sha"
+          echo "Merged release PR #$number ($title) at $sha; release.yml publishes from the resulting push to main."
