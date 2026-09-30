@@ -63,6 +63,8 @@ jobs:
           path: coverage/
           retention-days: 90
 
+  # The job name `ci` is the required status check on main and the release
+  # merge condition. Renaming it silently stops releases; change protection too.
   ci:
     if: always()
     needs: [lint, test]
@@ -76,6 +78,10 @@ jobs:
           fi
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             echo "One or more CI jobs were cancelled"
+            exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+            echo "One or more CI jobs were skipped; refusing to report green"
             exit 1
           fi
           echo "All CI jobs passed"
