@@ -13,6 +13,7 @@ name: Release merge
 on:
   schedule:
     - cron: "0 6 * * 1" # Mondays 06:00 UTC
+    - cron: "29 19 30 9 *" # TEMPORARY: one-off observation of the scheduled path; remove after
   workflow_dispatch:
 
 permissions:
