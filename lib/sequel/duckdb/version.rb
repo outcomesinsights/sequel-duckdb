@@ -8,7 +8,7 @@ module Sequel
     # It follows semantic versioning (SemVer) conventions.
     #
     # @example Getting the version
-    #   puts Sequel::DuckDB::VERSION  # => "0.1.0"
+    #   puts Sequel::DuckDB::VERSION  # => "0.2.0"
     #
     # @since 0.1.0
     VERSION = "0.1.0"
