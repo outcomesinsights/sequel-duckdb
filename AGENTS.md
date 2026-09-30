@@ -40,6 +40,20 @@ cp -rf source dest          # NOT: cp -r source dest
 
 <!-- BEGIN BEADS INTEGRATION profile:full hash:d4f96305 -->
 
+## Commit Messages Drive Releases
+
+Releases are cut by release-please from conventional commit messages, so the
+commit type decides what reaches the changelog and whether a release happens.
+
+- `feat:` and `fix:` are ONLY for changes to the shipped gem: what a consumer
+  of sequel-duckdb would notice.
+- Tooling, CI, hooks, the justfile, lint and coverage config, and dependency
+  bumps are `chore:`, `ci:` or `build:`. Test-only changes are `test:`. These
+  stay out of the changelog and never trigger a release on their own.
+- A breaking change to the gem's API needs `!` after the type or a
+  `BREAKING CHANGE:` footer. While the gem is 0.x it bumps the minor version.
+- Never edit `CHANGELOG.md` by hand; release-please owns it.
+
 ## Issue Tracking with bd (beads)
 
 **IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
