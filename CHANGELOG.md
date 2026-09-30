@@ -5,21 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- Performance optimization documentation
-- Migration examples and patterns
-- Comprehensive API documentation with YARD
-- Advanced error handling with specific exception mapping
-- Support for DuckDB-specific features (JSON, arrays, window functions)
-
-### Changed
-
-- Enhanced README with comprehensive usage examples
-- Improved documentation structure and organization
-
 ## [0.1.0] - 2025-07-21
 
 ### Added
