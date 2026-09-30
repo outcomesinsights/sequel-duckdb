@@ -1,0 +1,2 @@
+extensions = ["frontmatter", "gfm"]
+number = true
