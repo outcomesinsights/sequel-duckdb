@@ -12,7 +12,7 @@ This plan is intentionally detailed enough for a less capable agent to implement
 
 ## Why This Refactor Exists
 
-Today [`lib/sequel/adapters/shared/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/shared/duckdb.rb) starts with:
+Today [`lib/sequel/adapters/shared/duckdb.rb`](../lib/sequel/adapters/shared/duckdb.rb) starts with:
 
 ```ruby
 require "duckdb"
@@ -29,16 +29,16 @@ DuckDB should follow that pattern.
 
 ## Current Files Involved
 
-- [`lib/sequel/adapters/shared/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/shared/duckdb.rb)
-- [`lib/sequel/adapters/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/duckdb.rb)
-- [`lib/sequel/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/duckdb.rb)
-- [`test/mock_adapter_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/mock_adapter_test.rb)
-- [`test/sql_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/sql_test.rb)
-- [`test/core_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/core_sql_generation_test.rb)
-- [`test/advanced_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/advanced_sql_generation_test.rb)
-- [`test/date_arithmetic_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/date_arithmetic_test.rb)
-- [`test/database_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/database_test.rb)
-- [`test/spec_helper.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/spec_helper.rb)
+- [`lib/sequel/adapters/shared/duckdb.rb`](../lib/sequel/adapters/shared/duckdb.rb)
+- [`lib/sequel/adapters/duckdb.rb`](../lib/sequel/adapters/duckdb.rb)
+- [`lib/sequel/duckdb.rb`](../lib/sequel/duckdb.rb)
+- [`test/mock_adapter_test.rb`](../test/mock_adapter_test.rb)
+- [`test/sql_test.rb`](../test/sql_test.rb)
+- [`test/core_sql_generation_test.rb`](../test/core_sql_generation_test.rb)
+- [`test/advanced_sql_generation_test.rb`](../test/advanced_sql_generation_test.rb)
+- [`test/date_arithmetic_test.rb`](../test/date_arithmetic_test.rb)
+- [`test/database_test.rb`](../test/database_test.rb)
+- [`test/spec_helper.rb`](../test/spec_helper.rb)
 
 ## Design
 
@@ -75,7 +75,7 @@ These must all be true after the refactor:
 
 ### Step 1: Remove driver loading from the shared layer
 
-Edit [`lib/sequel/adapters/shared/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/shared/duckdb.rb).
+Edit [`lib/sequel/adapters/shared/duckdb.rb`](../lib/sequel/adapters/shared/duckdb.rb).
 
 Remove this line:
 
@@ -89,7 +89,7 @@ If it currently does, move those methods out into the real adapter file in Step 
 
 ### Step 2: Move all native-driver-dependent code into the real adapter file
 
-Edit [`lib/sequel/adapters/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/duckdb.rb).
+Edit [`lib/sequel/adapters/duckdb.rb`](../lib/sequel/adapters/duckdb.rb).
 
 This file should be the only place that does:
 
@@ -172,7 +172,7 @@ Do the same for any dataset methods that truly require `::DuckDB` classes. If `D
 
 ### Step 3: Keep the shared module responsible for mock adapter setup
 
-In [`lib/sequel/adapters/shared/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/shared/duckdb.rb), keep:
+In [`lib/sequel/adapters/shared/duckdb.rb`](../lib/sequel/adapters/shared/duckdb.rb), keep:
 
 - `Sequel::Database.set_shared_adapter_scheme(:duckdb, Sequel::DuckDB)`
 - `mock_adapter_setup`
@@ -183,7 +183,7 @@ The shared file should be loadable in an environment where `duckdb` is unavailab
 
 ### Step 4: Make the lightweight namespace file stay lightweight
 
-[`lib/sequel/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/duckdb.rb) should remain a namespace/version file only. Do not make it require the native driver.
+[`lib/sequel/duckdb.rb`](../lib/sequel/duckdb.rb) should remain a namespace/version file only. Do not make it require the native driver.
 
 That file can continue to define:
 
@@ -201,7 +201,7 @@ That placeholder error class is acceptable for mock-mode loadability. The real a
 
 Add a new test file:
 
-- [`test/mock_without_driver_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/mock_without_driver_test.rb)
+- [`test/mock_without_driver_test.rb`](../test/mock_without_driver_test.rb)
 
 This test must execute in a subprocess with the `duckdb` gem artificially blocked. Do **not** rely on the local bundle naturally lacking `duckdb`; this repo normally includes it.
 
@@ -262,7 +262,7 @@ The exact subprocess harness can vary, but the point is mandatory:
 
 ### Step 6: Tighten the existing mock adapter test
 
-Update [`test/mock_adapter_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/mock_adapter_test.rb).
+Update [`test/mock_adapter_test.rb`](../test/mock_adapter_test.rb).
 
 Add assertions beyond `refute_nil db`:
 
@@ -290,10 +290,10 @@ Use the actual SQL shape produced by the adapter after implementation. Do not fo
 
 Review these tests:
 
-- [`test/sql_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/sql_test.rb)
-- [`test/core_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/core_sql_generation_test.rb)
-- [`test/advanced_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/advanced_sql_generation_test.rb)
-- [`test/date_arithmetic_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/date_arithmetic_test.rb)
+- [`test/sql_test.rb`](../test/sql_test.rb)
+- [`test/core_sql_generation_test.rb`](../test/core_sql_generation_test.rb)
+- [`test/advanced_sql_generation_test.rb`](../test/advanced_sql_generation_test.rb)
+- [`test/date_arithmetic_test.rb`](../test/date_arithmetic_test.rb)
 
 Each of these should use `Sequel.mock(host: :duckdb)` or the helper that builds such a DB.
 
@@ -305,13 +305,13 @@ Keep integration/driver tests separate.
 
 These tests should continue using a real DuckDB connection:
 
-- [`test/database_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/database_test.rb)
-- [`test/schema_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/schema_test.rb)
-- [`test/schema_metadata_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/schema_metadata_test.rb)
-- [`test/schema_introspection_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/schema_introspection_test.rb)
-- [`test/type_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/type_test.rb)
-- [`test/model_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/model_test.rb)
-- [`test/end_to_end_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/end_to_end_test.rb)
+- [`test/database_test.rb`](../test/database_test.rb)
+- [`test/schema_test.rb`](../test/schema_test.rb)
+- [`test/schema_metadata_test.rb`](../test/schema_metadata_test.rb)
+- [`test/schema_introspection_test.rb`](../test/schema_introspection_test.rb)
+- [`test/type_test.rb`](../test/type_test.rb)
+- [`test/model_test.rb`](../test/model_test.rb)
+- [`test/end_to_end_test.rb`](../test/end_to_end_test.rb)
 
 Those tests should continue to exercise the real driver-backed adapter and should still require `duckdb`.
 
@@ -319,20 +319,20 @@ Those tests should continue to exercise the real driver-backed adapter and shoul
 
 ### Files likely edited
 
-- [`lib/sequel/adapters/shared/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/shared/duckdb.rb)
-- [`lib/sequel/adapters/duckdb.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/lib/sequel/adapters/duckdb.rb)
-- [`test/mock_adapter_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/mock_adapter_test.rb)
-- [`test/spec_helper.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/spec_helper.rb)
+- [`lib/sequel/adapters/shared/duckdb.rb`](../lib/sequel/adapters/shared/duckdb.rb)
+- [`lib/sequel/adapters/duckdb.rb`](../lib/sequel/adapters/duckdb.rb)
+- [`test/mock_adapter_test.rb`](../test/mock_adapter_test.rb)
+- [`test/spec_helper.rb`](../test/spec_helper.rb)
 
 ### Files likely added
 
-- [`test/mock_without_driver_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/mock_without_driver_test.rb)
+- [`test/mock_without_driver_test.rb`](../test/mock_without_driver_test.rb)
 
 ### Files to inspect for fallout
 
-- [`test/date_arithmetic_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/date_arithmetic_test.rb)
-- [`test/core_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/core_sql_generation_test.rb)
-- [`test/advanced_sql_generation_test.rb`](/home/ryan/projects/outins/jigsaw/main/gems/sequel-duckdb/test/advanced_sql_generation_test.rb)
+- [`test/date_arithmetic_test.rb`](../test/date_arithmetic_test.rb)
+- [`test/core_sql_generation_test.rb`](../test/core_sql_generation_test.rb)
+- [`test/advanced_sql_generation_test.rb`](../test/advanced_sql_generation_test.rb)
 
 ## Verification Plan
 
