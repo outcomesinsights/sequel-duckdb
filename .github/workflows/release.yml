@@ -145,15 +145,16 @@ jobs:
       - name: Push to rubygems.org
         run: gem push "sequel-duckdb-${VERSION}.gem"
       # The run's colour is not the evidence; the version on rubygems.org is.
-      # Compared against THIS release's version, so an older gem cannot pass it.
-      # Polled because rubygems' CDN can lag a minute behind the push.
+      # Looked up in the full version list, not latest.json, which omits
+      # pre-releases. Polled because rubygems' CDN can lag behind the push.
       - name: Confirm rubygems.org serves the new version
         run: |
           for i in $(seq 1 30); do
-            latest=$(curl -fsS https://rubygems.org/api/v1/versions/sequel-duckdb/latest.json | jq -r .version || true)
-            echo "attempt $i: rubygems latest=$latest"
-            [[ "$latest" == "$VERSION" ]] && exit 0
+            found=$(curl -fsS https://rubygems.org/api/v1/versions/sequel-duckdb.json \
+              | jq -r --arg v "$VERSION" '[.[] | select(.number == $v)] | length' || true)
+            echo "attempt $i: rubygems lists $VERSION: ${found:-?}"
+            [[ "$found" == "1" ]] && exit 0
             sleep 10
           done
-          echo "::error::rubygems.org still does not report $VERSION as latest"
+          echo "::error::rubygems.org still does not list $VERSION"
           exit 1
