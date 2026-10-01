@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "A Ruby gem that provides a complete database adapter for the Sequel toolkit to work with DuckDB, enabling Ruby applications to connect to and interact with DuckDB databases through Sequel's comprehensive ORM and database abstraction interface."
   spec.homepage = "https://github.com/sequel/sequel-duckdb"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = ">= 3.3.0"
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
 
