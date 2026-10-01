@@ -51,22 +51,38 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      # The `ci` check run from GitHub Actions, not any status named `ci`: a
-      # commit status with that context can be posted by anything with
-      # statuses:write and would pass having run nothing.
-      - name: Require a green ci check on the tagged commit
+      # Only main ships. Without this, a tag on a pull-request commit would
+      # publish code that never landed.
+      - name: Require the tagged commit to be on main
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          ci=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=ci" \
-            --jq '[.check_runs[] | select(.app.slug == "github-actions")]
-                  | sort_by(.started_at) | last | (.conclusion // .status // "missing")')
-          echo "ci on $SHA: $ci"
+          status=$(gh api "repos/$REPO/compare/$SHA...main" --jq .status)
+          echo "main relative to $SHA: $status"
+          if [[ "$status" != "ahead" && "$status" != "identical" ]]; then
+            echo "::error::$SHA is not on main ($status); refusing to publish"
+            exit 1
+          fi
+      # A successful run of the CI workflow FILE, started by a push to main, for
+      # exactly this commit. Not any check named `ci`: pull-request runs report
+      # that name too, as can any workflow with a job called ci, or anything
+      # with statuses:write.
+      - name: Require a green CI run from a push to main on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ci=$(gh api "repos/$REPO/actions/workflows/main.yml/runs?head_sha=$SHA&event=push&branch=main" \
+            --jq '[.workflow_runs[] | select(.path == ".github/workflows/main.yml" and .head_sha == env.SHA)]
+                  | sort_by(.created_at) | last | (.conclusion // .status // "missing")')
+          echo "CI (push to main) on $SHA: $ci"
           if [[ "$ci" != "success" ]]; then
-            echo "::error::ci on $SHA is '$ci'. Land the commit on main, let CI pass, then re-run this workflow."
+            echo "::error::CI on $SHA is '$ci'. Land the commit on main, let CI pass, then re-run this workflow."
             exit 1
           fi
 
@@ -102,6 +118,26 @@ jobs:
         run: bundle exec rake test
       - name: Build the gem
         run: gem build sequel-duckdb.gemspec --output "sequel-duckdb-${VERSION}.gem"
+      # The gemspec ships an allowlist of files, so prove the built gem is
+      # complete: install it into an empty GEM_HOME and load the adapter from
+      # there, not from the checkout.
+      - name: Check the built gem loads when installed
+        run: |
+          set -euo pipefail
+          home=$(mktemp -d); empty=$(mktemp -d)
+          # Runtime dependencies come from the bundle (vendor/bundle under bundler-cache).
+          deps=$(bundle exec ruby -e 'print((Gem.path + [Bundler.bundle_path.to_s]).uniq.join(":"))')
+          GEM_HOME="$home" gem install --local --ignore-dependencies --no-document "sequel-duckdb-${VERSION}.gem"
+          cd "$empty"
+          export GEM_HOME="$home" GEM_PATH="$home:$deps"
+          ruby -e '
+            gem "sequel-duckdb"; require "sequel"; require "sequel/duckdb"
+            dir = Gem.loaded_specs["sequel-duckdb"].gem_dir
+            abort "loaded #{dir}, not the built gem" unless dir.start_with?(ENV["GEM_HOME"])
+            db = Sequel.mock(host: :duckdb)
+            sql = db[:t].where(id: 1).sql
+            abort "unexpected SQL from the installed gem: #{sql}" unless sql.include?("WHERE")
+            puts "installed gem at #{dir}: #{sql}"'
       # Trusted publishing: exchanges this job's OIDC token for a short-lived
       # rubygems API key.
       - uses: rubygems/configure-rubygems-credentials@v2.1.0
