@@ -40,19 +40,31 @@ cp -rf source dest          # NOT: cp -r source dest
 
 <!-- BEGIN BEADS INTEGRATION profile:full hash:d4f96305 -->
 
-## Commit Messages Drive Releases
+## Releases and Commit Messages
 
-Releases are cut by release-please from conventional commit messages, so the
-commit type decides what reaches the changelog and whether a release happens.
+Releases are tag-based and cut weekly by a release agent; nothing about them is
+manual for a human. `.github/workflows/release.yml` publishes to rubygems.org
+via trusted publishing when a `v*` tag is pushed. To cut one:
+
+1. Pick the version from the conventional commits since the last `v*` tag.
+   While the gem is 0.x, a breaking change bumps the minor version and
+   anything else bumps the patch.
+2. Set `VERSION` in `lib/sequel/duckdb/version.rb`, run `bundle install` so
+   `Gemfile.lock` agrees, and add a `CHANGELOG.md` section listing only the
+   `feat`/`fix`/breaking commits.
+3. Land that commit on main and wait for the `ci` check to go green on it.
+4. Push the matching tag, e.g. `git tag v0.2.1 && git push origin v0.2.1`.
+   The workflow refuses a tag that does not equal `v` + `VERSION`, or a commit
+   without a green `ci` check, and it confirms rubygems serves the version.
+
+Commit types decide what reaches the changelog:
 
 - `feat:` and `fix:` are ONLY for changes to the shipped gem: what a consumer
   of sequel-duckdb would notice.
 - Tooling, CI, hooks, the justfile, lint and coverage config, and dependency
-  bumps are `chore:`, `ci:` or `build:`. Test-only changes are `test:`. These
-  stay out of the changelog and never trigger a release on their own.
+  bumps are `chore:`, `ci:` or `build:`. Test-only changes are `test:`.
 - A breaking change to the gem's API needs `!` after the type or a
-  `BREAKING CHANGE:` footer. While the gem is 0.x it bumps the minor version.
-- Never edit `CHANGELOG.md` by hand; release-please owns it.
+  `BREAKING CHANGE:` footer.
 
 ## Issue Tracking with bd (beads)
 

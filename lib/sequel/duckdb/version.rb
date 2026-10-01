@@ -11,9 +11,6 @@ module Sequel
     #   puts Sequel::DuckDB::VERSION
     #
     # @since 0.1.0
-    #
-    # release-please bumps this file by rewriting the FIRST quoted version
-    # string in it. Keep VERSION's value the only quoted version here.
     VERSION = "0.2.0"
   end
 end

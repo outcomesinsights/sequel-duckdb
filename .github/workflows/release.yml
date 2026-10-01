@@ -1,63 +1,48 @@
-# Releases are cut here and nowhere else.
+# Publishes sequel-duckdb to rubygems.org when a v* tag is pushed.
 #
-# On every push to main, release-please keeps a release PR up to date from the
-# conventional commits since the last release. When that PR is merged (by the
-# weekly release-merge.yml, or by hand), the push it creates runs this workflow
-# again: release-please tags the release and the publish job pushes the gem.
+# To cut a release: bump VERSION in lib/sequel/duckdb/version.rb, update
+# Gemfile.lock (`bundle install`) and CHANGELOG.md, land that commit on main,
+# wait for CI to go green on it, then push the matching tag:
+#   git tag v0.2.1 && git push origin v0.2.1
 #
 # The FILE NAME is load-bearing: the rubygems.org trusted publisher for
-# sequel-duckdb is registered to this repository and `release.yml`, with no
-# environment. Renaming this file, moving the publish job out of it, or adding
-# `environment:` to that job makes rubygems refuse the token.
+# sequel-duckdb is registered to this repository and `release.yml`, with NO
+# environment. Renaming this file, or adding `environment:` to the publish job,
+# makes rubygems refuse the token. No API key is stored anywhere.
 name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release-please:
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
-    steps:
-      # An App token, not GITHUB_TOKEN: a PR opened with GITHUB_TOKEN gets
-      # pull_request runs that execute no jobs, so the required `ci` check never
-      # reports and the release PR can never merge.
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
-      - uses: googleapis/release-please-action@v5
-        id: release
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-
-  publish:
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+  # CI runs on pushes to main and on PRs, never on a tag. Without this job, a tag
+  # on an untested commit would publish an untested gem, and a yank is the only
+  # way back. It fails closed: a tag pushed before CI finishes, or an API error,
+  # blocks the release. Re-run this workflow once CI is green.
+  verify:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
-    env:
-      TAG: ${{ needs.release-please.outputs.tag_name }}
+      checks: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
       - name: Refuse unless the tag matches Sequel::DuckDB::VERSION
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           version=$(ruby -e 'require "./lib/sequel/duckdb/version"; print Sequel::DuckDB::VERSION')
           echo "tag=$TAG version.rb=$version"
@@ -65,7 +50,39 @@ jobs:
             echo "::error::Tag $TAG does not match Sequel::DuckDB::VERSION $version; refusing to publish"
             exit 1
           fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The `ci` check run from GitHub Actions, not any status named `ci`: a
+      # commit status with that context can be posted by anything with
+      # statuses:write and would pass having run nothing.
+      - name: Require a green ci check on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ci=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=ci" \
+            --jq '[.check_runs[] | select(.app.slug == "github-actions")]
+                  | sort_by(.started_at) | last | (.conclusion // .status // "missing")')
+          echo "ci on $SHA: $ci"
+          if [[ "$ci" != "success" ]]; then
+            echo "::error::ci on $SHA is '$ci'. Land the commit on main, let CI pass, then re-run this workflow."
+            exit 1
+          fi
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    # Required by the OIDC token exchange; scoped to this job only.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
@@ -80,17 +97,20 @@ jobs:
         with:
           ruby-version: '4.0'
           bundler-cache: true
+      # Cheap here, so run it again against exactly what is about to ship.
       - name: Run the full suite against the tagged commit
         run: bundle exec rake test
       - name: Build the gem
         run: gem build sequel-duckdb.gemspec --output "sequel-duckdb-${VERSION}.gem"
       # Trusted publishing: exchanges this job's OIDC token for a short-lived
-      # rubygems API key. No key is stored anywhere.
+      # rubygems API key.
       - uses: rubygems/configure-rubygems-credentials@v2.1.0
       # No retry. A failed push fails the run; investigate before re-running.
       - name: Push to rubygems.org
         run: gem push "sequel-duckdb-${VERSION}.gem"
       # The run's colour is not the evidence; the version on rubygems.org is.
+      # Compared against THIS release's version, so an older gem cannot pass it.
+      # Polled because rubygems' CDN can lag a minute behind the push.
       - name: Confirm rubygems.org serves the new version
         run: |
           for i in $(seq 1 30); do
