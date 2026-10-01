@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-01
+
+### Breaking changes
+
+- Drop Ruby 3.2 support; require Ruby >= 3.3 ([9e0d2bd](https://github.com/outcomesinsights/sequel-duckdb/commit/9e0d2bda53aae129ee02773316e8c75a1142c480)): sequel-duckdb no longer installs on Ruby 3.2.
+
+### Fixed
+
+- Ship only lib/ and three docs; stop tracking the beads key ([c45dfc4](https://github.com/outcomesinsights/sequel-duckdb/commit/c45dfc4636917269f6333da1be2b21ed8855a0c2))
+
 ## [0.2.1](https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.0...v0.2.1) (2026-10-01)
 
 No changes to the gem's behaviour. The first release published by the
