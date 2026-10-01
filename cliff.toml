@@ -1,0 +1,74 @@
+# git-cliff config, used by the weekly release agent to pick the next version
+# and draft the CHANGELOG.md section. See https://git-cliff.org/docs/configuration
+#
+#   git-cliff --bumped-version            # next version from commits since the last v* tag
+#   git-cliff --unreleased --bump         # the section to add to CHANGELOG.md
+#
+# Only changes to the shipped gem count. Tooling, CI, tests, docs and
+# dependency bumps are skipped, so a week of nothing but those produces no
+# release. A breaking change is never skipped, whatever its type.
+
+[changelog]
+header = ""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif %}
+{%- set breaking = commits | filter(attribute="breaking", value=true) -%}
+{% if breaking | length > 0 %}
+### Breaking changes
+{% for commit in breaking -%}
+- {{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }})){% if commit.breaking_description and commit.breaking_description != commit.message %}: {{ commit.breaking_description | replace(from="\n", to=" ") | trim }}{% endif %}
+{% endfor %}
+{%- endif -%}
+{% for group, commits in commits | filter(attribute="breaking", value=false) | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits -%}
+- {{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }}))
+{% endfor %}
+{%- endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+filter_commits = true
+# A `!` or BREAKING CHANGE commit is shown and bumps the version even when its
+# type is one skipped below (e.g. `build!:` raising the Ruby floor).
+protect_breaking_commits = true
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+topo_order = false
+sort_commits = "newest"
+
+# First match wins.
+commit_parsers = [
+    # Not part of the shipped gem: no changelog entry, no release.
+    { message = "^chore", skip = true },
+    { message = "^ci", skip = true },
+    { message = "^build", skip = true },
+    { message = "^test", skip = true },
+    { message = "^style", skip = true },
+    { message = "^docs", skip = true },
+    { message = "^bd:", skip = true },
+
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^perf", group = "Changed" },
+    { message = "^refactor", group = "Changed" },
+    { message = "^revert", group = "Changed" },
+
+    # Deliberately not a silent skip: a type nobody has classified renders
+    # under its own heading rather than vanishing from the release.
+    { message = ".*", group = "Uncategorized" },
+]
+
+# 0.x convention: a breaking change bumps the minor version and a feature
+# bumps the patch. Without these, the build! commit since v0.2.1 makes
+# --bumped-version answer v1.0.0.
+[bump]
+features_always_bump_minor = false
+breaking_always_bump_major = false
