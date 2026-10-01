@@ -46,16 +46,21 @@ Releases are tag-based and cut weekly by a release agent; nothing about them is
 manual for a human. `.github/workflows/release.yml` publishes to rubygems.org
 via trusted publishing when a `v*` tag is pushed. To cut one:
 
-1. Pick the version from the conventional commits since the last `v*` tag.
-   While the gem is 0.x, a breaking change bumps the minor version and
-   anything else bumps the patch.
+1. Pick the version with `git-cliff --bumped-version` (configured in
+   `cliff.toml`). While the gem is 0.x a breaking change bumps the minor
+   version and anything else bumps the patch. If it prints the latest `v*` tag
+   unchanged ("There is nothing to bump"), there is nothing to release.
 2. Set `VERSION` in `lib/sequel/duckdb/version.rb`, run `bundle install` so
-   `Gemfile.lock` agrees, and add a `CHANGELOG.md` section listing only the
-   `feat`/`fix`/breaking commits.
-3. Land that commit on main and wait for the `ci` check to go green on it.
-4. Push the matching tag, e.g. `git tag v0.2.1 && git push origin v0.2.1`.
-   The workflow refuses a tag that does not equal `v` + `VERSION`, or a commit
-   without a green `ci` check, and it confirms rubygems serves the version.
+   `Gemfile.lock` agrees, and add the section printed by
+   `git-cliff --unreleased --bump` to the top of `CHANGELOG.md`, below its
+   header.
+3. Land that commit on main and wait for the CI workflow (`main.yml`) to go
+   green on the push to main.
+4. Push the matching tag, e.g. `git tag v0.3.0 && git push origin v0.3.0`.
+   The workflow refuses a tag that does not equal `v` + `VERSION`, a commit
+   that is not on main, or one without a green `main.yml` run from a push to
+   main. It confirms rubygems.org serves the version afterwards. `v*` tags
+   cannot be moved or deleted once pushed (repository ruleset).
 
 Commit types decide what reaches the changelog:
 
