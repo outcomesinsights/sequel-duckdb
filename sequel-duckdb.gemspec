@@ -10,14 +10,15 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Sequel database adapter for DuckDB"
   spec.description = "A Ruby gem that provides a complete database adapter for the Sequel toolkit to work with DuckDB, enabling Ruby applications to connect to and interact with DuckDB databases through Sequel's comprehensive ORM and database abstraction interface."
-  spec.homepage = "https://github.com/sequel/sequel-duckdb"
+  spec.homepage = "https://github.com/outcomesinsights/sequel-duckdb"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3.0"
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["changelog_uri"] = "https://github.com/sequel/sequel-duckdb/blob/main/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = spec.homepage
+  spec.metadata["changelog_uri"] = "https://github.com/outcomesinsights/sequel-duckdb/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
 
   # An allowlist, not `git ls-files`: the gem ships the library and three docs,
