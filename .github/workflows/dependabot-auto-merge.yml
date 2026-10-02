@@ -7,7 +7,9 @@ permissions: {}
 jobs:
   dependabot:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    # The PR's author, not github.actor: the actor is whoever triggered this
+    # run, which a re-run or a push to the branch can make someone else.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     # Approving and enabling auto-merge need these; nothing else does.
     permissions:
       contents: write
