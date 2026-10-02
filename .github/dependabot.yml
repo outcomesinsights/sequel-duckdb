@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    # Wait a week after a release before proposing it, so a yanked or
+    # compromised version has time to be caught upstream.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -12,6 +16,10 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    # Wait a week after a release before proposing it, so a yanked or
+    # compromised version has time to be caught upstream.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     groups:
       actions:
