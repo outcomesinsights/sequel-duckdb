@@ -97,10 +97,16 @@ jobs:
           sudo mv libduckdb/libduckdb.so /usr/local/lib/
           sudo ldconfig /usr/local/lib
           rm -rf libduckdb libduckdb-linux-amd64.zip
+      # No bundler cache on the release trigger: a cache written by a branch or
+      # PR run could supply the gems for the suite that gates publishing.
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: '4.0'
-          bundler-cache: true
+          bundler-cache: false
+      - name: Install the bundle from the lockfile
+        run: |
+          bundle config set --local deployment true
+          bundle install
       # Cheap here, so run it again against exactly what is about to ship.
       - name: Run the full suite against the tagged commit
         run: bundle exec rake test

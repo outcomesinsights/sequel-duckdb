@@ -19,6 +19,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
@@ -46,6 +48,8 @@ jobs:
     name: Test Ruby ${{ matrix.ruby }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
