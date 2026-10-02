@@ -101,7 +101,7 @@ jobs:
       # PR run could supply the gems for the suite that gates publishing.
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
-          ruby-version: '4.0'
+          ruby-version: "4.0"
           bundler-cache: false
       - name: Install the bundle from the lockfile
         run: |
@@ -129,7 +129,7 @@ jobs:
           persist-credentials: false
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
-          ruby-version: '4.0'
+          ruby-version: "4.0"
           bundler-cache: false
       - name: Build the gem
         run: gem build sequel-duckdb.gemspec --output "sequel-duckdb-${VERSION}.gem"

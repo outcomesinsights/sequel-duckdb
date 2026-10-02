@@ -46,24 +46,24 @@ sort_commits = "newest"
 
 # First match wins.
 commit_parsers = [
-    # Not part of the shipped gem: no changelog entry, no release.
-    { message = "^chore", skip = true },
-    { message = "^ci", skip = true },
-    { message = "^build", skip = true },
-    { message = "^test", skip = true },
-    { message = "^style", skip = true },
-    { message = "^docs", skip = true },
-    { message = "^bd:", skip = true },
+  # Not part of the shipped gem: no changelog entry, no release.
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+  { message = "^test", skip = true },
+  { message = "^style", skip = true },
+  { message = "^docs", skip = true },
+  { message = "^bd:", skip = true },
 
-    { message = "^feat", group = "Added" },
-    { message = "^fix", group = "Fixed" },
-    { message = "^perf", group = "Changed" },
-    { message = "^refactor", group = "Changed" },
-    { message = "^revert", group = "Changed" },
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^revert", group = "Changed" },
 
-    # Deliberately not a silent skip: a type nobody has classified renders
-    # under its own heading rather than vanishing from the release.
-    { message = ".*", group = "Uncategorized" },
+  # Deliberately not a silent skip: a type nobody has classified renders
+  # under its own heading rather than vanishing from the release.
+  { message = ".*", group = "Uncategorized" },
 ]
 
 # 0.x convention: a breaking change bumps the minor version and a feature
