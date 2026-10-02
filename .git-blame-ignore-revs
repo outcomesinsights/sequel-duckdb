@@ -1,0 +1,5 @@
+# Formatting-only commits; git blame skips them
+# (git config blame.ignoreRevsFile .git-blame-ignore-revs).
+
+# style: adopt the ruled RuboCop config (rubocop-rails-omakase + Lint)
+94af5da3fde077eb6acdb664bc2d1ed5669c65be
