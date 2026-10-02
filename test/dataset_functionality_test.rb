@@ -190,7 +190,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
     assert_instance_of String, row[:name], "Name should be string"
     assert_instance_of Integer, row[:age], "Age should be integer"
     assert_instance_of Date, row[:birth_date], "Birth date should be Date"
-    assert_includes [true, false], row[:active], "Active should be boolean"
+    assert_includes [ true, false ], row[:active], "Active should be boolean"
     assert_instance_of Time, row[:created_at], "Created at should be Time"
     assert_instance_of Float, row[:score], "Score should be float"
   end
@@ -274,7 +274,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
       names << row[:name]
     end
 
-    assert_equal ["Jane Smith", "John Doe"], names, "Names should be ordered alphabetically"
+    assert_equal [ "Jane Smith", "John Doe" ], names, "Names should be ordered alphabetically"
   end
 
   def test_query_execution_with_limit
@@ -324,7 +324,7 @@ class DatasetFunctionalityTest < SequelDuckDBTest::TestCase
       assert row[:active], "Should be active"
     end
 
-    assert_equal ["Alice Brown", "John Doe"], names, "Should return Alice and John in order"
+    assert_equal [ "Alice Brown", "John Doe" ], names, "Should return Alice and John in order"
   end
 
   def test_error_handling_in_fetch_rows

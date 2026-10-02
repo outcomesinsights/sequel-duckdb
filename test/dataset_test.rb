@@ -198,7 +198,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     records = db[:test_table].order(:name).all
     names = records.map { |r| r[:name] }
 
-    assert_equal ["Jane Smith", "John Doe"], names, "Records should be ordered by name"
+    assert_equal [ "Jane Smith", "John Doe" ], names, "Records should be ordered by name"
   end
 
   def test_dataset_limit_with_real_database
@@ -357,7 +357,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     refute_nil record, "First should return a record"
     assert_instance_of Hash, record, "First should return a hash"
-    assert_includes [1, 2], record[:id], "First should return one of the inserted records"
+    assert_includes [ 1, 2 ], record[:id], "First should return one of the inserted records"
 
     # Test first with ORDER BY
     ordered_record = dataset.order(:name).first
@@ -411,7 +411,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     ordered_records = dataset.order(:age).all
     ages = ordered_records.map { |r| r[:age] }
 
-    assert_equal [25, 30, 35], ages, "All should respect ORDER BY"
+    assert_equal [ 25, 30, 35 ], ages, "All should respect ORDER BY"
   end
 
   def test_dataset_insert_method_return_value
@@ -618,7 +618,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     long_name_list = long_names.map { |r| r[:name] }.sort
 
-    assert_equal ["Jane Smith", "John Doe"], long_name_list, "Should find John Doe and Jane Smith"
+    assert_equal [ "Jane Smith", "John Doe" ], long_name_list, "Should find John Doe and Jane Smith"
 
     # Test LiteralString with UPPER function in SELECT
     upper_names = dataset.select(:id, Sequel.lit("UPPER(name) AS upper_name")).order(:id).all
@@ -809,7 +809,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_equal 2, results.length
     names = results.map { |r| r[:name] }.sort
 
-    assert_equal ["John Doe", "Johnny Walker"], names
+    assert_equal [ "John Doe", "Johnny Walker" ], names
 
     # Test LIKE with suffix patterns
     results = db[:like_test_users].where(Sequel.like(:email, "%@example.com")).all
@@ -844,7 +844,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_equal 3, results.length # John, Johnny, Johnson
     names = results.map { |r| r[:name] }.sort
 
-    assert_equal ["Bob Johnson", "John Doe", "Johnny Walker"], names
+    assert_equal [ "Bob Johnson", "John Doe", "Johnny Walker" ], names
 
     # Test NOT ILIKE functionality
     results = db[:ilike_test_users].exclude(Sequel.ilike(:name, "%JOHN%")).all
@@ -896,7 +896,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
     assert_equal 2, results.length # John Doe and Johnny Walker
     names = results.map { |r| r[:name] }.sort
 
-    assert_equal ["John Doe", "Johnny Walker"], names
+    assert_equal [ "John Doe", "Johnny Walker" ], names
 
     db.disconnect
   end
@@ -964,7 +964,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
     # Should get numbers 1 through 5
     assert_equal 5, number_results.length, "Should get 5 numbers"
-    assert_equal [1, 2, 3, 4, 5], number_results.map { |r| r[:n] }.sort, "Should get sequence 1-5"
+    assert_equal [ 1, 2, 3, 4, 5 ], number_results.map { |r| r[:n] }.sort, "Should get sequence 1-5"
 
     db.disconnect
   end
@@ -978,8 +978,8 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
   def test_join_using_single_column
     dataset = mock_dataset(:users)
-    join_clause = Sequel::SQL::JoinUsingClause.new([:user_id], :inner, :profiles)
-    dataset = dataset.clone(join: [join_clause])
+    join_clause = Sequel::SQL::JoinUsingClause.new([ :user_id ], :inner, :profiles)
+    dataset = dataset.clone(join: [ join_clause ])
     expected_sql = "SELECT * FROM \"users\" INNER JOIN \"profiles\" USING (\"user_id\")"
 
     assert_sql expected_sql, dataset
@@ -988,7 +988,7 @@ class DatasetTest < SequelDuckDBTest::TestCase
   def test_join_using_multiple_columns
     dataset = mock_dataset(:users)
     join_clause = Sequel::SQL::JoinUsingClause.new(%i[user_id company_id], :inner, :profiles)
-    dataset = dataset.clone(join: [join_clause])
+    dataset = dataset.clone(join: [ join_clause ])
     expected_sql = "SELECT * FROM \"users\" INNER JOIN \"profiles\" USING (\"user_id\", \"company_id\")"
 
     assert_sql expected_sql, dataset
@@ -996,8 +996,8 @@ class DatasetTest < SequelDuckDBTest::TestCase
 
   def test_join_using_left_join
     dataset = mock_dataset(:users)
-    join_clause = Sequel::SQL::JoinUsingClause.new([:user_id], :left, :profiles)
-    dataset = dataset.clone(join: [join_clause])
+    join_clause = Sequel::SQL::JoinUsingClause.new([ :user_id ], :left, :profiles)
+    dataset = dataset.clone(join: [ join_clause ])
     expected_sql = "SELECT * FROM \"users\" LEFT JOIN \"profiles\" USING (\"user_id\")"
 
     assert_sql expected_sql, dataset

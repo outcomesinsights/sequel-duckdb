@@ -56,7 +56,7 @@ module Sequel
       end
 
       # Whether to quote identifiers by default for this database
-      def quote_identifiers_default # rubocop:disable Naming/PredicateMethod
+      def quote_identifiers_default
         true
       end
 
@@ -103,10 +103,10 @@ module Sequel
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
                   "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'BASE TABLE'"
-              else
+        else
                 "SELECT table_name FROM information_schema.tables " \
                   "WHERE table_schema = '#{schema_ref}' AND table_type = 'BASE TABLE'"
-              end
+        end
 
         tables = []
         execute(sql) do |row|
@@ -171,7 +171,7 @@ module Sequel
           column_info[:precision] = row[:numeric_precision] if row[:numeric_precision]
           column_info[:scale] = row[:numeric_scale] if row[:numeric_scale]
 
-          columns << [column_name, column_info]
+          columns << [ column_name, column_info ]
         end
 
         # Update primary key information
@@ -249,13 +249,13 @@ module Sequel
 
         # Format value appropriately for SQL
         formatted_value = case value
-                          when String
+        when String
                             "'#{value.gsub("'", "''")}'" # Escape single quotes
-                          when TrueClass, FalseClass, Numeric
+        when TrueClass, FalseClass, Numeric
                             value.to_s
-                          else
+        else
                             "'#{value}'"
-                          end
+        end
 
         # Execute PRAGMA statement
         pragma_sql = "PRAGMA #{pragma_key} = #{formatted_value}"
@@ -341,10 +341,10 @@ module Sequel
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
                   "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'VIEW'"
-              else
+        else
                 "SELECT table_name FROM information_schema.tables " \
                   "WHERE table_schema = '#{schema_ref}' AND table_type = 'VIEW'"
-              end
+        end
 
         views = []
         execute(sql) do |row|
@@ -754,13 +754,13 @@ module Sequel
                    read_something_sql(some_paths, options).then do |read_stmt|
                      from(read_stmt)
                    end.sql
-                 elsif source.is_a?(Dataset)
+        elsif source.is_a?(Dataset)
                    source.sql
-                 elsif source.is_a?(String)
+        elsif source.is_a?(String)
                    source
-                 else
+        else
                    raise Sequel::Error, "Unsupported source type: #{source.class}"
-                 end
+        end
 
         sql = String.new
         sql << "#{create_view_prefix_sql(name, options)} AS #{source}"
@@ -863,7 +863,7 @@ module Sequel
       }.freeze
 
       # Override select SQL clause order to support VALUES
-      Dataset.def_sql_method(self, :select, [["if opts[:values]", %w[values compounds order limit]], ["else", %w[with select distinct columns from join where group having compounds order limit lock]]])
+      Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having compounds order limit lock] ] ])
 
       private
 
@@ -1123,12 +1123,12 @@ module Sequel
           if value.negative?
             Sequel.lit("INTERVAL (#{value}) #{unit}")
           else
-            Sequel.lit(["INTERVAL ", " #{unit}"], value)
+            Sequel.lit([ "INTERVAL ", " #{unit}" ], value)
           end
         else
           # Expression: INTERVAL (column_name) HOUR
           # Note: expressions already include negation from date_sub
-          Sequel.lit(["INTERVAL (", ") #{unit}"], value)
+          Sequel.lit([ "INTERVAL (", ") #{unit}" ], value)
         end
       end
     end

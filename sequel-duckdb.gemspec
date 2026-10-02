@@ -5,8 +5,8 @@ require_relative "lib/sequel/duckdb/version"
 Gem::Specification.new do |spec|
   spec.name = "sequel-duckdb"
   spec.version = Sequel::DuckDB::VERSION
-  spec.authors = ["Ryan Duryea"]
-  spec.email = ["aguynamedryan@gmail.com"]
+  spec.authors = [ "Ryan Duryea" ]
+  spec.email = [ "aguynamedryan@gmail.com" ]
 
   spec.summary = "Sequel database adapter for DuckDB"
   spec.description = "A Ruby gem that provides a complete database adapter for the Sequel toolkit to work with DuckDB, enabling Ruby applications to connect to and interact with DuckDB databases through Sequel's comprehensive ORM and database abstraction interface."
@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   # nothing else. Listing the repository shipped .beads/ (including its
   # credential key), .kiro/, plans/ and AGENTS.md in 0.2.0 and 0.2.1.
   spec.files = %w[CHANGELOG.md LICENSE README.md] + Dir["lib/**/*.rb"]
-  spec.require_paths = ["lib"]
+  spec.require_paths = [ "lib" ]
 
   # Core dependencies
   # NOTE: the duckdb C extension is NOT a gemspec dependency.  The shared
@@ -42,6 +42,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "minitest", "~> 6.0"
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rubocop", "~> 1.21"
+  spec.add_development_dependency "rubocop-rails-omakase", "~> 1.1"
   spec.add_development_dependency "rubocop-minitest", "~> 0.40.0"
   spec.add_development_dependency "rubocop-rake", "~> 0.7.1"
   spec.add_development_dependency "rubocop-sequel", "~> 0.4.1"

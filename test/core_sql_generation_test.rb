@@ -163,7 +163,7 @@ class CoreSqlGenerationTest < SequelDuckDBTest::TestCase
     dataset = mock_dataset(:users)
     expected_sql = "INSERT INTO \"users\" (\"name\", \"age\") VALUES ('John', 30), ('Jane', 25)"
 
-    actual_sql = dataset.multi_insert_sql(%i[name age], [["John", 30], ["Jane", 25]]).first
+    actual_sql = dataset.multi_insert_sql(%i[name age], [ [ "John", 30 ], [ "Jane", 25 ] ]).first
 
     assert_equal expected_sql, actual_sql
   end

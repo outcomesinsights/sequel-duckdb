@@ -154,7 +154,7 @@ class SqlTest < SequelDuckDBTest::TestCase
 
     # INSERT with multiple value sets - test the SQL generation for multi_insert
     columns = %i[name age]
-    values = [["John", 30], ["Jane", 25]]
+    values = [ [ "John", 30 ], [ "Jane", 25 ] ]
 
     # For multi_insert, we test that it generates proper INSERT statements
     sql_statements = dataset.multi_insert_sql(columns, values)
@@ -786,7 +786,7 @@ class SqlTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("DuckDB array literal should work") do
       result = db.fetch("SELECT [1, 2, 3] AS numbers").first
 
-      assert_equal [1, 2, 3], result[:numbers]
+      assert_equal [ 1, 2, 3 ], result[:numbers]
     end
   end
 

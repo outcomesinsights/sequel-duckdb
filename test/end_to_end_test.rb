@@ -58,7 +58,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
     assert_nothing_raised("SELECT with GROUP BY/HAVING should work") do
       dataset.select(:category, Sequel.function(:count, :*).as(:count))
              .group(:category)
-             .having { Sequel.function(:count, :*) > 0 } # rubocop:disable Style/NumericPredicate
+             .having { Sequel.function(:count, :*) > 0 }
              .all
     end
 
@@ -439,7 +439,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
 
     # DuckDB might return binary data as hex string
     if retrieved[:blob_field].match?(/\A[0-9a-fA-F]+\z/)
-      retrieved_binary = [retrieved[:blob_field]].pack("H*").b
+      retrieved_binary = [ retrieved[:blob_field] ].pack("H*").b
 
       assert_equal test_data[:blob_field], retrieved_binary
     else

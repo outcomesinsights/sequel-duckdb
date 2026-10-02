@@ -319,7 +319,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
       assert_instance_of Hash, name_index, "Index info should be a hash"
       assert name_index.key?(:columns), "Index should have columns"
       assert name_index.key?(:unique), "Index should have unique flag"
-      assert_equal [:name], name_index[:columns], "Name index should be on name column"
+      assert_equal [ :name ], name_index[:columns], "Name index should be on name column"
       refute name_index[:unique], "Name index should not be unique"
     end
 
@@ -327,7 +327,7 @@ class SchemaMetadataTest < SequelDuckDBTest::TestCase
     if indexes.key?(:unique_email_index)
       email_index = indexes[:unique_email_index]
 
-      assert_equal [:email], email_index[:columns], "Email index should be on email column"
+      assert_equal [ :email ], email_index[:columns], "Email index should be on email column"
       assert email_index[:unique], "Email index should be unique"
     end
 

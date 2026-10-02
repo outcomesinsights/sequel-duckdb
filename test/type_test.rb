@@ -309,12 +309,12 @@ class TypeTest < SequelDuckDBTest::TestCase
       # DuckDB returns BLOB data as hex string, so we need to convert it back
       if retrieved_blob.is_a?(String) && retrieved_blob.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_blob.empty?
         # Convert hex string back to binary
-        retrieved_blob = [retrieved_blob].pack("H*").b
+        retrieved_blob = [ retrieved_blob ].pack("H*").b
       end
 
       if retrieved_binary.is_a?(String) && retrieved_binary.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_binary.empty?
         # Convert hex string back to binary
-        retrieved_binary = [retrieved_binary].pack("H*").b
+        retrieved_binary = [ retrieved_binary ].pack("H*").b
       end
 
       assert_equal binary_data, retrieved_blob, "BLOB field should match inserted binary data"
@@ -855,7 +855,7 @@ class TypeTest < SequelDuckDBTest::TestCase
 
     # DuckDB returns BLOB data as hex string, so we need to convert it back
     if retrieved_binary.is_a?(String) && retrieved_binary.match?(/\A[0-9a-fA-F]*\z/) && !retrieved_binary.empty?
-      retrieved_binary = [retrieved_binary].pack("H*").b
+      retrieved_binary = [ retrieved_binary ].pack("H*").b
     end
 
     assert_equal binary_data, retrieved_binary, "Binary data should be preserved"

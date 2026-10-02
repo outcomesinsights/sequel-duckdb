@@ -64,12 +64,12 @@ module Sequel
 
         @duckdb_database = if database_path == ":memory:" || database_path.nil?
                              ::DuckDB::Database.open(":memory:")
-                           else
+        else
                              if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
                                database_path = "/#{database_path}"
                              end
                              ::DuckDB::Database.open(database_path)
-                           end
+        end
       rescue ::DuckDB::Error => e
         raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
       rescue StandardError => e
@@ -123,7 +123,7 @@ module Sequel
       private
 
       def database_error_classes
-        [::DuckDB::Error]
+        [ ::DuckDB::Error ]
       end
 
       def _execute(type, sql, opts, &block)

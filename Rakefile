@@ -7,11 +7,11 @@ begin
   require "rubocop/rake_task"
 
   RuboCop::RakeTask.new(:lint) do |task|
-    task.options = ["--display-cop-names"]
+    task.options = [ "--display-cop-names" ]
   end
 
   RuboCop::RakeTask.new(:format) do |task|
-    task.options = ["--auto-correct-all"]
+    task.options = [ "--auto-correct-all" ]
   end
 
   desc "Run RuboCop with safe autocorrect"

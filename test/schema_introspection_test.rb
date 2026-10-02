@@ -426,7 +426,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
     # Verify index properties
     assert index_info.key?(:columns), "Index should have columns information"
-    assert_equal [:name], index_info[:columns], "Index should be on name column"
+    assert_equal [ :name ], index_info[:columns], "Index should be on name column"
 
     assert index_info.key?(:unique), "Index should have unique information"
     refute index_info[:unique], "Index should not be unique by default"
@@ -474,14 +474,14 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
     email_index = indexes[:unique_email_index]
 
     assert email_index[:unique], "Email index should be unique"
-    assert_equal [:email], email_index[:columns], "Email index should be on email column"
+    assert_equal [ :email ], email_index[:columns], "Email index should be on email column"
 
     # Test unique username index
     assert indexes.key?(:unique_username_index), "Should have unique_username_index"
     username_index = indexes[:unique_username_index]
 
     assert username_index[:unique], "Username index should be unique"
-    assert_equal [:username], username_index[:columns], "Username index should be on username column"
+    assert_equal [ :username ], username_index[:columns], "Username index should be on username column"
   end
 
   def test_schema_parse_indexes_primary_key_index
@@ -606,7 +606,7 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
         primary_key :id
         String :title
         Integer :parent_id
-        foreign_key [:parent_id], :parent_table, key: [:id]
+        foreign_key [ :parent_id ], :parent_table, key: [ :id ]
       end
 
       schema = @db.send(:schema_parse_table, :child_table, {})
@@ -678,6 +678,6 @@ class SchemaIntrospectionTest < SequelDuckDBTest::TestCase
 
   # Helper method to assert boolean value
   def assert_boolean(value, message = "Value should be boolean")
-    assert_includes [true, false], value, message
+    assert_includes [ true, false ], value, message
   end
 end

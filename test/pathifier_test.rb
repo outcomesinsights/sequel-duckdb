@@ -161,7 +161,7 @@ class PathifierTest < SequelDuckDBTest::TestCase
       "/data/file3.csv"
     ])
 
-    assert_equal [".csv"], pathifier.extnames
+    assert_equal [ ".csv" ], pathifier.extnames
   end
 
   def test_extnames_returns_multiple_unique_extensions
@@ -173,7 +173,7 @@ class PathifierTest < SequelDuckDBTest::TestCase
     ])
     pathifier.instance_variable_set(:@options, {})
 
-    assert_equal [".csv", ".parquet"], pathifier.extnames
+    assert_equal [ ".csv", ".parquet" ], pathifier.extnames
   end
 
   # Test to_format method

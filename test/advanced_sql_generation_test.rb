@@ -315,7 +315,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
 
   def test_join_using_clause
     # In Sequel, to use USING clause, pass an array of column symbols as the join condition
-    dataset = mock_dataset(:users).join(:profiles, [:user_id])
+    dataset = mock_dataset(:users).join(:profiles, [ :user_id ])
     expected_sql = "SELECT * FROM \"users\" INNER JOIN \"profiles\" USING (\"user_id\")"
 
     assert_sql expected_sql, dataset
@@ -552,7 +552,7 @@ class AdvancedSqlGenerationTest < SequelDuckDBTest::TestCase
               .left_join(:orders, user_id: :id)
               .where { (age > 18) & (active =~ true) }
               .group(:id, :name, :age)
-              .having { count(:id) > 0 } # rubocop:disable Style/NumericPredicate
+              .having { count(:id) > 0 }
               .order(Sequel.desc(:order_count), :name)
               .limit(10, 5)
 

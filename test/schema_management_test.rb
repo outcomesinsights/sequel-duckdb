@@ -317,7 +317,7 @@ describe "Schema Management" do
       @db.create_view(:test_view, "SELECT id FROM test_data")
       result = @db[:test_view].first
 
-      _(result.keys).must_equal([:id])
+      _(result.keys).must_equal([ :id ])
 
       @db.create_view(:test_view, "SELECT * FROM test_data", replace: true)
       result = @db[:test_view].first

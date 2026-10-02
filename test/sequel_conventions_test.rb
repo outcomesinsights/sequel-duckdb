@@ -99,11 +99,11 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
 
     # Test pattern matching (Ruby 3.0+ feature)
     result = case db.database_type
-             in :duckdb
+    in :duckdb
                "DuckDB adapter working"
-             else
+    else
                "Unknown adapter"
-             end
+    end
 
     assert_equal "DuckDB adapter working", result
   end
@@ -246,7 +246,7 @@ class SequelConventionsTest < SequelDuckDBTest::TestCase
     logger = Logger.new(log_output)
 
     db = create_db
-    db.loggers = [logger]
+    db.loggers = [ logger ]
 
     # Execute some operations to generate logs
     db.create_table(:log_test, if_not_exists: true) do

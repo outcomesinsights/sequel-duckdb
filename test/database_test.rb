@@ -40,7 +40,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
   def test_file_database_connection
     require "tempfile"
 
-    Tempfile.create(["test_db", ".duckdb"]) do |tmpfile|
+    Tempfile.create([ "test_db", ".duckdb" ]) do |tmpfile|
       db_path = tmpfile.path
       tmpfile.close
       File.unlink(db_path) # Remove the file so DuckDB can create it
@@ -138,7 +138,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     assert_equal 2, db[:test_table].count, "Both records should be committed"
     records = db[:test_table].all
 
-    assert_equal ["Auto Commit Test", "Auto Commit Test 2"], records.map { |r| r[:name] }.sort
+    assert_equal [ "Auto Commit Test", "Auto Commit Test 2" ], records.map { |r| r[:name] }.sort
   end
 
   def test_transaction_automatic_rollback_on_exception
@@ -209,7 +209,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     names = db[:test_table].select_map(:name).sort
 
-    assert_equal ["Inner Transaction", "Outer Transaction"], names
+    assert_equal [ "Inner Transaction", "Outer Transaction" ], names
   end
 
   def test_transaction_rollback_in_nested_transaction
@@ -251,9 +251,9 @@ class DatabaseTest < SequelDuckDBTest::TestCase
 
     assert_equal "string_result", result2, "Transaction should return string"
 
-    result3 = db.transaction { [1, 2, 3] }
+    result3 = db.transaction { [ 1, 2, 3 ] }
 
-    assert_equal [1, 2, 3], result3, "Transaction should return array"
+    assert_equal [ 1, 2, 3 ], result3, "Transaction should return array"
 
     result4 = db.transaction { { key: "value" } }
 
@@ -831,7 +831,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     logger = Logger.new(string_io)
 
     # Enable logging on the database
-    db.loggers = [logger]
+    db.loggers = [ logger ]
 
     # Execute some queries that should be logged
     assert_nothing_raised("Should be able to execute queries with logging enabled") do
@@ -858,7 +858,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
-    db.loggers = [logger]
+    db.loggers = [ logger ]
 
     # Execute a query and check for timing information
     Time.now
@@ -926,10 +926,10 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     logger = Logger.new(string_io)
 
     assert_nothing_raised("Should be able to add logger") do
-      db.loggers = [logger]
+      db.loggers = [ logger ]
     end
 
-    assert_equal [logger], db.loggers, "Logger should be set correctly"
+    assert_equal [ logger ], db.loggers, "Logger should be set correctly"
 
     # Test removing loggers
     assert_nothing_raised("Should be able to remove loggers") do
@@ -946,7 +946,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     require "logger"
     string_io = StringIO.new
     logger = Logger.new(string_io)
-    db.loggers = [logger]
+    db.loggers = [ logger ]
 
     # Execute invalid SQL to trigger error logging
     assert_database_error("Should raise error for invalid SQL") do
@@ -969,7 +969,7 @@ class DatabaseTest < SequelDuckDBTest::TestCase
     string_io = StringIO.new
     logger = Logger.new(string_io)
     logger.level = Logger::DEBUG # Set to debug level
-    db.loggers = [logger]
+    db.loggers = [ logger ]
 
     # Execute operations with debug logging
     assert_nothing_raised("Should provide debug information") do

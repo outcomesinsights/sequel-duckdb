@@ -37,7 +37,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
   # Test streaming result options for memory efficiency (Requirement 9.5)
   def test_streaming_result_options_memory_efficiency
     # Test streaming with different batch sizes
-    batch_sizes = [100, 500, 1000]
+    batch_sizes = [ 100, 500, 1000 ]
 
     batch_sizes.each do |batch_size|
       memory_before = memory_usage
@@ -71,7 +71,7 @@ class PerformanceBasicTest < SequelDuckDBTest::TestCase
     @db[:columnar_test].stream_with_memory_limit(100_000_000) do |row|
       processed_count += 1
       current_memory = memory_usage
-      max_memory_seen = [max_memory_seen, current_memory].max
+      max_memory_seen = [ max_memory_seen, current_memory ].max
 
       assert_kind_of Hash, row, "Row should be a hash"
     end

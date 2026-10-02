@@ -117,7 +117,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
       # Create table with various DuckDB-specific types
       @db.create_table(:complex_table) do
         Integer :id, primary_key: true
-        BigDecimal :price, size: [10, 2]
+        BigDecimal :price, size: [ 10, 2 ]
         Date :birth_date
         column :wake_time, :time # Explicitly use :time type
         column :data, :blob
@@ -164,7 +164,7 @@ describe "Sequel::Model integration with DuckDB adapter" do
         @captured_sql = sql if sql.include?("INSERT")
       end
 
-      def logger.captured_sql # rubocop:disable Style/TrivialAccessors
+      def logger.captured_sql
         @captured_sql
       end
       @db.loggers << logger
