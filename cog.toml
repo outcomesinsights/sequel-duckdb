@@ -1,0 +1,3 @@
+# cocogitto: lint reads commit subjects since the last release tag.
+# Releases are tagged vX.Y.Z (git-cliff and release.yml agree on the prefix).
+tag_prefix = "v"

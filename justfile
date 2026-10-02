@@ -1,8 +1,19 @@
 test:
     bundle exec rake test
 
+# Workflow and commit checks run through mise at pinned versions until the
+# tools are provisioned on every host (home-manager hm-80t). A tool that cannot
+# be fetched fails the recipe; nothing here is skipped.
+actionlint_version := "1.7.12"
+zizmor_version := "1.30.1"
+cog_version := "7.0.0"
+
+# Every non-rewriting check. `fmt` rewrites; this only reports.
 lint:
     bundle exec rubocop
+    mise x actionlint@{{ actionlint_version }} -- actionlint
+    mise x zizmor@{{ zizmor_version }} -- zizmor --offline --config .github/zizmor.yml .
+    mise x cocogitto@{{ cog_version }} -- cog check --from-latest-tag --ignore-merge-commits
 
 ci: fmt-check lint test hygiene
 

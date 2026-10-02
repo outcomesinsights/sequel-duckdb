@@ -1,0 +1,4 @@
+# zizmor configuration (zizmor --offline --config .github/zizmor.yml .).
+# Finding-specific ignores live inline as `# zizmor: ignore[...]` comments,
+# next to the code they excuse; this file holds repo-wide settings only.
+rules: {}
