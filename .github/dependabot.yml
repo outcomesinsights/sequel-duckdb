@@ -6,6 +6,8 @@ updates:
       interval: monthly
     # Wait a week after a release before proposing it, so a yanked or
     # compromised version has time to be caught upstream.
+    # On the monthly schedule, a release younger than 7 days at check time
+    # waits for the next monthly run (up to about five weeks). That is expected.
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
@@ -18,6 +20,8 @@ updates:
       interval: monthly
     # Wait a week after a release before proposing it, so a yanked or
     # compromised version has time to be caught upstream.
+    # On the monthly schedule, a release younger than 7 days at check time
+    # waits for the next monthly run (up to about five weeks). That is expected.
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
