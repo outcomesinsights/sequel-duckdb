@@ -36,7 +36,16 @@ options = [
 includes = ["*.rb", "*.rake", "*.gemspec", "Gemfile", "Rakefile"]
 
 [formatter.mdformat]
-command = "mdformat"
+command = "uvx"
+options = [
+  "--from",
+  "mdformat",
+  "--with",
+  "mdformat-gfm",
+  "--with",
+  "mdformat-frontmatter",
+  "mdformat",
+]
 includes = ["*.md"]
 
 [formatter.just]
