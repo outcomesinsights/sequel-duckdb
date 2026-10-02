@@ -1,0 +1,18 @@
+# Tool pins for this repo's recipes, assembled from gator's standard/mise.toml
+# (ruled 2026-10-02). `just setup` runs `mise install`; a clone needs only git
+# and mise. Pins are major-only and copied byte for byte from the standard.
+# rubocop travels in the Gemfile; mdformat is provisioned by the host.
+
+[tools]
+just = "1"
+uv = "0"
+
+"aqua:numtide/treefmt" = "2"
+prettier = "3"
+taplo = "0"
+
+actionlint = "1"
+zizmor = "1"
+cocogitto = "7"
+
+git-cliff = "2"

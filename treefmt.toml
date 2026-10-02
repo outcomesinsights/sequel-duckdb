@@ -1,0 +1,55 @@
+# Formatters for this repo, assembled from gator's standard/treefmt.toml
+# (ruled 2026-10-02): [global] plus the blocks for the languages present here,
+# copied byte for byte. `just fmt` is treefmt; `just fmt-check` is
+# treefmt --fail-on-change, which formats the tree and THEN exits 1.
+
+[global]
+excludes = [
+  # generated or owned by another tool
+  "*.lock",
+  "uv.lock",
+  "Gemfile.lock",
+  "package-lock.json",
+  "yarn.lock",
+  "renv.lock",
+  "*.min.*",
+  # other tools' stores: their formatters are their own business
+  ".beads/**",
+  ".seeds/**",
+  "claude_stuff/**",
+  "node_modules/**",
+  "vendor/**",
+  ".claude/worktrees/**",
+]
+
+[formatter.rubocop]
+command = "bundle"
+options = [
+  "exec",
+  "rubocop",
+  "--autocorrect",
+  "--fail-level",
+  "F",
+  "--format",
+  "quiet",
+]
+includes = ["*.rb", "*.rake", "*.gemspec", "Gemfile", "Rakefile"]
+
+[formatter.mdformat]
+command = "mdformat"
+includes = ["*.md"]
+
+[formatter.just]
+command = "just"
+options = ["--fmt", "--unstable", "--justfile"]
+includes = ["justfile", "Justfile", "*.just"]
+
+[formatter.prettier]
+command = "prettier"
+options = ["--write"]
+includes = ["*.yml", "*.yaml", "*.json"]
+
+[formatter.taplo]
+command = "taplo"
+options = ["fmt"]
+includes = ["*.toml"]

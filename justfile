@@ -1,44 +1,40 @@
 test:
     bundle exec rake test
 
-# Workflow and commit checks run through mise at pinned versions until the
-# tools are provisioned on every host (home-manager hm-80t). A tool that cannot
-# be fetched fails the recipe; nothing here is skipped.
-actionlint_version := "1.7.12"
-zizmor_version := "1.30.1"
-cog_version := "7.0.0"
+# Installs the pinned tools (mise.toml) and the bundle. A clone needs git and mise.
+setup:
+    mise install
+    bundle install
 
-# Every non-rewriting check. `fmt` rewrites; this only reports.
+# Every non-rewriting check. `fmt` rewrites; this only reports. Tools come from
+# mise.toml; a missing one fails the recipe.
 lint:
     bundle exec rubocop
-    mise x actionlint@{{ actionlint_version }} -- actionlint
-    mise x zizmor@{{ zizmor_version }} -- zizmor --offline --config .github/zizmor.yml .
-    mise x cocogitto@{{ cog_version }} -- cog check --from-latest-tag --ignore-merge-commits
+    actionlint
+    zizmor --offline --config .github/zizmor.yml .
+    cog check --from-latest-tag --ignore-merge-commits
 
 ci: fmt-check lint test hygiene
 
 bundle-update *ARGS:
     bundle update {{ ARGS }}
 
-# Rewrite files to canonical format. Run deliberately; never from a hook.
+# Formats every tracked file in every language here (treefmt.toml), including
+# RuboCop's safe autocorrections.
 fmt:
-    git ls-files "*.sh" | xargs -r shfmt -w
-    just --fmt --unstable
-    git ls-files "*.md" | xargs -r mdformat
+    treefmt
 
-# Report format drift without changing anything. This is what the hooks run —
-# a formatter that rewrites files mid-commit changes what you already reviewed.
+# Fails if `fmt` would change anything. It formats the tree first and THEN fails
+# (fix-and-fail): re-stage what it changed. It never rewrites and succeeds.
 fmt-check:
-    git ls-files "*.sh" | xargs -r shfmt -d
-    just --fmt --check --unstable
-    git ls-files "*.md" | xargs -r mdformat --check
+    treefmt --fail-on-change
 
 # What actually runs before a push. Defaults to the complete `ci`; point it at
 # something smaller ONLY where running complete CI locally is impractical.
 pre-push: ci
 
 # Runs on every commit, so it must stay FAST — a sub-minute budget. Tests belong
-# here when they fit; lint alone when they do not. fmt-check never rewrites.
+# here when they fit; lint alone when they do not.
 pre-commit: fmt-check lint test hygiene
 
 # Content checks inherited from overcommit when it was removed (2026-09-12):
