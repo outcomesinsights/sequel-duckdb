@@ -137,11 +137,13 @@ jobs:
       # complete: install it, with only its runtime dependencies, into an empty
       # GEM_HOME and load the adapter from there, not from the checkout.
       - name: Check the built gem loads when installed
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -euo pipefail
           home=$(mktemp -d); empty=$(mktemp -d)
           # GEM_PATH too, so already-installed gems cannot satisfy the
           # dependency: sequel is fetched from rubygems into the empty home.
+          # Deliberately outside the lockfile: this reproduces a consumer's
+          # install of the built gem (ruled 2026-10-02).
           GEM_HOME="$home" GEM_PATH="$home" gem install --no-document "sequel-duckdb-${VERSION}.gem"
           cd "$empty"
           GEM_HOME="$home" GEM_PATH="$home" ruby -e '
