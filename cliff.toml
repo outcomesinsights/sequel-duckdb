@@ -1,3 +1,14 @@
+# git-cliff config -- the canonical copy (weekly release ceremony, seed gator-4ws.30).
+# Copy as cliff.toml and replace OWNER/REPO in the two commit-link URLs with the repo's
+# (`outcomesinsights/sequel-duckdb`). NOT a [remote.github] table: that switches on
+# git-cliff's GitHub integration, which calls the API for pull-request metadata and PANICS
+# on a private repo (404) or needs a token on a public one (measured, 2.13 and 2.14).
+#
+# Everything else is identical across the fleet, EXCEPT the [bump] table at the bottom: its two
+# `= false` lines are the 0.x convention (a breaking change bumps minor, a feature bumps patch)
+# and belong only to a gem whose version is 0.x. A gem at 1.0 or above follows ordinary SemVer
+# and leaves them out -- measured on sequel-hexspace (2.0.0): at >= 1.0 the two settings are
+# inert either way. gator-doctor checks them against the repo's current version.
 # git-cliff config, used by the weekly release agent to pick the next version
 # and draft the CHANGELOG.md section. See https://git-cliff.org/docs/configuration
 #
@@ -11,7 +22,12 @@
 [changelog]
 header = ""
 body = """
-{% if version -%}
+{%- if commits | length == 0 -%}
+{#- An empty range renders nothing. Without this guard a deps-only range still emits a
+    bare heading naming the version already published -- precisely the thing somebody
+    pastes in by reflex (sequel-hexspace, gator-uem). No commits, no section. -#}
+{%- else -%}
+{%- if version -%}
 ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else -%}
 ## [Unreleased]
@@ -29,6 +45,7 @@ body = """
 - {{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }}))
 {% endfor %}
 {%- endfor %}
+{%- endif -%}
 """
 footer = ""
 trim = true
@@ -49,7 +66,11 @@ commit_parsers = [
   # Not part of the shipped gem: no changelog entry, no release.
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
-  { message = "^build", skip = true },
+  # build: NOT skipped. A `build:` commit that changes a runtime dependency (add_dependency,
+  # a widened constraint) changes what a consumer installs; two of sequel-hexspace's three
+  # such commits since 1.0.0 were invisible to the changelog when build was skipped
+  # (gator-uem). Tooling-only build commits appearing under Changed are the cost.
+  { message = "^build", group = "Changed" },
   { message = "^test", skip = true },
   { message = "^style", skip = true },
   { message = "^docs", skip = true },
