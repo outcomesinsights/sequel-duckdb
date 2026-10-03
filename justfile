@@ -40,7 +40,7 @@ pre-commit: fmt-check lint test hygiene
 # Content checks inherited from overcommit when it was removed (2026-09-12):
 # MergeConflicts, YamlSyntax, JsonSyntax. RuboCop and the test target were already
 # covered by fmt-check/lint/test; HardTabs and TrailingWhitespace were dropped because
-# they fight shfmt, .tsv, and generated files. See habituate/standards.md.
+# they fight shfmt, .tsv, and generated files.
 hygiene:
     #!/usr/bin/env bash
     set -uo pipefail
