@@ -3,5 +3,10 @@ plugins: [rubocop-minitest, rubocop-rake, rubocop-sequel]
 Lint:
   Enabled: true
 AllCops:
+  # omakase curates new cops (they arrive with its gem bump), so this knob only reaches
+  # pending cops in Lint and the plugins: `enable` measured 111 offenses on sequel-duckdb,
+  # 108 of them Minitest/MultipleAssertions, a judgment cop. `disable` also silences the
+  # "not configured" notice RuboCop prints every run when the line is absent.
+  NewCops: disable
   TargetRubyVersion: 3.3
   Exclude: [vendor/**/*, bin/**/*, tmp/**/*, claude_stuff/**/*]
