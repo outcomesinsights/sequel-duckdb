@@ -12,15 +12,30 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The justfile is the interface: every gate step runs a recipe, never a tool directly.
+# lint + test together cover `just ci` (fmt-check lint test hygiene). Each job starts
+# with the fleet's tool-setup prelude: checkout, mise-action (the tools in mise.toml),
+# setup-just, then the language-setup slot, then `just setup`. The DuckDB C library
+# goes in before ruby/setup-ruby, whose bundler-cache install compiles the duckdb gem
+# against it; setup-ruby supplies the matrix Ruby (mise.toml pins none), so `just
+# setup`'s `bundle install` is a no-op over bundler-cache.
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      # fetch-depth 0: `cog check --from-latest-tag` in `lint` needs the history and
+      # the tags; a shallow clone errors "unable to get any tag".
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1" # mise.toml's pin; zizmor flags unpinned-tools without it
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
@@ -34,8 +49,8 @@ jobs:
         with:
           ruby-version: "4.0"
           bundler-cache: true
-      - name: Run RuboCop
-        run: bundle exec rubocop
+      - run: just setup
+      - run: just fmt-check lint hygiene
 
   test:
     runs-on: ubuntu-latest
@@ -50,6 +65,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1" # mise.toml's pin; zizmor flags unpinned-tools without it
       - name: Install DuckDB C library
         run: |
           DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
@@ -63,8 +82,8 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - name: Run Tests
-        run: bundle exec rake test
+      - run: just setup
+      - run: just test
       - name: Upload Coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
