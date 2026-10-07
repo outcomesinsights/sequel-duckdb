@@ -15,9 +15,14 @@
 #   git-cliff --bumped-version            # next version from commits since the last v* tag
 #   git-cliff --unreleased --bump         # the section to add to CHANGELOG.md
 #
-# Only changes to the shipped gem count. Tooling, CI, tests, docs and
-# dependency bumps are skipped, so a week of nothing but those produces no
-# release. A breaking change is never skipped, whatever its type.
+# Only changes to the shipped gem count. chore, ci, test, style and docs commits are
+# skipped, so a week of nothing but those produces no release. `build:` commits COUNT
+# (under Changed): a dependency or Ruby-floor change changes what a consumer installs.
+# A breaking change is never skipped, whatever its type.
+#
+# Because build: counts toward the bump, the commit that ADOPTS this file must not be
+# typed build: -- `build(release): sync cliff.toml` made --bumped-version answer v0.3.2
+# for an unchanged gem (sequel-duckdb, measured). Type it ci(release):.
 
 [changelog]
 header = ""
@@ -57,7 +62,10 @@ filter_commits = true
 # A `!` or BREAKING CHANGE commit is shown and bumps the version even when its
 # type is one skipped below (e.g. `build!:` raising the Ruby floor).
 protect_breaking_commits = true
-tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+# Anchored at BOTH ends. Without the `$`, v1.1.0-rc1 and v1.1.0.1 match too and become
+# release boundaries: v1.1.0's section then starts at the rc instead of at v1.0.0, and
+# --bumped-version after a four-part tag answers v1.1.1.0 (measured on 2.14.2, gator-2x6).
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 topo_order = false
 sort_commits = "newest"
 
