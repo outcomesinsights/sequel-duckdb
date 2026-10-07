@@ -2,10 +2,10 @@
 
 require "simplecov"
 SimpleCov.start do
-  add_filter "/test/"
+  skip "/test/"
   enable_coverage :branch
-  add_group "Adapters", "lib/sequel/adapters"
-  add_group "Extensions", "lib/sequel/extensions"
+  group "Adapters", "lib/sequel/adapters"
+  group "Extensions", "lib/sequel/extensions"
 end
 
 # Test configuration and setup for sequel-duckdb adapter
