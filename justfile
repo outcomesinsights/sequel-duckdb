@@ -1,10 +1,14 @@
 test:
     bundle exec rake test
 
-# Installs the pinned tools (mise.toml) and the bundle. A clone needs git and mise.
+# Installs the pinned tools (mise.toml) and the bundle, then arms the tracked hooks.
+# A clone needs git and mise. Relative, so a worktree runs its own; repeating it changes
+# nothing, and it repairs the absolute path bd writes on `bd hooks install` (ruled
+# 2026-10-08). Guarded: pointing git at a missing directory would turn every hook off.
 setup:
     mise install
     bundle install
+    @if [ -d .beads/hooks ]; then git config core.hooksPath .beads/hooks; fi
 
 # Every non-rewriting check. `fmt` rewrites; this only reports. Tools come from
 # mise.toml; a missing one fails the recipe.
