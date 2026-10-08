@@ -1,6 +1,11 @@
 # git-cliff config -- the canonical copy (weekly release ceremony, seed gator-4ws.30).
-# Copy as cliff.toml and replace every OWNER/REPO (commit links in the body, compare and
-# release-tag links in the footer) with the repo's: `sed -i 's#OWNER/REPO#outcomesinsights/sequel-duckdb#g' cliff.toml`. NOT a [remote.github] table: that switches on
+# Copy as cliff.toml and replace OWNER/REPO in the templates (commit links in the body,
+# compare and release-tag links in the footer) with the repo's -- skipping comment lines, or
+# the sed rewrites its own example below into a no-op (sequel-duckdb, 2026-10-08):
+#   sed -i '/^#/!s#OWNER/REPO#outcomesinsights/sequel-duckdb#g' cliff.toml
+# The footer emits a definition only for a release with rendered commits, matching the body;
+# a backfill of an older CHANGELOG.md must add by hand the definition for any release whose
+# commits were all skipped types (sequel-duckdb's 0.2.1). NOT a [remote.github] table: that switches on
 # git-cliff's GitHub integration, which calls the API for pull-request metadata and PANICS
 # on a private repo (404) or needs a token on a public one (measured, 2.13 and 2.14).
 #
@@ -95,7 +100,11 @@ protect_breaking_commits = true
 # Anchored at BOTH ends. Without the `$`, v1.1.0-rc1 and v1.1.0.1 match too and become
 # release boundaries: v1.1.0's section then starts at the rc instead of at v1.0.0, and
 # --bumped-version after a four-part tag answers v1.1.1.0 (measured on 2.14.2, gator-2x6).
-tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+# The optional `-a.N` suffix is the fleet's pre-release form (gator-4ws.30: dotted, so it
+# sorts numerically and PEP 440 normalises it). Without it seeds' alpha train is invisible:
+# --bumped-version answered v0.7.0 instead of v0.7.0-a.10. Undotted rc1 / a8 stay rejected
+# (measured on a seeds clone and the gator-2x6 fixture, 2026-10-08).
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+\\.[0-9]+)?$"
 topo_order = false
 sort_commits = "newest"
 
