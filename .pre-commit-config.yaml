@@ -1,0 +1,32 @@
+# The commit-stage gate -- the canonical copy (seed gator-rga, layer 3; bead gator-dsi).
+# Copy as .pre-commit-config.yaml verbatim. Run by prek (pinned in mise.toml) from the
+# repo's TRACKED .beads/hooks/pre-commit, after beads' own block:
+#
+#     command -v prek >/dev/null 2>&1 || { echo "pre-commit: prek not on PATH -- mise install" >&2; exit 1; }
+#     exec prek run
+#
+# No `prek install`: every beads repo has core.hooksPath=.beads/hooks, where the framework
+# refuses to install, and installing over a beads shim is how a tracked shim got overwritten
+# in September. prek runs fine without being installed (measured 0.5.3: staged files, rc 2 on
+# failure, 0.04s overhead), and `bd hooks install` keeps what sits outside its markers.
+#
+# Two hooks, both local, both the repo's own recipes, so the gate and `just ci` cannot drift:
+#   fmt-check  treefmt on the STAGED files only (prek passes them); formats and fails, the
+#              author re-stages -- the fix-and-fail shape the standard allows a hook
+#   lint       `just lint`, whole repo, always
+# The suite is NOT here: pre-push runs `just ci` (the full local CI equivalent, from the
+# tracked .beads/hooks/pre-push), and the Stop gate runs it for agents before that.
+repos:
+  - repo: local
+    hooks:
+      - id: fmt-check
+        name: fmt-check (treefmt on the staged files)
+        entry: treefmt --fail-on-change --
+        language: system
+        pass_filenames: true
+      - id: lint
+        name: lint (just lint)
+        entry: just lint
+        language: system
+        pass_filenames: false
+        always_run: true

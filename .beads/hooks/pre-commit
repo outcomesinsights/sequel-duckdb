@@ -22,3 +22,10 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v0.61.0 ---
+
+# The commit-stage gate: prek runs the tracked .pre-commit-config.yaml (fmt-check on the
+# staged files, then `just lint`). Outside the beads markers on purpose, so `bd hooks install`
+# preserves it. Fails loudly when prek is missing: it is pinned in mise.toml, so a missing
+# prek means `mise install` has not run, and a gate that skips is the defect the standard bans.
+command -v prek >/dev/null 2>&1 || { echo "pre-commit: prek not on PATH -- run \`mise install\`" >&2; exit 1; }
+exec prek run

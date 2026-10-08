@@ -16,3 +16,6 @@ zizmor = "1"
 cocogitto = "7"
 
 git-cliff = "2"
+
+# the commit-stage runner (reads .pre-commit-config.yaml; never `prek install`)
+prek = "0"

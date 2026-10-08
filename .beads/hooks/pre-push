@@ -22,3 +22,13 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v0.61.0 ---
+
+# The push gate: the full local CI equivalent, so a push that passes here passes CI (the
+# CI-gates policy; ~19s here, measured 2026-10-08). Then publish the beads, refusing the push
+# if they did not publish: refs/dolt/data is not a branch, so `git push` does not carry it.
+# Outside the beads markers on purpose, so `bd hooks install` preserves it.
+# Git exports GIT_DIR and friends to hooks; the gate runs git (cog) and must see the real repo.
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_PREFIX GIT_QUARANTINE_PATH
+just ci || { echo "pre-push: \`just ci\` failed -- not pushing" >&2; exit 1; }
+command -v bd-publish >/dev/null 2>&1 || exit 0
+exec bd-publish "$@"

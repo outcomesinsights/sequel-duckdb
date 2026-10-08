@@ -14,6 +14,10 @@ lint:
     zizmor --offline --config .github/zizmor.yml .
     cog check --from-latest-tag --ignore-merge-commits
 
+# The full CI equivalent: GitHub Actions runs these recipes, and the tracked
+# .beads/hooks/pre-push runs `just ci` before every push. The commit-stage gate is
+# .pre-commit-config.yaml (fmt-check on staged files + lint), run by prek from
+# .beads/hooks/pre-commit.
 ci: fmt-check lint test hygiene
 
 bundle-update *ARGS:
@@ -28,14 +32,6 @@ fmt:
 # (fix-and-fail): re-stage what it changed. It never rewrites and succeeds.
 fmt-check:
     treefmt --fail-on-change
-
-# What actually runs before a push. Defaults to the complete `ci`; point it at
-# something smaller ONLY where running complete CI locally is impractical.
-pre-push: ci
-
-# Runs on every commit, so it must stay FAST — a sub-minute budget. Tests belong
-# here when they fit; lint alone when they do not.
-pre-commit: fmt-check lint test hygiene
 
 # Content checks inherited from overcommit when it was removed (2026-09-12):
 # MergeConflicts, YamlSyntax, JsonSyntax. RuboCop and the test target were already
