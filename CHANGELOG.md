@@ -21,12 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Ship only lib/ and three docs; stop tracking the beads key ([c45dfc4](https://github.com/outcomesinsights/sequel-duckdb/commit/c45dfc4636917269f6333da1be2b21ed8855a0c2))
 
-## [0.2.1](https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.0...v0.2.1) (2026-10-01)
+## [0.2.1] - 2026-10-01
 
 No changes to the gem's behaviour. The first release published by the
 tag-based release workflow.
 
-## [0.2.0](https://github.com/outcomesinsights/sequel-duckdb/compare/v0.1.0...v0.2.0) (2026-09-30)
+## [0.2.0] - 2026-09-30
 
 ### ⚠ BREAKING CHANGES
 
@@ -182,3 +182,9 @@ tag-based release workflow.
 - Connection string sanitization
 - File path validation for database files
 - Read-only database connection support
+
+[0.1.0]: https://github.com/outcomesinsights/sequel-duckdb/releases/tag/v0.1.0
+[0.2.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.1.0...v0.2.0
+[0.2.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.0...v0.2.1
+[0.3.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.1...v0.3.0
+[0.3.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.3.0...v0.3.1
