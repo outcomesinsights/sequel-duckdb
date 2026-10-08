@@ -1,6 +1,6 @@
 # git-cliff config -- the canonical copy (weekly release ceremony, seed gator-4ws.30).
-# Copy as cliff.toml and replace OWNER/REPO in the two commit-link URLs with the repo's
-# (`outcomesinsights/sequel-duckdb`). NOT a [remote.github] table: that switches on
+# Copy as cliff.toml and replace every OWNER/REPO (commit links in the body, compare and
+# release-tag links in the footer) with the repo's: `sed -i 's#OWNER/REPO#outcomesinsights/sequel-duckdb#g' cliff.toml`. NOT a [remote.github] table: that switches on
 # git-cliff's GitHub integration, which calls the API for pull-request metadata and PANICS
 # on a private repo (404) or needs a token on a public one (measured, 2.13 and 2.14).
 #
@@ -13,7 +13,8 @@
 # and draft the CHANGELOG.md section. See https://git-cliff.org/docs/configuration
 #
 #   git-cliff --bumped-version            # next version from commits since the last v* tag
-#   git-cliff --unreleased --bump         # the section to add to CHANGELOG.md
+#   git-cliff --unreleased --bump         # the section to add to CHANGELOG.md, and its one
+#                                         # `[X.Y.Z]: ...compare...` line for the file's end
 #
 # Only changes to the shipped gem count. chore, ci, test, style and docs commits are
 # skipped, so a week of nothing but those produces no release. `build:` commits COUNT
@@ -25,6 +26,13 @@
 # for an unchanged gem (sequel-duckdb, measured). Type it ci(release):.
 
 [changelog]
+# Keep a Changelog, complete (gator-cf4, ruled 2026-10-08): `## [X.Y.Z] - YYYY-MM-DD`
+# headings, Added / Fixed / Changed groups plus the common `Breaking changes` extension,
+# the commit scope as a bold prefix (`**spark:** Keep the schema ...`), a blank line after
+# every heading so a pasted draft is mdformat-clean (gator-6dy), and in the FOOTER the
+# link reference definitions that make `[X.Y.Z]` a link. Keep a Changelog puts those at
+# the END of the file, so a draft is pasted in two places: the section under `# Changelog`
+# at the top, the one-line `[X.Y.Z]: ...compare...` definition at the bottom.
 header = ""
 body = """
 {%- if commits | length == 0 -%}
@@ -40,19 +48,41 @@ body = """
 {%- set breaking = commits | filter(attribute="breaking", value=true) -%}
 {% if breaking | length > 0 %}
 ### Breaking changes
+
 {% for commit in breaking -%}
-- {{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }})){% if commit.breaking_description and commit.breaking_description != commit.message %}: {{ commit.breaking_description | replace(from="\n", to=" ") | trim }}{% endif %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }})){% if commit.breaking_description and commit.breaking_description != commit.message %}: {{ commit.breaking_description | replace(from="\n", to=" ") | trim }}{% endif %}
 {% endfor %}
 {%- endif -%}
 {% for group, commits in commits | filter(attribute="breaking", value=false) | group_by(attribute="group") %}
 ### {{ group }}
+
 {% for commit in commits -%}
-- {{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }}))
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/outcomesinsights/sequel-duckdb/commit/{{ commit.id }}))
 {% endfor %}
 {%- endfor %}
-{%- endif -%}
+{% endif -%}
 """
-footer = ""
+# The link reference definitions, one per rendered release: a compare link against the
+# previous tag, or the tag's own release page for the first release. `[Unreleased]` only
+# renders without --bump; with --bump the pending section already carries its version.
+footer = """
+{%- set_global defs = [] -%}
+{%- for release in releases -%}
+  {%- if release.commits | length == 0 %}{% continue %}{% endif -%}
+  {%- set from = release.previous.version | default(value="") -%}
+  {%- if release.version -%}
+    {%- set label = release.version | trim_start_matches(pat="v") -%}
+    {%- if from -%}
+      {%- set_global defs = defs | concat(with="[" ~ label ~ "]: https://github.com/outcomesinsights/sequel-duckdb/compare/" ~ from ~ "..." ~ release.version) -%}
+    {%- else -%}
+      {%- set_global defs = defs | concat(with="[" ~ label ~ "]: https://github.com/outcomesinsights/sequel-duckdb/releases/tag/" ~ release.version) -%}
+    {%- endif -%}
+  {%- elif from -%}
+    {%- set_global defs = defs | concat(with="[Unreleased]: https://github.com/outcomesinsights/sequel-duckdb/compare/" ~ from ~ "...HEAD") -%}
+  {%- endif -%}
+{%- endfor -%}
+{{ defs | join(sep="\n") }}
+"""
 trim = true
 
 [git]
