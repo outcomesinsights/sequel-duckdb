@@ -904,6 +904,19 @@ module Sequel
         true
       end
 
+      # DuckDB supports the FILTER clause for aggregate functions natively.
+      # Without this, Sequel emulates FILTER with CASE, which gives wrong
+      # results for order-sensitive aggregates such as first(x ORDER BY ...).
+      def supports_filtered_aggregates?
+        true
+      end
+
+      # DuckDB supports IS DISTINCT FROM natively. Sequel's is_distinct_from
+      # extension uses this flag; without it the extension emits a CASE.
+      def supports_is_distinct_from?
+        true
+      end
+
       def supports_cte?
         true
       end
