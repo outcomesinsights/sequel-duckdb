@@ -772,9 +772,13 @@ module Sequel
         sql
       end
 
+      # Runs a DuckDB COPY that writes +source+ (a Dataset or a SQL string) to
+      # +path+. For a Dataset this is the SQL from Dataset#copy_to_sql.
       def copy_to(source, path, options = Sequel::OPTS)
-        Sequel::DuckDB::Helpers::Copier.new(source, path, options).then do |copier|
-          run(copier.to_sql)
+        if source.is_a?(Sequel::Dataset)
+          run(source.copy_to_sql(path, **options))
+        else
+          run(Sequel::DuckDB::Helpers::Copier.new(source, path, options).to_sql)
         end
       end
 
@@ -864,6 +868,13 @@ module Sequel
 
       # Override select SQL clause order to support VALUES
       Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having compounds order limit lock] ] ])
+
+      # Returns the DuckDB COPY statement that writes this dataset to +path+,
+      # without running it. Options are DuckDB COPY options, for example
+      # format: :parquet, partition_by: [:a, :b], compression: :zstd.
+      def copy_to_sql(path, **options)
+        Sequel::DuckDB::Helpers::Copier.new(self, path, options).to_sql
+      end
 
       private
 
