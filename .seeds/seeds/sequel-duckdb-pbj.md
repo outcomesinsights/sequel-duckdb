@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-13T17:37:19.709459+00:00
+updated_at: 2026-10-13T17:42:47.359240+00:00
 tags:
   - hew
   - dsl
@@ -56,3 +56,20 @@ Ryan's idea, not ruled: `Database#set` and `Database#set_pragma` could both be s
 - Should `settable` quote values through the dataset's literalizer? That fixes DuckDB and changes the SQL for other databases.
 - Should `set_pragma` move from this adapter to a sequelizer extension? This adapter would then need to depend on sequelizer, or keep a copy.
 - Should `set_sql` become public, so a caller can get the text without running it? This is the same need as the `copy_to_sql` child seed.
+
+## Placement recommendation (sequel-duckdb session, 2026-10-13, not ruled)
+
+The rule follows Sequel's own conventions.
+
+- **sequel-duckdb core adapter, always loaded:** capability flags, bug fixes, and DuckDB-only statements that Sequel would put in an adapter. Postgres keeps `copy_table` and `copy_into` in its adapter. Items .1, .3 and .4 go here. `set_pragma` stays here. Item .6 goes here too if it is ever built, because Sequel puts select syntax that only one database has in that database's adapter.
+- **An opt-in sequel-duckdb extension:** new expression builders, so that a user who does not load the extension gets the same SQL as before. This mirrors Sequel's `pg_*_ops` extensions. Items .2 and .5 go here.
+- **sequelizer extension:** only behaviour that is generic across databases. The `settable` fix (`Database#set`) goes here. Nothing in .1 to .7 belongs in sequelizer, because COPY, PRAGMA, FILTER, TRY_CAST and the table functions all have syntax specific to DuckDB.
+- **Drop:** item .7. Sequel passes a Symbol cast type through unchecked on every adapter, and DuckDB reports a bad type name when it binds the query.
+
+A pattern appears in .1, in hew's S3 entry and in `settable`: callers need the SQL text without running it. hew needs it for plan files and for DuckDB CLI `-cmd` arguments. Sequel's own convention is a public `*_sql` method beside each method that runs SQL, for example `insert_sql` beside `insert`. Each new method that runs SQL should get one: `copy_to_sql`, a public `set_sql`, and possibly `pragma_sql`.
+
+## hew's N\* entries (checked against hew's ledger, 2026-10-13)
+
+- N1 maps to .5, N2 and N9 map to .3, and N3 maps to .4.
+- N4 to N8 need no feature. hew writes them in the DSL today.
+- The ledger also lists carve fragments that it does not itemize. One of them has no seed: DuckDB lambda syntax (`list_transform(l, x -> ...)`, at hew's `carve.rb:289`). It would be a candidate for the opt-in extension if hew itemizes it.

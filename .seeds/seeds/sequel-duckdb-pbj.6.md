@@ -5,7 +5,7 @@ status: captured
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:01.163409+00:00
-updated_at: 2026-10-13T17:36:01.163409+00:00
+updated_at: 2026-10-13T17:42:49.879161+00:00
 tags:
   - hew
   - dsl
@@ -23,3 +23,7 @@ Add dataset methods for DuckDB's `* EXCLUDE (...)` and `* REPLACE (...)` select 
 ## Verified fact (0.3.1)
 
 The gem has no support for EXCLUDE or REPLACE.
+
+## Placement (not ruled): core adapter dataset method, deferred
+
+If this is ever built, it goes in the core adapter as a dataset method. Sequel puts select syntax that only one database has in that database's adapter. It emits nothing new unless a caller calls it. I agree with hew's recommendation to defer it: hew can select the columns by name, because `Plan#types_before` already knows them.

@@ -5,7 +5,7 @@ status: captured
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:35:59.281130+00:00
-updated_at: 2026-10-13T17:35:59.281130+00:00
+updated_at: 2026-10-13T17:42:47.768804+00:00
 tags:
   - hew
   - dsl
@@ -28,3 +28,7 @@ Verified on 2026-10-13 against a mock database. The log is in claude_stuff, whic
 ## Notes
 
 The path escaping and the identifier quoting are bug fixes even if Ryan rejects the new public method.
+
+## Placement (not ruled): core adapter
+
+The Copier fixes are bug fixes, so they go in the core adapter whether or not the new method is accepted. `Dataset#copy_to_sql` is DuckDB-only syntax with an adapter precedent: Postgres has `copy_table` and `copy_into` in its adapter. `Database#copy_to` keeps its signature and runs `copy_to_sql`.

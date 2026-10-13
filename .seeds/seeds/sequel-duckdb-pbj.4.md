@@ -5,7 +5,7 @@ status: captured
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:00.425476+00:00
-updated_at: 2026-10-13T17:36:00.425476+00:00
+updated_at: 2026-10-13T17:42:49.065734+00:00
 tags:
   - hew
   - dsl
@@ -24,3 +24,7 @@ Declare `supports_is_distinct_from?` as true in the adapter's dataset methods. h
 
 - This changes the SQL that ConceptQL gets for distinct-from comparisons. ConceptQL's suite must pass before a release.
 - The flag itself does not change results. But a caller that changes a join from `=` to IS NOT DISTINCT FROM changes the join semantics, because NULL keys then match.
+
+## Placement (not ruled): core adapter
+
+This is a capability flag, so it goes in the core adapter. It changes SQL only for callers that load Sequel's `is_distinct_from` extension. ConceptQL's suite must pass before a release that contains it.
