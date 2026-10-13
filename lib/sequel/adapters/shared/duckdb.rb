@@ -911,6 +911,12 @@ module Sequel
         true
       end
 
+      # DuckDB supports IS DISTINCT FROM natively. Sequel's is_distinct_from
+      # extension uses this flag; without it the extension emits a CASE.
+      def supports_is_distinct_from?
+        true
+      end
+
       def supports_cte?
         true
       end
