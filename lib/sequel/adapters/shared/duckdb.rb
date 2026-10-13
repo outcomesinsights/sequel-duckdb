@@ -904,6 +904,13 @@ module Sequel
         true
       end
 
+      # DuckDB supports the FILTER clause for aggregate functions natively.
+      # Without this, Sequel emulates FILTER with CASE, which gives wrong
+      # results for order-sensitive aggregates such as first(x ORDER BY ...).
+      def supports_filtered_aggregates?
+        true
+      end
+
       def supports_cte?
         true
       end
