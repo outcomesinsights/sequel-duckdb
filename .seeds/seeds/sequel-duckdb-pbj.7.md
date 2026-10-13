@@ -1,11 +1,12 @@
 ---
 id: sequel-duckdb-pbj.7
 title: Checked DuckDB type vocabulary (Sequel.duckdb_type)
-status: captured
+status: abandoned
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:01.531800+00:00
-updated_at: 2026-10-13T17:42:50.282625+00:00
+updated_at: 2026-10-13T17:51:38.226237+00:00
+resolved_at: 2026-10-13T17:51:38.226217+00:00
 tags:
   - hew
   - dsl

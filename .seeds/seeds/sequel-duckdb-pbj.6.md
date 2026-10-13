@@ -1,11 +1,11 @@
 ---
 id: sequel-duckdb-pbj.6
 title: Dataset methods for SELECT * EXCLUDE and * REPLACE (hew recommends deferral)
-status: captured
+status: deferred
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:01.163409+00:00
-updated_at: 2026-10-13T17:42:49.879161+00:00
+updated_at: 2026-10-13T17:51:37.410384+00:00
 tags:
   - hew
   - dsl

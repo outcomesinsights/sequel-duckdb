@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-13T17:42:47.359240+00:00
+updated_at: 2026-10-13T18:02:41.188679+00:00
 tags:
   - hew
   - dsl
@@ -73,3 +73,21 @@ A pattern appears in .1, in hew's S3 entry and in `settable`: callers need the S
 - N1 maps to .5, N2 and N9 map to .3, and N3 maps to .4.
 - N4 to N8 need no feature. hew writes them in the DSL today.
 - The ledger also lists carve fragments that it does not itemize. One of them has no seed: DuckDB lambda syntax (`list_transform(l, x -> ...)`, at hew's `carve.rb:289`). It would be a candidate for the opt-in extension if hew itemizes it.
+
+## RULING 2026-10-13 (Ryan)
+
+Ryan accepted the placement recommendation and asked for beads and an implementation:
+
+- Build .1, .3 and .4 in the core adapter.
+- Build .2 and .5 in an opt-in sequel-duckdb extension.
+- Defer .6.
+- Abandon .7.
+- The `settable` fix belongs to sequelizer. It is filed there as sequelizer-c85.
+
+## Design rulings 2026-10-13 (Ryan, from the seeds-to-beads questions)
+
+- **Extension:** one opt-in extension named `duckdb_ops`, holding `try_cast` and the table-function helpers.
+- **Named arguments:** a general named-argument builder that works with any function, plus the helpers `read_parquet`, `read_csv` and `read_json` built on it.
+- **COPY format:** use `format:` when given. Otherwise infer it from the file extension. If neither gives a format, raise `Sequel::Error` naming the path.
+- **ConceptQL:** a verification bead runs ConceptQL's suite against this checkout before the work counts as done.
+- **Copier test:** the one assertion `(FORMAT CSV, DELIMITER |)` in `test_copy_with_delimiter_option` may change to the valid `(FORMAT CSV, DELIMITER '|')`. DuckDB rejects the old SQL. Every other existing test stays unchanged.
