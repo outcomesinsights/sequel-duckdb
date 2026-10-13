@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-13T17:35:58.869373+00:00
+updated_at: 2026-10-13T17:37:19.709459+00:00
 tags:
   - hew
   - dsl
@@ -35,3 +35,24 @@ New expression builders go in an opt-in extension, so a user who does not load i
 ## Hazard for any release
 
 Items 3 and 4 change the SQL that ConceptQL gets from sequel-duckdb, because ConceptQL uses `.filter` aggregates and distinct-from comparisons. ConceptQL's suite must pass before a release that contains either item.
+
+## Correction and open idea: Database#set already exists in sequelizer (2026-10-13)
+
+hew's request said that Sequel core has no `Database#set`. That is true for core. But sequelizer already has a `settable` extension with `Database#set(opts)` and a private `set_sql`. sequelizer's `db_opts` extension loads `settable` automatically.
+
+`settable` emits `SET key=value` and does not quote the value. On a real in-memory DuckDB (gem 0.3.1):
+
+- `SET threads=4` runs.
+- `SET memory_limit=1GB` fails: `Parser Error: syntax error at or near "GB"`.
+- `SET memory_limit='1GB'` runs.
+- `SET timezone=America/Los_Angeles` fails: `Binder Error: SET value cannot contain column names`.
+
+So `settable` is broken for DuckDB string values today.
+
+sequel-duckdb has its own `Database#set_pragma(key, value)` and `configure_duckdb(opts)` in the adapter. They quote and escape strings correctly, and they emit `PRAGMA key = value`.
+
+Ryan's idea, not ruled: `Database#set` and `Database#set_pragma` could both be sequelizer extensions. Questions to decide:
+
+- Should `settable` quote values through the dataset's literalizer? That fixes DuckDB and changes the SQL for other databases.
+- Should `set_pragma` move from this adapter to a sequelizer extension? This adapter would then need to depend on sequelizer, or keep a copy.
+- Should `set_sql` become public, so a caller can get the text without running it? This is the same need as the `copy_to_sql` child seed.
