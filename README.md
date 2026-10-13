@@ -562,6 +562,23 @@ Sequel.try_cast(:amount, Float)
 # => TRY_CAST("amount" AS double precision)
 ```
 
+DuckDB table functions take named parameters. `Sequel.duckdb_named(**params)` builds them
+for the last argument of `Sequel.function`. `Sequel.duckdb_read_parquet`,
+`Sequel.duckdb_read_csv` and `Sequel.duckdb_read_json` take a path or an array of paths,
+plus named parameters. An Array value becomes a DuckDB list. A Hash value becomes a
+struct, in which a Symbol is a bare type name and a String is a string literal.
+
+```ruby
+parts = Sequel.duckdb_read_parquet("/data/events/**/*.parquet",
+                                   hive_partitioning: true, hive_types: { year: :BIGINT })
+DB.from(parts.as(:events)).where(year: 2024)
+# => SELECT * FROM read_parquet(['/data/events/**/*.parquet'], hive_partitioning = TRUE,
+#      hive_types = {'year': BIGINT}) AS "events" WHERE ("year" = 2024)
+
+Sequel.function(:read_json, "/data/a.json", Sequel.duckdb_named(columns: { a: "INTEGER" }))
+# => read_json('/data/a.json', columns = {'a': 'INTEGER'})
+```
+
 ## Model Integration
 
 ### Sequel::Model Usage

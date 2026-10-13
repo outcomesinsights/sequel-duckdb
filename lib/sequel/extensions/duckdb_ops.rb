@@ -16,6 +16,12 @@
 #   Sequel.try_cast(:x, :DOUBLE)  # TRY_CAST("x" AS DOUBLE)
 #   Sequel.try_cast(:x, Float)    # TRY_CAST("x" AS double precision)
 #
+#   Sequel.function(:f, :x, Sequel.duckdb_named(a: 1, b: true))
+#   # f("x", a = 1, b = TRUE)
+#
+#   Sequel.duckdb_read_parquet("/d/**/*.parquet", hive_partitioning: true)
+#   # read_parquet(['/d/**/*.parquet'], hive_partitioning = TRUE)
+#
 # TRY_CAST returns NULL when the cast fails, where CAST raises.
 
 module Sequel
@@ -30,6 +36,92 @@ module Sequel
         sql << " AS " << ds.db.cast_type_literal(type).to_s << ")"
       end
     end
+
+    # Literalizes the values of DuckDB named parameters.
+    module OpsLiteral
+      # Array -> list literal [v1, v2]. Hash -> struct literal {'key': value}.
+      # Anything else goes through the dataset's literal_append.
+      #
+      # In a struct, a Symbol value is a bare type name and a String value is a
+      # string literal, so hive_types: { year: :BIGINT } gives {'year': BIGINT}
+      # and columns: { a: "INTEGER" } gives {'a': 'INTEGER'}. DuckDB 1.5 accepts
+      # both forms for hive_types and for read_json's columns (checked on a real
+      # database: {'year': BIGINT} and {'year': 'BIGINT'} both type the column).
+      def self.append(ds, sql, value)
+        case value
+        when Array
+          sql << "["
+          value.each_with_index do |v, i|
+            sql << ", " unless i.zero?
+            append(ds, sql, v)
+          end
+          sql << "]"
+        when Hash
+          sql << "{"
+          value.each_with_index do |(k, v), i|
+            sql << ", " unless i.zero?
+            ds.literal_append(sql, k.to_s)
+            sql << ": "
+            v.is_a?(Symbol) ? sql << v.to_s : append(ds, sql, v)
+          end
+          sql << "}"
+        else
+          ds.literal_append(sql, value)
+        end
+      end
+    end
+
+    # A DuckDB list literal, ['a', 'b'].
+    class ListLiteral < Sequel::SQL::Expression
+      attr_reader :values
+
+      def initialize(values)
+        super()
+        @values = values.dup.freeze
+        freeze
+      end
+
+      def to_s_append(ds, sql)
+        OpsLiteral.append(ds, sql, values)
+      end
+    end
+
+    # Named parameters, name1 = value1, name2 = value2, in the given order.
+    # Use it as the last argument of Sequel.function.
+    class NamedArguments < Sequel::SQL::Expression
+      NAME = /\A[a-z_][a-z0-9_]*\z/
+
+      attr_reader :args
+
+      def initialize(args)
+        super()
+        raise ArgumentError, "no DuckDB named parameters given" if args.empty?
+
+        args.each_key do |name|
+          raise ArgumentError, "invalid DuckDB parameter name: #{name.inspect}" unless NAME.match?(name.to_s)
+        end
+        @args = args.dup.freeze
+        freeze
+      end
+
+      def to_s_append(ds, sql)
+        args.each_with_index do |(name, value), i|
+          sql << ", " unless i.zero?
+          sql << name.to_s << " = "
+          OpsLiteral.append(ds, sql, value)
+        end
+      end
+    end
+
+    # name(['path', ...], named = value, ...) as a Sequel::SQL::Function.
+    def self.read_function(name, paths, named)
+      paths = Array(paths)
+      raise ArgumentError, "paths must be one or more Strings: #{paths.inspect}" if paths.empty? || !paths.all?(String)
+
+      args = [ ListLiteral.new(paths) ]
+      args << NamedArguments.new(named) unless named.empty?
+      Sequel::SQL::Function.new(name, *args)
+    end
   end
 
   module SQL
@@ -37,6 +129,26 @@ module Sequel
       # Return a DuckDB TRY_CAST of expr to type.
       def try_cast(expr, type)
         Sequel::DuckDB::TryCast.new(expr, type)
+      end
+
+      # Return DuckDB named parameters, for the last argument of Sequel.function.
+      def duckdb_named(**args)
+        Sequel::DuckDB::NamedArguments.new(args)
+      end
+
+      # read_parquet(paths, named...). paths is a String or an Array of Strings.
+      def duckdb_read_parquet(paths, **named)
+        Sequel::DuckDB.read_function(:read_parquet, paths, named)
+      end
+
+      # read_csv(paths, named...). paths is a String or an Array of Strings.
+      def duckdb_read_csv(paths, **named)
+        Sequel::DuckDB.read_function(:read_csv, paths, named)
+      end
+
+      # read_json(paths, named...). paths is a String or an Array of Strings.
+      def duckdb_read_json(paths, **named)
+        Sequel::DuckDB.read_function(:read_json, paths, named)
       end
     end
   end
