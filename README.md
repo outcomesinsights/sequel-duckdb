@@ -539,6 +539,46 @@ db[:users].copy_to_sql("/data/users.csv", header: true, delimiter: "|")
 # => COPY (SELECT * FROM "users") TO '/data/users.csv' (FORMAT CSV, HEADER, DELIMITER '|')
 ```
 
+### duckdb_ops extension
+
+The `duckdb_ops` extension adds DuckDB-specific expression builders to `Sequel`. It is
+opt-in. If you do not load it, Sequel generates the same SQL as before. Load it with
+either form. Both forms make the builders available globally.
+
+```ruby
+Sequel.extension :duckdb_ops
+# or
+DB.extension :duckdb_ops
+```
+
+`Sequel.try_cast(expr, type)` builds a DuckDB `TRY_CAST`. It returns NULL when the cast
+fails, where `CAST` raises an error. The type works as in `Sequel.cast`: a Ruby class
+maps to the adapter's type name, and a Symbol or String passes through unchanged.
+
+```ruby
+DB[:raw].select(Sequel.try_cast(:amount, :DOUBLE).as(:amount))
+# => SELECT TRY_CAST("amount" AS DOUBLE) AS "amount" FROM "raw"
+Sequel.try_cast(:amount, Float)
+# => TRY_CAST("amount" AS double precision)
+```
+
+DuckDB table functions take named parameters. `Sequel.duckdb_named(**params)` builds them
+for the last argument of `Sequel.function`. `Sequel.duckdb_read_parquet`,
+`Sequel.duckdb_read_csv` and `Sequel.duckdb_read_json` take a path or an array of paths,
+plus named parameters. An Array value becomes a DuckDB list. A Hash value becomes a
+struct, in which a Symbol is a bare type name and a String is a string literal.
+
+```ruby
+parts = Sequel.duckdb_read_parquet("/data/events/**/*.parquet",
+                                   hive_partitioning: true, hive_types: { year: :BIGINT })
+DB.from(parts.as(:events)).where(year: 2024)
+# => SELECT * FROM read_parquet(['/data/events/**/*.parquet'], hive_partitioning = TRUE,
+#      hive_types = {'year': BIGINT}) AS "events" WHERE ("year" = 2024)
+
+Sequel.function(:read_json, "/data/a.json", Sequel.duckdb_named(columns: { a: "INTEGER" }))
+# => read_json('/data/a.json', columns = {'a': 'INTEGER'})
+```
+
 ## Model Integration
 
 ### Sequel::Model Usage
