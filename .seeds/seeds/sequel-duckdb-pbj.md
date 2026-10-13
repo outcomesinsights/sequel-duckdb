@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-13T18:02:41.188679+00:00
+updated_at: 2026-10-13T18:48:26.680963+00:00
 tags:
   - hew
   - dsl
@@ -91,3 +91,20 @@ Ryan accepted the placement recommendation and asked for beads and an implementa
 - **COPY format:** use `format:` when given. Otherwise infer it from the file extension. If neither gives a format, raise `Sequel::Error` naming the path.
 - **ConceptQL:** a verification bead runs ConceptQL's suite against this checkout before the work counts as done.
 - **Copier test:** the one assertion `(FORMAT CSV, DELIMITER |)` in `test_copy_with_delimiter_option` may change to the valid `(FORMAT CSV, DELIMITER '|')`. DuckDB rejects the old SQL. Every other existing test stays unchanged.
+
+## UPDATE 2026-10-13: ConceptQL verification (bead sequel-duckdb-acd.7)
+
+ConceptQL's DuckDB suite passes against the final state of this bead set (main at 56142ea). No test regressed. The candidate loaded the new FILTER and IS DISTINCT FROM flags, but ConceptQL never reaches them: its lib and sequelizer contain no aggregate `.filter`, no `is_distinct_from`, and no `copy_to`.
+
+The suite ran through ConceptQL's `just test-duckdb` recipe, in a throwaway clone of ConceptQL at 75cae435. Both runs used one fixture file and minitest seed 15329.
+
+```
+baseline  (sequel-duckdb 0.3.0, lock revision ce86567): 504 runs, 1854 assertions, 0 failures, 0 errors, 0 skips
+candidate (sequel-duckdb 0.3.1, path to this checkout): 504 runs, 1854 assertions, 0 failures, 0 errors, 0 skips
+```
+
+The logs are claude_stuff/acd.7/conceptql-baseline-20261013-114032.log and claude_stuff/acd.7/conceptql-candidate-20261013-114411.log.
+
+The Postgres and Spark jobs of ConceptQL's CI were not run. They need Docker services, and they do not load sequel-duckdb.
+
+A side finding belongs to ConceptQL. Its pinned fixture checksum no longer matches the published Dropbox fixture, so its own `just test-duckdb` stops at the checksum check today. For this comparison, the current publish was re-pinned in the throwaway clone only.
