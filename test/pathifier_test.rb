@@ -2,6 +2,8 @@
 
 require_relative "spec_helper"
 require_relative "../lib/sequel/duckdb/helpers/pathifier"
+require "tmpdir"
+require "fileutils"
 
 # Test Sequel::DuckDB::Helpers::Pathifier for SQL generation
 class PathifierTest < SequelDuckDBTest::TestCase
@@ -224,5 +226,21 @@ class PathifierTest < SequelDuckDBTest::TestCase
     sql_expr = pathifier.to_sql
 
     assert_equal "read_parquet(['/data/*.parquet'])", @db.literal(sql_expr)
+  end
+
+  def test_doubles_single_quotes_in_paths
+    pathifier = Sequel::DuckDB::Helpers::Pathifier.new([ "/tmp/o'x/a.parquet", "/tmp/b.parquet" ])
+
+    assert_equal "read_parquet(['/tmp/o''x/a.parquet','/tmp/b.parquet'])", @db.literal(pathifier.to_sql)
+  end
+
+  def test_reads_back_a_file_under_a_directory_with_an_apostrophe
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "o'x", "out.parquet")
+      FileUtils.mkdir_p(File.dirname(path))
+      @db.run("COPY (SELECT 42 AS n) TO '#{path.gsub("'", "''")}' (FORMAT PARQUET)")
+
+      assert_equal [ { n: 42 } ], @db.from(Sequel::DuckDB::Helpers::Pathifier.new(path).to_sql).all
+    end
   end
 end

@@ -120,7 +120,7 @@ module Sequel
         #   db.literal(sql)
         #   # => "read_csv(['/data/a.csv','/data/b.csv'])"
         def to_sql
-          paths_sql = @paths.map { |p| "'#{p}'" }.join(",").then do |paths_arr|
+          paths_sql = @paths.map { |p| "'#{p.to_s.gsub("'", "''")}'" }.join(",").then do |paths_arr|
             Sequel::LiteralString.new("[#{paths_arr}]")
           end
 
