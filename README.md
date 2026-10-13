@@ -539,6 +539,29 @@ db[:users].copy_to_sql("/data/users.csv", header: true, delimiter: "|")
 # => COPY (SELECT * FROM "users") TO '/data/users.csv' (FORMAT CSV, HEADER, DELIMITER '|')
 ```
 
+### duckdb_ops extension
+
+The `duckdb_ops` extension adds DuckDB-specific expression builders to `Sequel`. It is
+opt-in. If you do not load it, Sequel generates the same SQL as before. Load it with
+either form. Both forms make the builders available globally.
+
+```ruby
+Sequel.extension :duckdb_ops
+# or
+DB.extension :duckdb_ops
+```
+
+`Sequel.try_cast(expr, type)` builds a DuckDB `TRY_CAST`. It returns NULL when the cast
+fails, where `CAST` raises an error. The type works as in `Sequel.cast`: a Ruby class
+maps to the adapter's type name, and a Symbol or String passes through unchanged.
+
+```ruby
+DB[:raw].select(Sequel.try_cast(:amount, :DOUBLE).as(:amount))
+# => SELECT TRY_CAST("amount" AS DOUBLE) AS "amount" FROM "raw"
+Sequel.try_cast(:amount, Float)
+# => TRY_CAST("amount" AS double precision)
+```
+
 ## Model Integration
 
 ### Sequel::Model Usage
