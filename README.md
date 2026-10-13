@@ -520,6 +520,25 @@ db[:users].multi_insert(users_data)
 db[:large_table].select(:id, :name, :created_at).where(active: true)
 ```
 
+### Exporting with COPY
+
+`Database#copy_to` runs a DuckDB `COPY` that writes a dataset (or a SQL string) to a file.
+FORMAT comes from the `format:` option, or else from the file extension. A path with
+neither, such as a directory for a partitioned export, raises `Sequel::Error`.
+
+```ruby
+db.copy_to(db[:users].where(active: true), "/data/users.parquet")
+db.copy_to(db[:events], "/data/events", format: :parquet, partition_by: [:year, :month])
+```
+
+`Dataset#copy_to_sql` returns the same `COPY` statement without running it, for example to
+write a plan file:
+
+```ruby
+db[:users].copy_to_sql("/data/users.csv", header: true, delimiter: "|")
+# => COPY (SELECT * FROM "users") TO '/data/users.csv' (FORMAT CSV, HEADER, DELIMITER '|')
+```
+
 ## Model Integration
 
 ### Sequel::Model Usage
