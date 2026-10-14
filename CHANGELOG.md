@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **copy:** `Database#copy_to` and the new `Dataset#copy_to_sql` write partition columns
+  as quoted identifiers. `partition_by: "year"` gave `PARTITION_BY YEAR` and now gives
+  `PARTITION_BY ("year")`. DuckDB runs both forms, so the result does not change. Tests
+  that compare COPY strings must update their expected strings. Word values are
+  unchanged, for example `FORMAT PARQUET` and `COMPRESSION ZSTD`. Values that are not a
+  single word, such as `delimiter: "|"`, are now quoted strings. The old text for those
+  values was a DuckDB syntax error.
+
 ## [0.3.1] - 2026-10-02
 
 ### Fixed

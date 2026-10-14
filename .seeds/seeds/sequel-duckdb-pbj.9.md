@@ -5,7 +5,7 @@ status: captured
 type: question
 parent: sequel-duckdb-pbj
 created_at: 2026-10-14T17:29:33.374986+00:00
-updated_at: 2026-10-14T17:29:33.374986+00:00
+updated_at: 2026-10-14T19:40:29.350439+00:00
 tags:
   - hew
   - dsl
@@ -43,3 +43,15 @@ Question: add a README note that the extension must be loaded on the Database, a
 copy_to_sql now writes `FORMAT PARQUET` in upper case and quotes partition columns: `(FORMAT PARQUET, PARTITION_BY ("year"))`. DuckDB accepts both. The change altered every expected COPY string in hew's specs. Other consumers whose specs match COPY text will see the same change.
 
 Question: should the release notes for the next version state this change in COPY text explicitly, beyond the fix(copy) commit subject that git-cliff will list?
+
+## RULED 2026-10-14 (Ryan)
+
+Ryan: "For item one, let's go with the read me for item two. I don't really know what you're trying to tell me, but fine. Three, go ahead and put it in the release notes."
+
+- Item 1: no `Sequel.duckdb_list` builder. The README documents `Sequel.function(:list_value, ...)` in a "Lists" section.
+- Item 2: the README has an "IS DISTINCT FROM" section. It says to load the extension on the Database and to negate with `~`.
+- Item 3: CHANGELOG.md has an `## [Unreleased]` section with the COPY text change.
+
+Correction to item 3, verified 2026-10-14 (claude_stuff/copy-text-compare-20261014-123856.log and claude_stuff/old-copy-forms-20261014-124003.log): `FORMAT PARQUET` was already upper case before these changes. For input that worked before, the only text change is `PARTITION_BY YEAR` becoming `PARTITION_BY ("year")`. The old text for non-word values, such as `DELIMITER ,` and `DELIMITER |`, was a DuckDB syntax error. hew's spec changes came from hew's own earlier SQL text.
+
+Release hazard: the release procedure in AGENTS.md says to add the git-cliff section at the top of CHANGELOG.md. It does not mention an existing `## [Unreleased]` section. The release agent must merge the Unreleased note into the new version's section and remove the Unreleased heading.

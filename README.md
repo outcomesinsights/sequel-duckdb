@@ -539,6 +539,35 @@ db[:users].copy_to_sql("/data/users.csv", header: true, delimiter: "|")
 # => COPY (SELECT * FROM "users") TO '/data/users.csv' (FORMAT CSV, HEADER, DELIMITER '|')
 ```
 
+### Lists
+
+Sequel writes a Ruby Array as a parenthesized list, such as `(1, 2, 3)`, for `IN`
+conditions. DuckDB does not read that as a list value. To build a DuckDB list from
+expressions, call DuckDB's `list_value` function:
+
+```ruby
+DB.literal([1, 2, 3])
+# => (1, 2, 3)
+DB.literal(Sequel.function(:list_value, :a, Sequel[:b] + 1))
+# => list_value("a", ("b" + 1))
+```
+
+### IS DISTINCT FROM
+
+The adapter declares that DuckDB supports `IS DISTINCT FROM`. Sequel's `is_distinct_from`
+extension then writes it natively. Load the extension on the Database. With only
+`Sequel.extension :is_distinct_from`, the builder exists, but the dataset cannot write it
+and raises `NoMethodError`. Write `IS NOT DISTINCT FROM` by negating the expression with
+`~`:
+
+```ruby
+DB.extension :is_distinct_from
+DB[:t].where(Sequel.is_distinct_from(:a, :b))
+# => SELECT * FROM "t" WHERE ("a" IS DISTINCT FROM "b")
+DB[:t].where(~Sequel.is_distinct_from(:a, :b))
+# => SELECT * FROM "t" WHERE NOT ("a" IS DISTINCT FROM "b")
+```
+
 ### duckdb_ops extension
 
 The `duckdb_ops` extension adds DuckDB-specific expression builders to `Sequel`. It is
