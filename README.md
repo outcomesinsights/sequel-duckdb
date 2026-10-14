@@ -579,6 +579,39 @@ Sequel.function(:read_json, "/data/a.json", Sequel.duckdb_named(columns: { a: "I
 # => read_json('/data/a.json', columns = {'a': 'INTEGER'})
 ```
 
+#### Lambda expressions
+
+`Sequel.duckdb_lambda` builds a DuckDB lambda expression for list functions such as
+`list_transform`, `list_filter` and `list_reduce`. Call those functions through
+`Sequel.function`. The builder has two forms. In the block form, every argument is a
+parameter name, and the block gets one identifier for each parameter. In the body form,
+the first argument is a parameter name or an Array of names, and the second argument is
+the body. The body names the parameters as Symbols or with `Sequel[:x]`.
+
+```ruby
+Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x }
+Sequel.duckdb_lambda([:acc, :x], Sequel[:acc] + :x)
+# => lambda "acc", "x": ("acc" + "x")
+
+Sequel.function(:list_reduce, :amounts,
+                Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x },
+                Sequel.cast(0, :BIGINT))
+# => list_reduce("amounts", lambda "acc", "x": ("acc" + "x"), CAST(0 AS BIGINT))
+```
+
+DuckDB has no `let`. To compute a value once and use it more than once, wrap it in a
+one-element list, transform it, and take element 1 with `Sequel.subscript`:
+
+```ruby
+square_plus = Sequel.duckdb_lambda(:v) { |v| (v * v) + v }
+Sequel.subscript(Sequel.function(:list_transform, Sequel.function(:list_value, :n), square_plus), 1)
+# => (list_transform(list_value("n"), lambda "v": (("v" * "v") + "v")))[1]
+```
+
+The builder emits DuckDB's `lambda` keyword syntax, never the `x -> body` arrow, which
+DuckDB deprecated. It needs a DuckDB version that accepts the `lambda` keyword. Parameter
+names are quoted identifiers, the same as the references to them in the body.
+
 ## Model Integration
 
 ### Sequel::Model Usage
