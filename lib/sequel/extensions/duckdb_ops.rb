@@ -22,6 +22,9 @@
 #   Sequel.duckdb_read_parquet("/d/**/*.parquet", hive_partitioning: true)
 #   # read_parquet(['/d/**/*.parquet'], hive_partitioning = TRUE)
 #
+#   Sequel.duckdb_lambda(:x) { |x| x + 1 }  # lambda "x": ("x" + 1)
+#   Sequel.duckdb_lambda(:x, Sequel[:x] + 1) # the same, body form
+#
 # TRY_CAST returns NULL when the cast fails, where CAST raises.
 
 module Sequel
@@ -113,6 +116,57 @@ module Sequel
       end
     end
 
+    # A DuckDB lambda expression, lambda "acc", "x": body. The parameter names
+    # are quoted identifiers, so they match how Sequel writes the references in
+    # the body. It emits the lambda keyword syntax, never the deprecated arrow.
+    class Lambda < Sequel::SQL::Expression
+      attr_reader :params, :body
+
+      def initialize(params, body)
+        super()
+        raise ArgumentError, "a DuckDB lambda needs at least one parameter" if params.empty?
+
+        params.each do |name|
+          unless (name.is_a?(Symbol) || name.is_a?(String)) && !name.empty?
+            raise ArgumentError, "invalid DuckDB lambda parameter name: #{name.inspect}"
+          end
+        end
+        dup = params.map(&:to_s).tally.select { |_, n| n > 1 }.keys
+        raise ArgumentError, "duplicate DuckDB lambda parameter names: #{dup.inspect}" unless dup.empty?
+
+        @params = params.dup.freeze
+        @body = body
+        freeze
+      end
+
+      def to_s_append(ds, sql)
+        sql << "lambda "
+        params.each_with_index do |name, i|
+          sql << ", " unless i.zero?
+          ds.quote_identifier_append(sql, name)
+        end
+        sql << ": "
+        ds.literal_append(sql, body)
+      end
+    end
+
+    # Sequel.duckdb_lambda: the block form takes parameter names and yields
+    # one identifier per parameter; the body form takes a name or an Array of
+    # names, then the body.
+    def self.lambda_expression(args, block)
+      if block
+        if args.any? { |a| !(a.is_a?(Symbol) || a.is_a?(String)) }
+          raise ArgumentError, "Sequel.duckdb_lambda takes parameter names with a block, not a body argument: #{args.inspect}"
+        end
+
+        Lambda.new(args, block.call(*args.map { |name| Sequel::SQL::Identifier.new(name) }))
+      else
+        raise ArgumentError, "Sequel.duckdb_lambda without a block takes (params, body), got #{args.size} arguments" unless args.size == 2
+
+        Lambda.new(Array(args[0]), args[1])
+      end
+    end
+
     # name(['path', ...], named = value, ...) as a Sequel::SQL::Function.
     def self.read_function(name, paths, named)
       paths = Array(paths)
@@ -134,6 +188,14 @@ module Sequel
       # Return DuckDB named parameters, for the last argument of Sequel.function.
       def duckdb_named(**args)
         Sequel::DuckDB::NamedArguments.new(args)
+      end
+
+      # Return a DuckDB lambda expression, lambda "x": body. Two forms:
+      #
+      #   Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x }
+      #   Sequel.duckdb_lambda([:acc, :x], Sequel[:acc] + :x)
+      def duckdb_lambda(*args, &block)
+        Sequel::DuckDB.lambda_expression(args, block)
       end
 
       # read_parquet(paths, named...). paths is a String or an Array of Strings.

@@ -47,6 +47,17 @@ class DuckDBOpsLoadTest < SequelDuckDBTest::TestCase
 
     assert_equal [ "false", "true", "TRY_CAST(\"x\" AS DOUBLE)" ], out.lines.map(&:chomp)
   end
+
+  def test_sequel_extension_adds_duckdb_lambda_only_when_loaded
+    out = run_isolated(<<~RUBY)
+      puts Sequel.respond_to?(:duckdb_lambda)
+      Sequel.extension :duckdb_ops
+      puts Sequel.respond_to?(:duckdb_lambda)
+      puts Sequel.mock(host: "duckdb").literal(Sequel.duckdb_lambda(:x) { |x| x + 1 })
+    RUBY
+
+    assert_equal [ "false", "true", "lambda \"x\": (\"x\" + 1)" ], out.lines.map(&:chomp)
+  end
 end
 
 class DuckDBOpsTryCastTest < SequelDuckDBTest::TestCase
@@ -203,5 +214,129 @@ class DuckDBOpsReadFunctionsRealTest < SequelDuckDBTest::TestCase
     ds = @db.from(Sequel.duckdb_read_csv(path, header: true, delim: "|").as(:c))
 
     assert_equal [ { x: 1, y: "p" } ], ds.all
+  end
+end
+
+class DuckDBOpsLambdaTest < SequelDuckDBTest::TestCase
+  def sql(expr)
+    mock_db.literal(expr)
+  end
+
+  def test_block_form_with_one_parameter
+    assert_equal "lambda \"x\": (\"x\" + 1)", sql(Sequel.duckdb_lambda(:x) { |x| x + 1 })
+  end
+
+  def test_block_form_with_two_parameters
+    assert_equal "lambda \"acc\", \"x\": (\"acc\" + \"x\")", sql(Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x })
+  end
+
+  def test_block_receives_one_identifier_per_parameter_in_order
+    seen = nil
+    Sequel.duckdb_lambda(:acc, "x") { |*ids| seen = ids }
+
+    assert_equal [ Sequel::SQL::Identifier ] * 2, seen.map(&:class)
+    assert_equal [ :acc, "x" ], seen.map(&:value)
+  end
+
+  def test_body_form_with_an_array_of_names
+    assert_equal "lambda \"acc\", \"x\": (\"acc\" + \"x\")", sql(Sequel.duckdb_lambda([ :acc, :x ], Sequel[:acc] + :x))
+  end
+
+  def test_body_form_with_a_single_symbol
+    assert_equal "lambda \"x\": (\"x\" + 1)", sql(Sequel.duckdb_lambda(:x, Sequel[:x] + 1))
+  end
+
+  def test_body_form_with_a_plain_ruby_value
+    assert_equal "lambda \"x\": 'text'", sql(Sequel.duckdb_lambda(:x, "text"))
+  end
+
+  def test_both_forms_give_identical_sql
+    assert_equal sql(Sequel.duckdb_lambda(:x) { |x| x + 1 }), sql(Sequel.duckdb_lambda(:x, Sequel[:x] + 1))
+    assert_equal sql(Sequel.duckdb_lambda(:acc, :x) { |acc, x| (acc * 31) + x }),
+                 sql(Sequel.duckdb_lambda([ :acc, :x ], (Sequel[:acc] * 31) + :x))
+  end
+
+  def test_parameter_names_use_identifier_quoting
+    assert_equal "lambda \"a\"\"b\": 1", sql(Sequel.duckdb_lambda("a\"b", 1))
+  end
+
+  def test_no_parameters_raise
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda { 1 } }
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda([], 1) }
+  end
+
+  def test_invalid_parameter_names_raise
+    [ 1, nil, Sequel[:x], :"", "" ].each do |name|
+      assert_raises(ArgumentError, name.inspect) { Sequel.duckdb_lambda([ name ], 1) }
+      assert_raises(ArgumentError, name.inspect) { Sequel.duckdb_lambda(name) { 1 } }
+    end
+  end
+
+  def test_duplicate_parameter_names_raise
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda(:x, :x) { |x, _| x } }
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda([ :x, "x" ], 1) }
+  end
+
+  def test_block_with_a_body_argument_raises
+    [ -> { Sequel.duckdb_lambda(:x, Sequel[:x] + 1) { |x| x } },
+      -> { Sequel.duckdb_lambda([ :x ], 1) { |x| x } } ].each do |call|
+      assert_match(/not a body argument/, assert_raises(ArgumentError, &call).message)
+    end
+  end
+
+  def test_body_form_needs_exactly_two_arguments
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda(:x) }
+    assert_raises(ArgumentError) { Sequel.duckdb_lambda(:acc, :x, Sequel[:acc] + :x) }
+  end
+end
+
+class DuckDBOpsLambdaRealTest < SequelDuckDBTest::TestCase
+  def setup
+    super
+    @db = SequelDuckDBTest.create_test_db
+  end
+
+  def teardown
+    @db.disconnect
+    super
+  end
+
+  def list(*values)
+    Sequel.function(:list_value, *values)
+  end
+
+  def test_list_transform
+    assert_equal [ 2, 3, 4 ], @db.get(Sequel.function(:list_transform, list(1, 2, 3), Sequel.duckdb_lambda(:x) { |x| x + 1 }))
+  end
+
+  def test_list_reduce_with_an_initial_value
+    reduce = Sequel.function(:list_reduce, list(1, 2, 3),
+                             Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x },
+                             Sequel.cast(0, :BIGINT))
+
+    assert_equal 6, @db.get(reduce)
+  end
+
+  def test_let_idiom
+    body = Sequel.duckdb_lambda(:v) { |v| (v * v) + v }
+    let = Sequel.subscript(Sequel.function(:list_transform, list(Sequel.lit("40 + 2")), body), 1)
+
+    assert_equal 1806, @db.get(let)
+  end
+
+  def test_struct_field_access_in_the_body
+    structs = Sequel.lit("[{'rows': 3}, {'rows': 4}]")
+    rows = Sequel.function(:list_transform, structs, Sequel.duckdb_lambda(:p, Sequel.qualify(:p, :rows)))
+
+    assert_equal 7, @db.get(Sequel.function(:list_sum, rows))
+  end
+
+  def test_nested_lambda_refers_to_the_outer_parameter
+    outer = Sequel.duckdb_lambda(:x) do |x|
+      inner = Sequel.duckdb_lambda(:y) { |y| x + y }
+      Sequel.function(:list_sum, Sequel.function(:list_transform, list(10, 20), inner))
+    end
+
+    assert_equal [ 32, 34 ], @db.get(Sequel.function(:list_transform, list(1, 2), outer))
   end
 end
