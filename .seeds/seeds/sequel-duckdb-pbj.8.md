@@ -5,7 +5,7 @@ status: captured
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-14T14:17:25.781098+00:00
-updated_at: 2026-10-14T14:17:25.781098+00:00
+updated_at: 2026-10-14T15:52:15.342528+00:00
 tags:
   - hew
   - dsl
@@ -72,3 +72,12 @@ The opt-in duckdb_ops extension, beside try_cast and duckdb_named. It is an expr
 - Whether to quote parameter names. Quoted works (verified above). Quoting matches how Sequel writes the references in the body, so both sides agree.
 - Whether to add list-function helpers (list_transform, list_reduce, list_filter) or leave them to Sequel.function. Sequel.function already works for them once the lambda exists.
 - Whether the "let" idiom deserves its own helper, or is just list_transform plus Sequel.subscript.
+
+## RULED 2026-10-14 (Ryan, in the sequel-duckdb session)
+
+Ryan: "let's move forward with implementing lambda support". He then ruled on the open questions:
+
+- Builder shape: "Both forms". A block form, `Sequel.duckdb_lambda(:acc, :x) { |acc, x| acc + x }`, and a body-argument form, `Sequel.duckdb_lambda([:acc, :x], body)`, used when no block is given.
+- Syntax: "lambda keyword (Recommended)". Emit `lambda x: body`, not the deprecated `x -> body`. The README says it needs a DuckDB that has the lambda keyword.
+- Scope: "Lambda only (Recommended)". Add only `Sequel.duckdb_lambda` to the duckdb_ops extension. List functions go through `Sequel.function`, `[1]` goes through `Sequel.subscript`, and the README shows the "let" idiom as an example. No let helper and no list-function wrappers.
+- Parameter names are quoted identifiers, so that they match how Sequel writes the references in the body (verified above).
