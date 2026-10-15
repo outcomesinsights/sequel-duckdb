@@ -3,6 +3,7 @@
 require "sequel"
 require "duckdb"
 require_relative "shared/duckdb"
+require_relative "../duckdb/instance_registry"
 
 # Sequel is a database toolkit for Ruby that provides a powerful ORM and database abstraction layer.
 # This module extends Sequel to support DuckDB, a high-performance analytical database engine.
@@ -58,30 +59,57 @@ module Sequel
 
       # Open the DuckDB::Database once during Sequel::Database initialization.
       # DuckDB's ATTACH/schema state is per-Database, not per-Connection, so all
-      # pool connections must share one Database instance.
+      # pool connections must share one Database instance. A database file is also
+      # shared with every other Sequel::Database on that file in this process
+      # (InstanceRegistry), and #disconnect gives it back once no connection is open.
       def adapter_initialize
-        database_path = opts[:database]
-
-        @duckdb_database = if database_path == ":memory:" || database_path.nil?
-                             ::DuckDB::Database.open(":memory:")
-        else
-                             if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
-                               database_path = "/#{database_path}"
-                             end
-                             ::DuckDB::Database.open(database_path)
-        end
+        @duckdb_mutex = Mutex.new
+        @duckdb_connections = 0
+        @duckdb_file = duckdb_file_path(opts[:database])
+        @duckdb_database = open_duckdb_database
       rescue ::DuckDB::Error => e
         raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
       rescue StandardError => e
         raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
       end
 
+      # nil for an in-memory database, which is never shared.
+      def duckdb_file_path(database_path)
+        return nil if database_path.nil? || database_path == ":memory:"
+        return "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
+
+        database_path
+      end
+
+      def open_duckdb_database
+        @duckdb_file ? InstanceRegistry.acquire(@duckdb_file) : ::DuckDB::Database.open(":memory:")
+      end
+
       public
 
       def connect(_server)
-        @duckdb_database.connect
+        @duckdb_mutex.synchronize do
+          @duckdb_database ||= open_duckdb_database
+          conn = @duckdb_database.connect
+          @duckdb_connections += 1
+          conn
+        end
       rescue ::DuckDB::Error => e
         raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
+      end
+
+      # Closes the pool's idle connections. When no connection of this Sequel::Database
+      # is still open, it also gives back its reference to the shared database file, so
+      # the file closes once no Sequel::Database in the process uses it. The next query
+      # opens it again. An in-memory database stays open, so its data survives.
+      def disconnect(opts = OPTS)
+        super
+        @duckdb_mutex.synchronize do
+          next unless @duckdb_file && @duckdb_database && @duckdb_connections.zero?
+
+          InstanceRegistry.release(@duckdb_file)
+          @duckdb_database = nil
+        end
       end
 
       def disconnect_connection(conn)
@@ -91,6 +119,7 @@ module Sequel
           conn.close
         rescue ::DuckDB::Error # rubocop:disable Lint/SuppressedException -- best-effort cleanup on disconnect
         end
+        @duckdb_mutex.synchronize { @duckdb_connections -= 1 }
       end
 
       def valid_connection?(conn)

@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `months: 1` gives `"d" - INTERVAL (-1) MONTH`, and `months: -1` gives
   `"d" - INTERVAL 1 MONTH`. Day and time intervals are unchanged. Tests that compare
   date arithmetic SQL strings must update their expected strings for years and months.
+- **connection:** two `Sequel::Database` objects on one DuckDB file in one process opened
+  two DuckDB instances, and writes through one did not reliably reach the other. Every
+  `Sequel::Database` on a file now shares one DuckDB instance. `Database#disconnect` now
+  gives the file back once that database has no open connection. The file closes when no
+  `Sequel::Database` in the process uses it, and the next query opens it again.
+  In-memory databases are unchanged: each is separate and stays open after `disconnect`.
 
 ## [0.3.1] - 2026-10-02
 
