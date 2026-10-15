@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-13T18:48:26.680963+00:00
+updated_at: 2026-10-15T03:43:45.602480+00:00
 tags:
   - hew
   - dsl
@@ -108,3 +108,15 @@ The logs are claude_stuff/acd.7/conceptql-baseline-20261013-114032.log and claud
 The Postgres and Spark jobs of ConceptQL's CI were not run. They need Docker services, and they do not load sequel-duckdb.
 
 A side finding belongs to ConceptQL. Its pinned fixture checksum no longer matches the published Dropbox fixture, so its own `just test-duckdb` stops at the checksum check today. For this comparison, the current publish was re-pinned in the throwaway clone only.
+
+## UPDATE 2026-10-14: settable has changed since the 2026-10-13 note
+
+Read from sequelizer's current `settable` and `db_opts` source:
+
+- `set_sql` is now public. It returns the SET statements without running them.
+- A value wrapped in `Sequel.expr` goes through `literal`, so `DB.set(memory_limit: Sequel.expr('1GB'))` gives `SET memory_limit='1GB'`. A plain String is still written raw, so `DB.set(memory_limit: '1GB')` still fails on DuckDB.
+- `db_opts` quotes any value that contains a non-word character before it calls `set_sql`.
+
+Verified on DuckDB 1.5.5 (claude_stuff/set-vs-pragma-probe-\*.log): `SET name = value` and `PRAGMA name = value` change the same setting. `memory_limit`, `threads` and `TimeZone` were checked. So for DuckDB settings, `set_pragma` gives no capability that `DB.set` lacks. Nothing in this adapter calls `set_pragma` or `configure_duckdb` on connect.
+
+Agent recommendation, not ruled: keep `set_pragma` in the adapter and do not move it to sequelizer. Moving it means that this adapter depends on sequelizer, or keeps a copy. `PRAGMA name = value` exists only in DuckDB and SQLite. The useful fix is in sequelizer: `settable` should quote plain String values through `literal`, as `db_opts` already does.
