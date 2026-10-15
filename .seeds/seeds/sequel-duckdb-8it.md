@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-15T13:18:24.717192+00:00
+updated_at: 2026-10-15T13:21:20.488278+00:00
 tags:
   - duckdb
   - t_shank
@@ -75,3 +75,5 @@ So the adapter should keep its own registry: a Mutex-guarded Hash from expanded 
 ## RULED 2026-10-15 (Ryan)
 
 Ryan: "let's proceed as you recommend and make a seed for reporting upstream". The adapter keeps its own registry: a Mutex-guarded Hash from the file path to a `DuckDB::Database` and a reference count, opened with plain `DuckDB::Database.open`. It does not use `DuckDB::InstanceCache`. Build bead sequel-duckdb-zn2.
+
+UPDATE 2026-10-15: shipped in 367f3b2 (bead sequel-duckdb-zn2). `lib/sequel/duckdb/instance_registry.rb` holds the registry. `lib/sequel/adapters/duckdb.rb` counts open connections under its own Mutex, not through `pool.size`, so the pool's lock and the adapter's lock never nest. A forked child gets an empty registry and opens its own instance, because t_shank's benchmark builds in a forked child. The config question stays open, and the adapter still passes no DuckDB config.
