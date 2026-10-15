@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-15T13:16:02.885317+00:00
+updated_at: 2026-10-15T13:18:24.717192+00:00
 tags:
   - duckdb
   - t_shank
@@ -71,3 +71,7 @@ ruby-duckdb wraps the C cache as `DuckDB::InstanceCache#get_or_create(path, conf
 - After the returned Database is closed, a second `get_or_create` for that path on the SAME cache object hangs. It did not return in 20 seconds and ignored SIGTERM, so `timeout` could not stop it. A NEW cache object, or a plain `DuckDB::Database.open`, opens the file normally.
 
 So the adapter should keep its own registry: a Mutex-guarded Hash from expanded path to the `DuckDB::Database` and a reference count. It opens with plain `DuckDB::Database.open`, and closes and removes the entry when the count reaches zero. That avoids the hang, because a reopen after a close never touches a stale cache. Agent recommendation, not ruled. The hang may be worth a report to ruby-duckdb, and that is Ryan's decision.
+
+## RULED 2026-10-15 (Ryan)
+
+Ryan: "let's proceed as you recommend and make a seed for reporting upstream". The adapter keeps its own registry: a Mutex-guarded Hash from the file path to a `DuckDB::Database` and a reference count, opened with plain `DuckDB::Database.open`. It does not use `DuckDB::InstanceCache`. Build bead sequel-duckdb-zn2.
