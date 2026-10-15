@@ -4,7 +4,7 @@ title: DuckDB DSL features requested by hew to remove raw SQL
 status: captured
 type: exploration
 created_at: 2026-10-13T17:35:58.869373+00:00
-updated_at: 2026-10-15T03:45:53.404801+00:00
+updated_at: 2026-10-15T03:47:40.324997+00:00
 tags:
   - hew
   - dsl
@@ -119,8 +119,8 @@ Read from sequelizer's current `settable` and `db_opts` source:
 
 Verified on DuckDB 1.5.5 (claude_stuff/set-vs-pragma-probe-\*.log): `SET name = value` and `PRAGMA name = value` change the same setting. `memory_limit`, `threads` and `TimeZone` were checked. So for DuckDB settings, `set_pragma` gives no capability that `DB.set` lacks. Nothing in this adapter calls `set_pragma` or `configure_duckdb` on connect.
 
-Agent recommendation, not ruled: keep `set_pragma` in the adapter and do not move it to sequelizer. Moving it means that this adapter depends on sequelizer, or keeps a copy. `PRAGMA name = value` exists only in DuckDB and SQLite. The useful fix is in sequelizer: `settable` should quote plain String values through `literal`, as `db_opts` already does.
+Agent recommendation, not ruled: keep `set_pragma` in the adapter and do not move it to sequelizer. Moving it means that this adapter depends on sequelizer, or keeps a copy. `PRAGMA name = value` exists only in DuckDB and SQLite. sequelizer already ruled on quoting in its seed sequelizer-c85: the caller chooses, so a plain String stays raw and the caller wraps a DuckDB value in `Sequel.expr`.
 
 ## RULED 2026-10-14 (Ryan)
 
-Ryan: "let's not move either then I guess". `set_pragma` and `configure_duckdb` stay in this adapter. `settable` stays in sequelizer. Neither moves. Not ruled: whether sequelizer's `settable` should quote plain String values. That question belongs to sequelizer.
+Ryan: "let's not move either then I guess". `set_pragma` and `configure_duckdb` stay in this adapter. `settable` stays in sequelizer. Neither moves. sequelizer already ruled on String quoting on 2026-10-14 (seed sequelizer-c85, "Caller chooses"). Plain String values stay raw, because quoting them breaks PostgreSQL lists such as `search_path=a,b,public`. A DuckDB caller wraps the value: `DB.set(memory_limit: Sequel.expr("1GB"))`. No question is open here.
