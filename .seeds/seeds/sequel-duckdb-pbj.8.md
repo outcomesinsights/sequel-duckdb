@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.8
 title: 'DuckDB lambda expressions (lambda x: ...) in the duckdb_ops extension'
-status: captured
+status: resolved
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-14T14:17:25.781098+00:00
-updated_at: 2026-10-14T15:52:15.342528+00:00
+updated_at: 2026-10-15T03:41:07.563592+00:00
+resolved_at: 2026-10-15T03:41:07.563585+00:00
+resolution: "Shipped in 5de2362 (bead sequel-duckdb-2mi): Sequel::DuckDB::Lambda and Sequel.duckdb_lambda in block and body forms, lib/sequel/extensions/duckdb_ops.rb:122; emits the lambda keyword syntax; README 'Lambda expressions'. Efficacy: tweaking none."
 tags:
   - hew
   - dsl

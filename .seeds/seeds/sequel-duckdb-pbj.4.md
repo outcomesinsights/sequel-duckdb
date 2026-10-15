@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.4
 title: Declare supports_is_distinct_from? so DuckDB gets native IS DISTINCT FROM
-status: captured
+status: resolved
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:00.425476+00:00
-updated_at: 2026-10-13T17:42:49.065734+00:00
+updated_at: 2026-10-15T03:41:05.837042+00:00
+resolved_at: 2026-10-15T03:41:05.837031+00:00
+resolution: "Shipped in d8a1397 (bead sequel-duckdb-acd.4): supports_is_distinct_from? returns true at lib/sequel/adapters/shared/duckdb.rb:930; test/is_distinct_from_test.rb. README section 'IS DISTINCT FROM' added in b242cc5. Efficacy: minor. Planning miss: the bead did not say that the is_distinct_from extension must be loaded on the Database, so a README note came later from hew's feedback (seed sequel-duckdb-pbj.9)."
 tags:
   - hew
   - dsl

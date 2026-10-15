@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.1
 title: Public Dataset#copy_to_sql and Copier fixes (path escaping, explicit format, quoted partition columns)
-status: captured
+status: resolved
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:35:59.281130+00:00
-updated_at: 2026-10-13T17:42:47.768804+00:00
+updated_at: 2026-10-15T03:41:06.261409+00:00
+resolved_at: 2026-10-15T03:41:06.261399+00:00
+resolution: "Shipped in 13efc23 and a972d8f (beads sequel-duckdb-acd.2, sequel-duckdb-acd.5): Dataset#copy_to_sql at lib/sequel/adapters/shared/duckdb.rb:878; Copier escaping, quoting and format inference in lib/sequel/duckdb/helpers/copier.rb; test/copy_to_sql_test.rb. The signature became (path, **options); see the UPDATE note. Efficacy: minor. Planning miss: the bead did not ask for a release note about the changed COPY text, which hew's feedback raised later (seed sequel-duckdb-pbj.9)."
 tags:
   - hew
   - dsl
@@ -32,3 +34,7 @@ The path escaping and the identifier quoting are bug fixes even if Ryan rejects 
 ## Placement (not ruled): core adapter
 
 The Copier fixes are bug fixes, so they go in the core adapter whether or not the new method is accepted. `Dataset#copy_to_sql` is DuckDB-only syntax with an adapter precedent: Postgres has `copy_table` and `copy_into` in its adapter. `Database#copy_to` keeps its signature and runs `copy_to_sql`.
+
+## UPDATE 2026-10-14: what shipped (beads sequel-duckdb-acd.2, sequel-duckdb-acd.5)
+
+The signature shipped as `Dataset#copy_to_sql(path, **options)`, not `(path, format:, partition_by:)`. Every COPY option passes through. The format comes from `format:`, else from the file extension, else Copier raises `Sequel::Error`. The `destination` method was removed. Two changes went beyond the proposal. Values that are not a single word, such as `delimiter: "|"`, are now quoted strings, because the old text was a DuckDB syntax error. Integer and Float values are written bare. The change in COPY text is noted in CHANGELOG.md under `[Unreleased]`.

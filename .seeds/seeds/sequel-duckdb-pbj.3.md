@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.3
 title: Declare supports_filtered_aggregates? so DuckDB gets native FILTER
-status: captured
+status: resolved
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:00.053261+00:00
-updated_at: 2026-10-13T17:42:48.664391+00:00
+updated_at: 2026-10-15T03:41:05.443027+00:00
+resolved_at: 2026-10-15T03:41:05.443017+00:00
+resolution: 'Shipped in c7aad9c (bead sequel-duckdb-acd.1): supports_filtered_aggregates? returns true at lib/sequel/adapters/shared/duckdb.rb:924; test/filtered_aggregates_test.rb. ConceptQL verified with no regressions (bead sequel-duckdb-acd.7). Efficacy: tweaking none.'
 tags:
   - hew
   - dsl

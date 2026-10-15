@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.9
 title: 'hew feedback on unreleased main: list builder, IS DISTINCT FROM README notes, COPY text change'
-status: captured
+status: resolved
 type: question
 parent: sequel-duckdb-pbj
 created_at: 2026-10-14T17:29:33.374986+00:00
-updated_at: 2026-10-14T19:40:29.350439+00:00
+updated_at: 2026-10-15T03:41:07.983536+00:00
+resolved_at: 2026-10-15T03:41:07.983527+00:00
+resolution: "Shipped in b242cc5 (no bead; Ryan ruled directly): README sections 'Lists' (list_value) and 'IS DISTINCT FROM' (load on the Database, ~ for IS NOT DISTINCT FROM); CHANGELOG.md [Unreleased] note on the COPY text. The release hazard moved to bead sequel-duckdb-4uq. Efficacy: not applicable, this seed was feedback on shipped work."
 tags:
   - hew
   - dsl

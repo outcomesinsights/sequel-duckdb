@@ -1,11 +1,13 @@
 ---
 id: sequel-duckdb-pbj.5
 title: Sequel.try_cast(expr, type) in an opt-in duckdb_ops extension
-status: captured
+status: resolved
 type: idea
 parent: sequel-duckdb-pbj
 created_at: 2026-10-13T17:36:00.792628+00:00
-updated_at: 2026-10-13T17:42:49.461595+00:00
+updated_at: 2026-10-15T03:41:06.710313+00:00
+resolved_at: 2026-10-15T03:41:06.710304+00:00
+resolution: 'Shipped in a8c0815 (bead sequel-duckdb-acd.3): Sequel.try_cast in the opt-in duckdb_ops extension, lib/sequel/extensions/duckdb_ops.rb:184; test/duckdb_ops_test.rb. Efficacy: tweaking none.'
 tags:
   - hew
   - dsl
