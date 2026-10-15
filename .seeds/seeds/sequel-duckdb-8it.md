@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-15T13:08:02.639559+00:00
+updated_at: 2026-10-15T13:09:30.289442+00:00
 tags:
   - duckdb
   - t_shank
@@ -45,3 +45,9 @@ Agent recommendation: option 3. It fixes the divergence that t_shank hit, and it
 ## RULED 2026-10-15 (Ryan)
 
 Ryan chose option 3: "3 please". Keep a process-wide registry with one shared `::DuckDB::Database` per file, counted by reference. `disconnect` releases this `Sequel::Database`'s reference. The instance closes when the last reference is released. `:memory:` is never shared. The config question stays open, because the adapter passes no DuckDB config today. It must be answered before any config is added to `adapter_initialize`.
+
+## UPDATE 2026-10-15: how Python's duckdb handles different settings
+
+Measured with Python duckdb 1.5.6 (claude_stuff/python-duckdb-config-probe-\*.log). A second `duckdb.connect` on the same file with the same settings shares the open instance and sees its tables. A second connect with different settings raises `ConnectionException: Can't open a connection to same database file with a different configuration than existing connections`. This happened for `threads`, `memory_limit` and `read_only=True`. After every connection is closed, the file opens with new settings. The rule is first opener wins until the instance closes, and a mismatch is an error. It is not a silent second instance.
+
+This answers the open config question for this adapter, if config is ever added: raise `Sequel::DatabaseConnectionError` on a mismatch, as Python does. Not ruled.
