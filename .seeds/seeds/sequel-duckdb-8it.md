@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-15T13:05:17.133281+00:00
+updated_at: 2026-10-15T13:08:02.639559+00:00
 tags:
   - duckdb
   - t_shank
@@ -41,3 +41,7 @@ Hazard from the reporter: never close an instance under live connections of the 
 Open question for option 2 or 3: `adapter_initialize` passes no DuckDB config today. If one is added later (for example read-only), two Sequel databases on one path with different config cannot share an instance. They would need an error or separate registry keys.
 
 Agent recommendation: option 3. It fixes the divergence that t_shank hit, and it gives callers a way to release the file.
+
+## RULED 2026-10-15 (Ryan)
+
+Ryan chose option 3: "3 please". Keep a process-wide registry with one shared `::DuckDB::Database` per file, counted by reference. `disconnect` releases this `Sequel::Database`'s reference. The instance closes when the last reference is released. `:memory:` is never shared. The config question stays open, because the adapter passes no DuckDB config today. It must be answered before any config is added to `adapter_initialize`.
