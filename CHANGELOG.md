@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single word, such as `delimiter: "|"`, are now quoted strings. The old text for those
   values was a DuckDB syntax error.
 
+### Fixed
+
+- **date_arithmetic:** a query that held both `Sequel.date_add(d, days: 30)` and
+  `Sequel.date_add(d, months: 1)` returned the same date for both. DuckDB judges
+  `INTERVAL 30 DAY` equal to `INTERVAL 1 MONTH`, and its optimizer computed only one of
+  the two expressions. The same happened with 360 days and 1 year, and inside aggregates.
+  Year and month intervals are now written as a subtraction of the negated value:
+  `months: 1` gives `"d" - INTERVAL (-1) MONTH`, and `months: -1` gives
+  `"d" - INTERVAL 1 MONTH`. Day and time intervals are unchanged. Tests that compare
+  date arithmetic SQL strings must update their expected strings for years and months.
+
 ## [0.3.1] - 2026-10-02
 
 ### Fixed

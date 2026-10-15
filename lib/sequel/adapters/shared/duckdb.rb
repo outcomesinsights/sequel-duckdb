@@ -866,6 +866,9 @@ module Sequel
         seconds: "SECOND"
       }.freeze
 
+      # Units that date_add_sql_append emits as a subtraction (see the comment there)
+      MONTH_BASED_UNITS = %w[YEAR MONTH].freeze
+
       # Override select SQL clause order to support VALUES
       Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having compounds order limit lock] ] ])
 
@@ -1124,9 +1127,16 @@ module Sequel
           sql_unit = DUCKDB_DURATION_UNITS[unit]
           next unless sql_unit
 
-          # Create interval addition
-          interval = build_interval_literal(value, sql_unit)
-          result = Sequel.+(result, interval)
+          result = if MONTH_BASED_UNITS.include?(sql_unit)
+            # DuckDB judges INTERVAL 1 MONTH equal to INTERVAL 30 DAY, and its optimizer
+            # then merges d + INTERVAL 30 DAY with d + INTERVAL 1 MONTH into one
+            # expression, so both return the same date. Month-based intervals are emitted
+            # as a subtraction of the negated value, so only a minus node ever holds a
+            # month-based constant and only a plus node a day- or time-based one.
+            Sequel.-(result, build_interval_literal(negate_interval_value(value), sql_unit))
+          else
+            Sequel.+(result, build_interval_literal(value, sql_unit))
+          end
         end
 
         # Apply cast if specified or default to Time (TIMESTAMP)
@@ -1137,6 +1147,10 @@ module Sequel
       end
 
       private
+
+      def negate_interval_value(value)
+        value.is_a?(Numeric) ? -value : Sequel.*(value, -1)
+      end
 
       def build_interval_literal(value, unit)
         # If value is numeric, use direct syntax
