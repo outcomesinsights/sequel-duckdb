@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single word, such as `delimiter: "|"`, are now quoted strings. The old text for those
   values was a DuckDB syntax error.
 
+### Added
+
+- **capabilities:** the adapter now declares Sequel's flags for DISTINCT ON, GROUP BY
+  ROLLUP, CUBE and GROUPING SETS, LATERAL subqueries, MERGE, the WINDOW clause, regular
+  expressions, and `CREATE TABLE IF NOT EXISTS` / `DROP TABLE IF EXISTS`. Sequel refused
+  most of these features before, or left the WINDOW clause out of the SQL. Negated
+  regexps (`exclude(name: /x/)`) are now written as `NOT regexp_matches(...)`.
+  `create_table?` and `drop_table?` now emit `IF NOT EXISTS` / `IF EXISTS`. Other SQL is
+  unchanged.
+
 ### Fixed
 
 - **schema:** a schema, table or catalog name with a single quote in it broke

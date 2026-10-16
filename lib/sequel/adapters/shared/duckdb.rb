@@ -521,6 +521,16 @@ module Sequel
         true
       end
 
+      # create_table? and drop_table? emit IF NOT EXISTS / IF EXISTS instead of
+      # querying information_schema first.
+      def supports_create_table_if_not_exists?
+        true
+      end
+
+      def supports_drop_table_if_exists?
+        true
+      end
+
       # DuckDB-specific schema generation methods
 
       # Generate SQL for primary key column
@@ -868,7 +878,7 @@ module Sequel
       MONTH_BASED_UNITS = %w[YEAR MONTH].freeze
 
       # Override select SQL clause order to support VALUES
-      Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having compounds order limit lock] ] ])
+      Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having window compounds order limit lock] ] ])
 
       # Returns the DuckDB COPY statement that writes this dataset to +path+,
       # without running it. Options are DuckDB COPY options, for example
@@ -951,6 +961,48 @@ module Sequel
         true
       end
 
+      # Features that Sequel refuses, or leaves out of the SQL, without these flags.
+      # test/capability_flags_test.rb runs each one against a real DuckDB.
+      # supports_cte_in_subqueries? is left undeclared on purpose: declaring it stops
+      # Sequel from moving a subquery's CTE to the outer query, which changes the SQL
+      # that existing callers get.
+      def supports_distinct_on?
+        true
+      end
+
+      def supports_ordered_distinct_on?
+        true
+      end
+
+      def supports_group_rollup?
+        true
+      end
+
+      def supports_group_cube?
+        true
+      end
+
+      def supports_grouping_sets?
+        true
+      end
+
+      def supports_lateral_subqueries?
+        true
+      end
+
+      def supports_merge?
+        true
+      end
+
+      def supports_window_clause?
+        true
+      end
+
+      # complex_expression_sql_append writes all four regexp operators.
+      def supports_regexp?
+        true
+      end
+
       # DuckDB requires WITH RECURSIVE if any CTE is recursive
       # This follows the same pattern as PostgreSQL
       def select_with_sql_base
@@ -1020,6 +1072,10 @@ module Sequel
           sql << ", "
           literal_append(sql, args.last)
           sql << ", 'i'))"
+        when :"!~", :"!~*"
+          # Not Sequel's default: DuckDB's !~ is a full match, so !~ 'bc' is true for 'abc'.
+          sql << "NOT "
+          complex_expression_sql_append(sql, operator == :"!~" ? :~ : :"~*", args)
         else
           super
         end
