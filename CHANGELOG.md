@@ -45,8 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the two expressions. The same happened with 360 days and 1 year, and inside aggregates.
   Year and month intervals are now written as a subtraction of the negated value:
   `months: 1` gives `"d" - INTERVAL (-1) MONTH`, and `months: -1` gives
-  `"d" - INTERVAL 1 MONTH`. Day and time intervals are unchanged. Tests that compare
-  date arithmetic SQL strings must update their expected strings for years and months.
+  `"d" - INTERVAL 1 MONTH`. The same merge happened between days and hours of equal
+  length, for example 1 day and 24 hours, which differ for a TIMESTAMPTZ across a
+  daylight-saving change. Hour, minute and second intervals are now written with the
+  interval first: `hours: 24` gives `INTERVAL 24 HOUR + "d"`. Day intervals are
+  unchanged. Tests that compare date arithmetic SQL strings must update their expected
+  strings for every unit except days.
 - **connection:** two `Sequel::Database` objects on one DuckDB file in one process opened
   two DuckDB instances, and writes through one did not reliably reach the other. Every
   `Sequel::Database` on a file now shares one DuckDB instance. `Database#disconnect` now
