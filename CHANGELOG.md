@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **schema:** a schema, table or catalog name with a single quote in it broke
+  `tables`, `views`, `table_exists?`, `schema`, `indexes`, `schemas` and
+  `schema_exists?` with a syntax error. `set_pragma` had the same defect for a value that
+  is not a String, Boolean or Number.
 - **date_arithmetic:** a query that held both `Sequel.date_add(d, days: 30)` and
   `Sequel.date_add(d, months: 1)` returned the same date for both. DuckDB judges
   `INTERVAL 30 DAY` equal to `INTERVAL 1 MONTH`, and its optimizer computed only one of

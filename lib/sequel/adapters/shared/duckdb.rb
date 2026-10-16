@@ -102,10 +102,10 @@ module Sequel
 
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
-                  "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'BASE TABLE'"
+                  "WHERE table_catalog = #{literal(schema_ref.table.to_s)} AND table_schema = #{literal(schema_ref.column.to_s)} AND table_type = 'BASE TABLE'"
         else
                 "SELECT table_name FROM information_schema.tables " \
-                  "WHERE table_schema = '#{schema_ref}' AND table_type = 'BASE TABLE'"
+                  "WHERE table_schema = #{literal(schema_ref.to_s)} AND table_type = 'BASE TABLE'"
         end
 
         tables = []
@@ -139,7 +139,7 @@ module Sequel
             numeric_precision,
             numeric_scale
           FROM information_schema.columns
-          WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}'
+          WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)}
           ORDER BY ordinal_position
         SQL
 
@@ -200,7 +200,7 @@ module Sequel
             expressions,
             sql
           FROM duckdb_indexes()
-          WHERE schema_name = '#{schema_name}' AND table_name = '#{table_name}'
+          WHERE schema_name = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)}
         SQL
 
         indexes = {}
@@ -249,12 +249,10 @@ module Sequel
 
         # Format value appropriately for SQL
         formatted_value = case value
-        when String
-                            "'#{value.gsub("'", "''")}'" # Escape single quotes
         when TrueClass, FalseClass, Numeric
                             value.to_s
         else
-                            "'#{value}'"
+                            literal(value.to_s)
         end
 
         # Execute PRAGMA statement
@@ -313,7 +311,7 @@ module Sequel
         end
 
         sql = "SELECT 1 FROM information_schema.tables " \
-              "WHERE table_schema = '#{schema_name}' AND table_name = '#{table_name}' LIMIT 1"
+              "WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)} LIMIT 1"
 
         result = nil
         execute(sql) do |_row|
@@ -340,10 +338,10 @@ module Sequel
 
         sql = if schema_ref.is_a?(Sequel::SQL::QualifiedIdentifier)
                 "SELECT table_name FROM information_schema.tables " \
-                  "WHERE table_catalog = '#{schema_ref.table}' AND table_schema = '#{schema_ref.column}' AND table_type = 'VIEW'"
+                  "WHERE table_catalog = #{literal(schema_ref.table.to_s)} AND table_schema = #{literal(schema_ref.column.to_s)} AND table_type = 'VIEW'"
         else
                 "SELECT table_name FROM information_schema.tables " \
-                  "WHERE table_schema = '#{schema_ref}' AND table_type = 'VIEW'"
+                  "WHERE table_schema = #{literal(schema_ref.to_s)} AND table_type = 'VIEW'"
         end
 
         views = []
@@ -477,8 +475,8 @@ module Sequel
             AND tc.table_schema = kcu.table_schema
             AND tc.table_name = kcu.table_name
           WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND tc.table_schema = '#{schema_name}'
-            AND tc.table_name = '#{table_name}'
+            AND tc.table_schema = #{literal(schema_name.to_s)}
+            AND tc.table_name = #{literal(table_name.to_s)}
         SQL
 
         primary_key_columns = []
@@ -685,7 +683,7 @@ module Sequel
       #
       def schemas(opts = OPTS)
         sql = "SELECT schema_name FROM information_schema.schemata"
-        sql += " WHERE catalog_name = '#{opts[:catalog]}'" if opts[:catalog]
+        sql += " WHERE catalog_name = #{literal(opts[:catalog].to_s)}" if opts[:catalog]
 
         schemas = []
         execute(sql) do |row|
@@ -702,7 +700,7 @@ module Sequel
       # @return [Boolean] true if schema exists
       #
       def schema_exists?(name, _opts = OPTS)
-        sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = '#{name}' LIMIT 1"
+        sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = #{literal(name.to_s)} LIMIT 1"
 
         result = nil
         execute(sql) do |_row|
