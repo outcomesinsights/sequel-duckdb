@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-16T13:28:55.209333+00:00
+updated_at: 2026-10-16T13:38:05.454255+00:00
 tags:
   - duckdb
   - t_shank
@@ -83,3 +83,5 @@ UPDATE 2026-10-15: shipped in 367f3b2 (bead sequel-duckdb-zn2). `lib/sequel/duck
 Ryan: "raise error on conflicting settings". When a second `Sequel::Database` opens a file that is already open in this process with different DuckDB settings, the adapter raises `Sequel::DatabaseConnectionError`. This is the rule that Python, JDBC and R follow. Settings are fixed by the first opener until the instance closes.
 
 Finding (2026-10-16): the README documents a `config:` option (`config: { memory_limit: '2GB', threads: 4 }`) in three places, and the class comment in `lib/sequel/adapters/duckdb.rb` documents it too. But `adapter_initialize` never reads `opts[:config]`, so the option is ignored without an error. A conflict can only exist once the adapter passes these settings to DuckDB. So the build passes `config:` to `DuckDB::Database.open` through a `DuckDB::Config`, and compares it in the registry. No settings and some settings count as different, as in DuckDB's own instance cache. The README also shows `readonly: false`, which the adapter also ignores. That is not part of this ruling.
+
+UPDATE 2026-10-16: the settings ruling shipped in 40c1c6f (bead sequel-duckdb-4kg). `config:` now reaches DuckDB through `DuckDB::Config`. `InstanceRegistry` stores each file's settings and raises `InstanceRegistry::SettingsConflict`, a `Sequel::DatabaseConnectionError`, when a later `Sequel::Database` asks for different ones. A reopen after `disconnect` is checked the same way. The `readonly:` option in the README is still ignored.
