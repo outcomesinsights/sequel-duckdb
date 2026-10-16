@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+    # A push that touches only these paths does not run CI. release.yml needs a green
+    # push run on the tagged commit, and the release commit always changes code, so a
+    # release is not affected. Pull requests are not filtered, because `ci` is their
+    # required check. docs/ and *.md are not listed: the gem ships its README.
+    paths-ignore:
+      - ".seeds/**"
+      - ".beads/**"
+      - ".claude/**"
+      - "claude_stuff/**"
   pull_request:
 
 permissions: {}
