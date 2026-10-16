@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opened it. Opening it with different settings raises `Sequel::DatabaseConnectionError`,
   as DuckDB's Python, Java and R clients do. No `config:` and some `config:` count as
   different.
+- **schema:** `table_exists?` returned false for some tables that exist: a
+  `Sequel.identifier` name, an unqualified name on the `search_path`, a table in an
+  attached catalog, and a `Sequel.identifier` name with the `schema:` option. DuckDB now
+  resolves the name, as it does for a query. `schema` and `indexes` are unchanged, and
+  they still look up an unqualified name only in `main` or the `schema:` option.
 - **schema:** a schema, table or catalog name with a single quote in it broke
   `tables`, `views`, `table_exists?`, `schema`, `indexes`, `schemas` and
   `schema_exists?` with a syntax error. `set_pragma` had the same defect for a value that

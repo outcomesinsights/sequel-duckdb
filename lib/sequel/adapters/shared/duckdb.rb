@@ -125,7 +125,7 @@ module Sequel
         schema_name = opts[:schema] || "main"
 
         # First check if table exists
-        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless table_exists?(table_name, opts)
+        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless information_schema_table_exists?(table_name, opts)
 
         # Use information_schema.columns for detailed column information
         sql = <<~SQL
@@ -189,7 +189,7 @@ module Sequel
         schema_name = opts[:schema] || "main"
 
         # First check if table exists
-        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless table_exists?(table_name, opts)
+        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless information_schema_table_exists?(table_name, opts)
 
         # Use duckdb_indexes() function to get index information
         sql = <<~SQL
@@ -297,28 +297,25 @@ module Sequel
 
       # Check if table exists
       #
-      # @param table_name [Symbol, String, Sequel::SQL::QualifiedIdentifier] Name of the table
-      # @param opts [Hash] Options
+      # DuckDB resolves the name itself, as it does for any query, so every Sequel
+      # identifier form, the search_path, temporary tables and views all work. The query
+      # reads no rows. A missing table is a catalog error, which does not abort an open
+      # DuckDB transaction, so no savepoint is needed.
+      #
+      # @param table_name [Symbol, String, Sequel::SQL::Identifier, Sequel::SQL::QualifiedIdentifier] Name of the table
+      # @param opts [Hash] Options (:schema qualifies an unqualified name)
       # @return [Boolean] true if table exists
       def table_exists?(table_name, opts = {})
-        # Handle qualified identifiers (e.g., Sequel[:schema][:table])
-        if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
-          schema_name = table_name.table.to_s
-          table_name = table_name.column.to_s
-        else
-          schema_name = opts[:schema] || "main"
-          table_name = table_name.to_s
+        if opts[:schema] && !table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
+          table_name = Sequel.qualify(opts[:schema], table_name)
         end
 
-        sql = "SELECT 1 FROM information_schema.tables " \
-              "WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)} LIMIT 1"
-
-        result = nil
-        execute(sql) do |_row|
-          result = true
-        end
-
-        !!result
+        from(table_name).where(false).select(Sequel::NULL).all
+        true
+      rescue Sequel::DatabaseConnectionError, Sequel::DatabaseDisconnectError
+        raise
+      rescue Sequel::DatabaseError
+        false
       end
 
       # Get list of tables
@@ -456,6 +453,35 @@ module Sequel
         else
           default_str # Return as-is for complex expressions
         end
+      end
+
+      # The guard for schema_parse_table and schema_parse_indexes. It looks up the name the
+      # way their information_schema and duckdb_indexes() queries do: an unqualified name
+      # is in opts[:schema] or "main", and the search_path is not used. Unlike
+      # table_exists?, it is false for a table those queries cannot read, so they raise
+      # instead of returning no columns.
+      #
+      # @param table_name [Symbol, String, Sequel::SQL::QualifiedIdentifier] Name of the table
+      # @param opts [Hash] Options
+      # @return [Boolean] true if information_schema lists the table
+      def information_schema_table_exists?(table_name, opts = {})
+        if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
+          schema_name = table_name.table.to_s
+          table_name = table_name.column.to_s
+        else
+          schema_name = opts[:schema] || "main"
+          table_name = table_name.to_s
+        end
+
+        sql = "SELECT 1 FROM information_schema.tables " \
+              "WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)} LIMIT 1"
+
+        result = nil
+        execute(sql) do |_row|
+          result = true
+        end
+
+        !!result
       end
 
       # Update primary key information in column schema
