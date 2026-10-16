@@ -4,7 +4,7 @@ title: 'One DuckDB instance per file: share it across Sequel::Database objects, 
 status: captured
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-15T13:21:20.488278+00:00
+updated_at: 2026-10-16T13:28:55.209333+00:00
 tags:
   - duckdb
   - t_shank
@@ -77,3 +77,9 @@ So the adapter should keep its own registry: a Mutex-guarded Hash from expanded 
 Ryan: "let's proceed as you recommend and make a seed for reporting upstream". The adapter keeps its own registry: a Mutex-guarded Hash from the file path to a `DuckDB::Database` and a reference count, opened with plain `DuckDB::Database.open`. It does not use `DuckDB::InstanceCache`. Build bead sequel-duckdb-zn2.
 
 UPDATE 2026-10-15: shipped in 367f3b2 (bead sequel-duckdb-zn2). `lib/sequel/duckdb/instance_registry.rb` holds the registry. `lib/sequel/adapters/duckdb.rb` counts open connections under its own Mutex, not through `pool.size`, so the pool's lock and the adapter's lock never nest. A forked child gets an empty registry and opens its own instance, because t_shank's benchmark builds in a forked child. The config question stays open, and the adapter still passes no DuckDB config.
+
+## RULED 2026-10-16 (Ryan): raise an error on conflicting settings
+
+Ryan: "raise error on conflicting settings". When a second `Sequel::Database` opens a file that is already open in this process with different DuckDB settings, the adapter raises `Sequel::DatabaseConnectionError`. This is the rule that Python, JDBC and R follow. Settings are fixed by the first opener until the instance closes.
+
+Finding (2026-10-16): the README documents a `config:` option (`config: { memory_limit: '2GB', threads: 4 }`) in three places, and the class comment in `lib/sequel/adapters/duckdb.rb` documents it too. But `adapter_initialize` never reads `opts[:config]`, so the option is ignored without an error. A conflict can only exist once the adapter passes these settings to DuckDB. So the build passes `config:` to `DuckDB::Database.open` through a `DuckDB::Config`, and compares it in the registry. No settings and some settings count as different, as in DuckDB's own instance cache. The README also shows `readonly: false`, which the adapter also ignores. That is not part of this ruling.

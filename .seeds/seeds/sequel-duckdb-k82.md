@@ -4,7 +4,7 @@ title: Report ruby-duckdb InstanceCache hang (get_or_create after close) upstrea
 status: captured
 type: decision
 created_at: 2026-10-15T13:18:23.495966+00:00
-updated_at: 2026-10-15T13:18:23.495966+00:00
+updated_at: 2026-10-16T13:28:54.739102+00:00
 tags:
   - duckdb
   - upstream
@@ -39,3 +39,16 @@ sequel-duckdb does not depend on this. Ryan ruled on 2026-10-15 that the adapter
 ## Not decided
 
 Ryan asked for this seed on 2026-10-15 ("make a seed for reporting upstream"). He has not said to file the issue. Filing it publishes to a public tracker, so it needs his explicit go. Before filing, rerun the reproduction on the newest ruby-duckdb release.
+
+## UPDATE 2026-10-16: the hang still happens on the latest ruby-duckdb
+
+ruby-duckdb 1.5.6.0 is the latest release on rubygems (checked 2026-10-16). This repo's Gemfile.lock still pins 1.5.5.1. The same probe, run with ruby-duckdb 1.5.6.0 and libduckdb 1.5.6, gives the same result (claude_stuff/ruby-instance-cache-hang-probe-1560-\*.log):
+
+```
+double_close: exit 0
+reget: HUNG after 20s, killing pid 1040184
+new_cache: query [[0]]
+new_cache: exit 0
+```
+
+So an upstream report is still worth filing, and it should name 1.5.6.0. Filing still needs Ryan's go.
