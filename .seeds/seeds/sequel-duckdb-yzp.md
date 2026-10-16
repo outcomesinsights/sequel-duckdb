@@ -4,7 +4,7 @@ title: 'DuckDB merges d + 30 days with d + 1 month (interval equality in its opt
 status: captured
 type: question
 created_at: 2026-10-16T13:44:51.378532+00:00
-updated_at: 2026-10-16T13:44:51.378532+00:00
+updated_at: 2026-10-16T13:46:13.169466+00:00
 ---
 
 ## The defect
@@ -45,3 +45,7 @@ The correct values are 19:00 UTC for 1 day and 20:00 UTC for 24 hours. In each q
 2. Does the residual DAY/time case need handling in sequel-duckdb? One option is to write time units with a third form, for example `d - INTERVAL (-n) HOUR`, and keep days as `+`. That changes the SQL text for hours, minutes and seconds.
 
 Related: conceptql bead conceptql-a4j bumps sequel-duckdb in conceptql's Gemfile.lock after the push, reruns its DuckDB suite, and then closes.
+
+## RULED 2026-10-16 (Ryan): fix the day/time case too
+
+Ryan: "fix the day/hour case too". The upstream report (open question 1) is not ruled.
