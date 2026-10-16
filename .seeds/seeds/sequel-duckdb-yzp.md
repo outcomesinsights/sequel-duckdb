@@ -4,7 +4,7 @@ title: 'DuckDB merges d + 30 days with d + 1 month (interval equality in its opt
 status: captured
 type: question
 created_at: 2026-10-16T13:44:51.378532+00:00
-updated_at: 2026-10-16T13:46:13.169466+00:00
+updated_at: 2026-10-16T13:48:47.295789+00:00
 ---
 
 ## The defect
@@ -49,3 +49,5 @@ Related: conceptql bead conceptql-a4j bumps sequel-duckdb in conceptql's Gemfile
 ## RULED 2026-10-16 (Ryan): fix the day/time case too
 
 Ryan: "fix the day/hour case too". The upstream report (open question 1) is not ruled.
+
+UPDATE 2026-10-16: the day/time case shipped in 6ec6ec5 (bead sequel-duckdb-eca). Time units are written as INTERVAL n HOUR + d. The subtraction form was rejected, because it merges 720 hours with 1 month (claude_stuff/interval-third-form-probe-\*.log). The upstream report is still not ruled.
