@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **connection:** the `config:` option was documented but ignored. Its DuckDB settings,
+  for example `config: { threads: 4, memory_limit: "2GB" }`, now reach DuckDB. A file that
+  is already open in this process keeps the settings of the first `Sequel::Database` that
+  opened it. Opening it with different settings raises `Sequel::DatabaseConnectionError`,
+  as DuckDB's Python, Java and R clients do. No `config:` and some `config:` count as
+  different.
 - **schema:** a schema, table or catalog name with a single quote in it broke
   `tables`, `views`, `table_exists?`, `schema`, `indexes`, `schemas` and
   `schema_exists?` with a syntax error. `set_pragma` had the same defect for a value that

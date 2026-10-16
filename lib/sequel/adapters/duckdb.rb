@@ -66,7 +66,10 @@ module Sequel
         @duckdb_mutex = Mutex.new
         @duckdb_connections = 0
         @duckdb_file = duckdb_file_path(opts[:database])
+        @duckdb_settings = InstanceRegistry.normalize_settings(opts[:config])
         @duckdb_database = open_duckdb_database
+      rescue Sequel::DatabaseConnectionError
+        raise
       rescue ::DuckDB::Error => e
         raise Sequel::DatabaseConnectionError, "Failed to connect to DuckDB database: #{e.message}"
       rescue StandardError => e
@@ -81,8 +84,13 @@ module Sequel
         database_path
       end
 
+      # opts[:config] holds DuckDB settings, for example { threads: 4, memory_limit: "2GB" }.
       def open_duckdb_database
-        @duckdb_file ? InstanceRegistry.acquire(@duckdb_file) : ::DuckDB::Database.open(":memory:")
+        if @duckdb_file
+          InstanceRegistry.acquire(@duckdb_file, @duckdb_settings)
+        else
+          InstanceRegistry.open(":memory:", @duckdb_settings)
+        end
       end
 
       public

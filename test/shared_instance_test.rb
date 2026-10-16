@@ -23,8 +23,12 @@ class SharedInstanceTest < SequelDuckDBTest::TestCase
     super
   end
 
-  def open_db(path = @path)
-    Sequel.connect(adapter: :duckdb, database: path).tap { |db| @dbs << db }
+  def open_db(path = @path, **opts)
+    Sequel.connect(adapter: :duckdb, database: path, **opts).tap { |db| @dbs << db }
+  end
+
+  def setting(db, name)
+    db.get(Sequel.function(:current_setting, name))
   end
 
   def table?(db, schema)
@@ -145,6 +149,60 @@ class SharedInstanceTest < SequelDuckDBTest::TestCase
 
     assert_equal 1, dbs.map { |db| duckdb_database(db).object_id }.uniq.size
     assert_equal 8, Registry.references(@path)
+  end
+
+  # The README documents config:, and before this the adapter ignored it.
+  def test_config_reaches_duckdb
+    assert_equal 2, setting(open_db(config: { threads: 2 }), "threads")
+  end
+
+  def test_config_reaches_an_in_memory_database
+    db = Sequel.connect(adapter: :duckdb, database: ":memory:", config: { threads: 3 }).tap { |d| @dbs << d }
+
+    assert_equal 3, setting(db, "threads")
+  end
+
+  def test_same_config_shares_the_instance
+    a = open_db(config: { threads: 2 })
+    b = open_db(config: { "threads" => "2" })
+
+    assert_same duckdb_database(a), duckdb_database(b)
+  end
+
+  # Python, JDBC and R raise here too: the first opener fixes the settings.
+  def test_different_config_raises
+    open_db(config: { threads: 2 })
+
+    error = assert_raises(Sequel::DatabaseConnectionError) { open_db(config: { threads: 4 }) }
+    assert_match(/different DuckDB settings/, error.message)
+    assert_equal 1, Registry.references(@path)
+  end
+
+  def test_no_config_after_config_raises
+    open_db(config: { threads: 2 })
+
+    assert_raises(Sequel::DatabaseConnectionError) { open_db }
+  end
+
+  def test_config_after_no_config_raises
+    open_db
+
+    assert_raises(Sequel::DatabaseConnectionError) { open_db(config: { threads: 2 }) }
+  end
+
+  def test_reopen_with_different_config_raises
+    a = open_db(config: { threads: 2 })
+    a.get(1)
+    a.disconnect
+    open_db(config: { threads: 4 })
+
+    assert_raises(Sequel::DatabaseConnectionError) { a.get(1) }
+  end
+
+  def test_new_config_is_accepted_after_the_file_closes
+    open_db(config: { threads: 2 }).disconnect
+
+    assert_equal 4, setting(open_db(config: { threads: 4 }), "threads")
   end
 
   def test_forked_child_does_not_reuse_the_parents_instance
