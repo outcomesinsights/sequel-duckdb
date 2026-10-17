@@ -122,10 +122,7 @@ module Sequel
       # @param opts [Hash] Options for schema parsing
       # @return [Array<Array>] Array of [column_name, column_info] pairs
       def schema_parse_table(table_name, opts = {})
-        schema_name = opts[:schema] || "main"
-
-        # First check if table exists
-        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless information_schema_table_exists?(table_name, opts)
+        resolved = resolve_table!(table_name, opts)
 
         # Use information_schema.columns for detailed column information
         sql = <<~SQL
@@ -139,7 +136,7 @@ module Sequel
             numeric_precision,
             numeric_scale
           FROM information_schema.columns
-          WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)}
+          WHERE #{resolved_table_filter(resolved, catalog: :table_catalog, schema: :table_schema, table: :table_name)}
           ORDER BY ordinal_position
         SQL
 
@@ -175,7 +172,7 @@ module Sequel
         end
 
         # Update primary key information
-        update_primary_key_info(table_name, columns, opts)
+        update_primary_key_info(resolved, columns)
 
         columns
       end
@@ -186,10 +183,7 @@ module Sequel
       # @param opts [Hash] Options for index parsing
       # @return [Hash] Hash of index_name => index_info
       def schema_parse_indexes(table_name, opts = {})
-        schema_name = opts[:schema] || "main"
-
-        # First check if table exists
-        raise Sequel::DatabaseError, "Table '#{table_name}' does not exist" unless information_schema_table_exists?(table_name, opts)
+        resolved = resolve_table!(table_name, opts)
 
         # Use duckdb_indexes() function to get index information
         sql = <<~SQL
@@ -200,7 +194,7 @@ module Sequel
             expressions,
             sql
           FROM duckdb_indexes()
-          WHERE schema_name = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)}
+          WHERE #{resolved_table_filter(resolved, catalog: :database_name, schema: :schema_name, table: :table_name)}
         SQL
 
         indexes = {}
@@ -306,11 +300,7 @@ module Sequel
       # @param opts [Hash] Options (:schema qualifies an unqualified name)
       # @return [Boolean] true if table exists
       def table_exists?(table_name, opts = {})
-        if opts[:schema] && !table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
-          table_name = Sequel.qualify(opts[:schema], table_name)
-        end
-
-        from(table_name).where(false).select(Sequel::NULL).all
+        from(qualify_with_schema_option(table_name, opts)).where(false).select(Sequel::NULL).all
         true
       rescue Sequel::DatabaseConnectionError, Sequel::DatabaseDisconnectError
         raise
@@ -355,9 +345,9 @@ module Sequel
       # @param opts [Hash] Options
       # @return [Array<Array>] Schema information
       def schema(table_name, opts = {})
-        # Handle qualified identifiers (e.g., Sequel[:schema][:table])
+        # The cache key of a qualified identifier (e.g., Sequel[:schema][:table]) is the table
         if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
-          opts = opts.merge(schema: table_name.table.to_s)
+          parse_name = table_name
           actual_table_name = table_name.column.to_s.to_sym
         elsif table_name.is_a?(Sequel::Dataset)
           # Handle case where Sequel passes a Dataset object instead of table name
@@ -377,7 +367,7 @@ module Sequel
         end
 
         # Cache schema information for type conversion
-        schema_info = schema_parse_table(actual_table_name, opts)
+        schema_info = schema_parse_table(parse_name || actual_table_name, opts)
         @schema_cache ||= {}
         @schema_cache[actual_table_name] = {}
 
@@ -455,54 +445,103 @@ module Sequel
         end
       end
 
-      # The guard for schema_parse_table and schema_parse_indexes. It looks up the name the
-      # way their information_schema and duckdb_indexes() queries do: an unqualified name
-      # is in opts[:schema] or "main", and the search_path is not used. Unlike
-      # table_exists?, it is false for a table those queries cannot read, so they raise
-      # instead of returning no columns.
+      # Find the table or view that a name refers to, as DuckDB resolves it in a query.
+      # The information_schema and duckdb_indexes() queries need the exact catalog, schema
+      # and table, and DuckDB has no function that returns them. So the candidates are the
+      # tables and views with that name, and the one whose EXPLAIN plan equals the plan for
+      # the name is the match. Two candidates have equal plans only when a view is
+      # SELECT * FROM the other candidate. DuckDB's search order then decides.
       #
-      # @param table_name [Symbol, String, Sequel::SQL::QualifiedIdentifier] Name of the table
-      # @param opts [Hash] Options
-      # @return [Boolean] true if information_schema lists the table
-      def information_schema_table_exists?(table_name, opts = {})
-        if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
-          schema_name = table_name.table.to_s
-          table_name = table_name.column.to_s
-        else
-          schema_name = opts[:schema] || "main"
-          table_name = table_name.to_s
+      # @param table_name [Symbol, String, Sequel::SQL::Identifier, Sequel::SQL::QualifiedIdentifier] Name of the table
+      # @param opts [Hash] Options (:schema qualifies an unqualified name)
+      # @return [Hash, nil] :catalog, :schema and :table, or nil if the name does not resolve
+      def resolve_table(table_name, opts = {})
+        table_name = qualify_with_schema_option(table_name, opts)
+        target = explain_plan(table_name)
+        return unless target
+
+        candidates = fetch("SELECT table_catalog, table_schema, table_name FROM information_schema.tables " \
+                           "WHERE lower(table_name) = lower(?)", bare_table_name(table_name)).all
+        matches = candidates.select do |c|
+          explain_plan(qualified_name(c[:table_catalog], c[:table_schema], c[:table_name])) == target
         end
+        match = matches.size > 1 ? first_in_search_order(matches) : matches.first
+        match && { catalog: match[:table_catalog], schema: match[:table_schema], table: match[:table_name] }
+      end
 
-        sql = "SELECT 1 FROM information_schema.tables " \
-              "WHERE table_schema = #{literal(schema_name.to_s)} AND table_name = #{literal(table_name.to_s)} LIMIT 1"
+      # resolve_table, but a name that does not resolve raises.
+      def resolve_table!(table_name, opts = {})
+        resolve_table(table_name, opts) ||
+          raise(Sequel::DatabaseError, "Table #{literal(qualify_with_schema_option(table_name, opts))} does not exist")
+      end
 
-        result = nil
-        execute(sql) do |_row|
-          result = true
+      def qualify_with_schema_option(table_name, opts)
+        return table_name unless opts[:schema] && !table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
+
+        Sequel.qualify(opts[:schema], table_name)
+      end
+
+      def bare_table_name(table_name)
+        case table_name
+        when Sequel::SQL::QualifiedIdentifier then bare_table_name(table_name.column)
+        when Sequel::SQL::Identifier then table_name.value.to_s
+        else table_name.to_s
         end
+      end
 
-        !!result
+      def qualified_name(catalog, schema, table)
+        Sequel::SQL::QualifiedIdentifier.new(
+          Sequel::SQL::QualifiedIdentifier.new(Sequel.identifier(catalog), Sequel.identifier(schema)),
+          Sequel.identifier(table)
+        )
+      end
+
+      # The EXPLAIN plan of SELECT * FROM the name, or nil if DuckDB cannot bind the name.
+      # A bind error does not abort an open DuckDB transaction.
+      def explain_plan(table_name)
+        plan = []
+        execute("EXPLAIN (FORMAT JSON) #{from(table_name).sql}") { |row| plan << row }
+        plan
+      rescue Sequel::DatabaseConnectionError, Sequel::DatabaseDisconnectError
+        raise
+      rescue Sequel::DatabaseError
+        nil
+      end
+
+      # DuckDB looks in the temp catalog first, then in the search_path schemas, then in the
+      # default catalog.
+      def first_in_search_order(candidates)
+        schemas = get(Sequel.function(:current_schemas, false))
+        database = get(Sequel.function(:current_database))
+        candidates.min_by do |c|
+          [ c[:table_catalog] == "temp" ? 0 : 1,
+            schemas.index(c[:table_schema]) || schemas.size,
+            c[:table_catalog] == database ? 0 : 1 ]
+        end
+      end
+
+      # The SQL condition that selects the resolved table in a catalog query, given the
+      # names of that query's catalog, schema and table columns.
+      def resolved_table_filter(resolved, catalog:, schema:, table:)
+        literal(Sequel.&({ catalog => resolved[:catalog] }, { schema => resolved[:schema] }, { table => resolved[:table] }))
       end
 
       # Update primary key information in column schema
       #
-      # @param table_name [Symbol, String] Table name
+      # @param resolved [Hash] The table, from resolve_table
       # @param columns [Array] Array of column information
-      # @param opts [Hash] Options
-      def update_primary_key_info(table_name, columns, opts = {})
-        schema_name = opts[:schema] || "main"
-
+      def update_primary_key_info(resolved, columns)
         # Query for primary key constraints
         sql = <<~SQL
           SELECT column_name
           FROM information_schema.table_constraints tc
           JOIN information_schema.key_column_usage kcu
             ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_catalog = kcu.table_catalog
             AND tc.table_schema = kcu.table_schema
             AND tc.table_name = kcu.table_name
           WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND tc.table_schema = #{literal(schema_name.to_s)}
-            AND tc.table_name = #{literal(table_name.to_s)}
+            AND #{resolved_table_filter(resolved, catalog: Sequel[:tc][:table_catalog], schema: Sequel[:tc][:table_schema], table: Sequel[:tc][:table_name])}
         SQL
 
         primary_key_columns = []

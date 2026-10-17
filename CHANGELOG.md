@@ -38,8 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **schema:** `table_exists?` returned false for some tables that exist: a
   `Sequel.identifier` name, an unqualified name on the `search_path`, a table in an
   attached catalog, and a `Sequel.identifier` name with the `schema:` option. DuckDB now
-  resolves the name, as it does for a query. `schema` and `indexes` are unchanged, and
-  they still look up an unqualified name only in `main` or the `schema:` option.
+  resolves the name, as it does for a query. `schema` and `indexes` raised "does not
+  exist" for the same names. They now read the table or view that a query with that
+  name reads, including a temporary table that has the name of a `main` table.
 - **schema:** a schema, table or catalog name with a single quote in it broke
   `tables`, `views`, `table_exists?`, `schema`, `indexes`, `schemas` and
   `schema_exists?` with a syntax error. `set_pragma` had the same defect for a value that
