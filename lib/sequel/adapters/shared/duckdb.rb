@@ -393,13 +393,16 @@ module Sequel
       #
       # @param duckdb_type [String] DuckDB data type
       # @return [Symbol] Sequel type symbol
+      # information_schema.columns reports a REAL column as FLOAT, a TIMESTAMPTZ column as
+      # TIMESTAMP WITH TIME ZONE, and a VARINT column as BIGNUM. An unsigned type maps by
+      # the signed type that holds all its values.
       def map_duckdb_type_to_sequel(duckdb_type)
         case duckdb_type.upcase
-        when "INTEGER", "INT", "INT4", "SMALLINT", "INT2", "TINYINT", "INT1"
+        when "INTEGER", "INT", "INT4", "SMALLINT", "INT2", "TINYINT", "INT1", "USMALLINT", "UTINYINT"
           :integer
-        when "BIGINT", "INT8"
+        when "BIGINT", "INT8", "UINTEGER", "UBIGINT", "HUGEINT", "UHUGEINT", "BIGNUM", "VARINT"
           :bigint
-        when "REAL", "FLOAT4", "DOUBLE", "FLOAT8"
+        when "FLOAT", "REAL", "FLOAT4", "DOUBLE", "FLOAT8"
           :float
         when /^DECIMAL/, /^NUMERIC/
           :decimal
@@ -407,10 +410,13 @@ module Sequel
           :boolean
         when "DATE"
           :date
-        when "TIMESTAMP", "DATETIME"
+        when "TIMESTAMP", "DATETIME", "TIMESTAMP WITH TIME ZONE", "TIMESTAMPTZ",
+             "TIMESTAMP_S", "TIMESTAMP_MS", "TIMESTAMP_US", "TIMESTAMP_NS"
           :datetime
-        when "TIME"
+        when "TIME", "TIME WITH TIME ZONE", "TIMETZ", "TIME_NS"
           :time
+        when "INTERVAL"
+          :interval
         when "BLOB", "BYTEA"
           :blob
         when "UUID"

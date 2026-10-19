@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolves the name, as it does for a query. `schema` and `indexes` raised "does not
   exist" for the same names. They now read the table or view that a query with that
   name reads, including a temporary table that has the name of a `main` table.
+- **schema:** `db.schema` reported type `:string` for FLOAT and REAL, unsigned and
+  128-bit integer, VARINT, TIMESTAMPTZ, TIMESTAMP_S/MS/NS, TIMETZ, TIME_NS and INTERVAL
+  columns. Sequel models then typecast an assigned value to a String, for example 1.5 to
+  "1.5" for a FLOAT column. These columns now report `:float`, `:integer`, `:bigint`,
+  `:datetime`, `:time` or `:interval`. List, struct, map, union, enum, JSON and BIT
+  columns still report `:string`.
 - **schema:** a schema, table or catalog name with a single quote in it broke
   `tables`, `views`, `table_exists?`, `schema`, `indexes`, `schemas` and
   `schema_exists?` with a syntax error. `set_pragma` had the same defect for a value that
