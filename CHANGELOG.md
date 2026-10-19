@@ -56,6 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type that has no Sequel type, for example a STRUCT, is reported as `:array`. A model
   typecasts an assigned Array to a `DuckDBArray` and typecasts each element to the
   element type. Without the extension, the SQL and the values do not change.
+- **extensions:** the opt-in `duckdb_struct` extension writes and reads DuckDB STRUCT
+  columns. Sequel's `pg_row` is the PostgreSQL counterpart. DuckDB structs have no type
+  name, so you do not register a type. `Sequel.duckdb_struct(a: 1, b: "x")` returns a
+  `Sequel::DuckDB::DuckDBStruct` with Symbol keys. Sequel writes it as the struct
+  `{'a': 1, 'b': 'x'}`. A plain Ruby Hash still means a condition. A struct or list
+  inside a struct is written only when it is a wrapper too. Load the extension with
+  `DB.extension :duckdb_struct`. STRUCT result values are then `DuckDBStruct` objects.
+  `db.schema` reports a STRUCT column as `:struct`. A model typecasts an assigned Hash to
+  a `DuckDBStruct`. With `duckdb_array` also loaded, a list of structs is reported as
+  `:struct_array`. Without the extension, the SQL and the values do not change.
 
 ### Fixed
 
