@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JSON`, so you register them as `:json`. A column type without a converter keeps the
   value that ruby-duckdb returns. The adapter registers converters for `:time` and
   `:time_ns`, and a registration of your own replaces them.
+- **extensions:** the opt-in `duckdb_array` extension writes and reads DuckDB LIST and
+  ARRAY columns, as Sequel's `pg_array` does for PostgreSQL. `Sequel.duckdb_array([1, 2])`
+  returns a `Sequel::DuckDB::DuckDBArray`, which Sequel writes as the list `[1, 2]`. A
+  plain Ruby Array still means an IN list or a condition. Load the extension with
+  `DB.extension :duckdb_array`. LIST and ARRAY result values are then `DuckDBArray`
+  objects. A value nested inside another list, struct or map is not wrapped. `db.schema`
+  reports an `INTEGER[]` or `INTEGER[3]` column as `:integer_array`. A list of an element
+  type that has no Sequel type, for example a STRUCT, is reported as `:array`. A model
+  typecasts an assigned Array to a `DuckDBArray` and typecasts each element to the
+  element type. Without the extension, the SQL and the values do not change.
 
 ### Fixed
 
