@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged, for example `FORMAT PARQUET` and `COMPRESSION ZSTD`. Values that are not a
   single word, such as `delimiter: "|"`, are now quoted strings. The old text for those
   values was a DuckDB syntax error.
+- **adapter (breaking):** TIME and TIME_NS result values are now `Sequel::SQLTime`, not
+  `Time`. Sequel's postgres and sqlite adapters use the same class for a time of day. The
+  value keeps the hour, minute, second and fraction, and TIME_NS keeps its nanoseconds. A
+  value assigned to a TIME model column is also a `Sequel::SQLTime` on today's date. It
+  was a `Time` on 1970-01-01 before. So a model that is assigned the time it already has
+  no longer reports the column as changed. A `Sequel::SQLTime` in a query is written as
+  `'HH:MM:SS.ffffff'`, so writes keep the fraction. TIMETZ result values do not change:
+  they stay the `Time` that ruby-duckdb returns, with the value's UTC offset.
+  `Sequel::SQLTime` is a subclass of `Time`, so `is_a?(Time)` is still true. Code that
+  compares the class exactly with `Time`, or that expects the date 1970-01-01, must
+  change.
 
 ### Added
 
@@ -32,8 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole value, so a LIST of STRUCT arrives as one Array. `type` is the type name that
   ruby-duckdb reports, for example `:time` or `:list`. A column with a type alias is
   looked up by its alias first. JSON columns report the type `:varchar` with the alias
-  `JSON`, so you register them as `:json`. With no converters registered, rows are
-  unchanged.
+  `JSON`, so you register them as `:json`. A column type without a converter keeps the
+  value that ruby-duckdb returns. The adapter registers converters for `:time` and
+  `:time_ns`, and a registration of your own replaces them.
 
 ### Fixed
 
