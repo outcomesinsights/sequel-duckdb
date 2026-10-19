@@ -856,34 +856,6 @@ module Sequel
       def read_something_sql(paths, options = OPTS)
         Sequel::DuckDB::Helpers::Pathifier.new(paths, options).to_sql
       end
-
-      # Type conversion methods for DuckDB-specific handling
-
-      # Convert DuckDB TIME values to Ruby time-only objects
-      # DuckDB TIME columns should only contain time-of-day information
-      def typecast_value_time(value)
-        case value
-        when Time
-          # Extract only the time portion, discarding date information
-          # Create a new Time object with today's date but the original time
-          Time.local(1970, 1, 1, value.hour, value.min, value.sec, value.usec)
-        when String
-          # Parse time string and create time-only object
-          if value =~ /\A(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?\z/
-            hour = ::Regexp.last_match(1).to_i
-            min = ::Regexp.last_match(2).to_i
-            sec = ::Regexp.last_match(3).to_i
-            usec = (::Regexp.last_match(4) || "0").ljust(6, "0").to_i
-            Time.local(1970, 1, 1, hour, min, sec, usec)
-          else
-            # Fallback: parse as time and extract time portion
-            parsed = Time.parse(value.to_s)
-            Time.local(1970, 1, 1, parsed.hour, parsed.min, parsed.sec, parsed.usec)
-          end
-        else
-          value
-        end
-      end
     end
 
     # DatasetMethods module provides shared dataset functionality for DuckDB adapter
@@ -1169,6 +1141,9 @@ module Sequel
       # Only handles cases that differ from Sequel's default behavior
       def literal_append(sql, value)
         case value
+        when Sequel::SQLTime
+          # A time of day: Sequel writes it as 'HH:MM:SS.ffffff'
+          super
         when Time
           # Special handling for time-only values (year 1970 indicates time-only)
           if value.year == 1970 && value.month == 1 && value.day == 1
