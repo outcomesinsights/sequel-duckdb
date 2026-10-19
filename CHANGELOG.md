@@ -46,6 +46,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JSON`, so you register them as `:json`. A column type without a converter keeps the
   value that ruby-duckdb returns. The adapter registers converters for `:time` and
   `:time_ns`, and a registration of your own replaces them.
+- **extensions:** the opt-in `duckdb_array` extension writes and reads DuckDB LIST and
+  ARRAY columns, as Sequel's `pg_array` does for PostgreSQL. `Sequel.duckdb_array([1, 2])`
+  returns a `Sequel::DuckDB::DuckDBArray`, which Sequel writes as the list `[1, 2]`. A
+  plain Ruby Array still means an IN list or a condition. Load the extension with
+  `DB.extension :duckdb_array`. LIST and ARRAY result values are then `DuckDBArray`
+  objects. A value nested inside another list, struct or map is not wrapped. `db.schema`
+  reports an `INTEGER[]` or `INTEGER[3]` column as `:integer_array`. A list of an element
+  type that has no Sequel type, for example a STRUCT, is reported as `:array`. A model
+  typecasts an assigned Array to a `DuckDBArray` and typecasts each element to the
+  element type. Without the extension, the SQL and the values do not change.
+- **extensions:** the opt-in `duckdb_struct` extension writes and reads DuckDB STRUCT
+  columns. Sequel's `pg_row` is the PostgreSQL counterpart. DuckDB structs have no type
+  name, so you do not register a type. `Sequel.duckdb_struct(a: 1, b: "x")` returns a
+  `Sequel::DuckDB::DuckDBStruct` with Symbol keys. Sequel writes it as the struct
+  `{'a': 1, 'b': 'x'}`. A plain Ruby Hash still means a condition. A struct or list
+  inside a struct is written only when it is a wrapper too. Load the extension with
+  `DB.extension :duckdb_struct`. STRUCT result values are then `DuckDBStruct` objects.
+  `db.schema` reports a STRUCT column as `:struct`. A model typecasts an assigned Hash to
+  a `DuckDBStruct`. With `duckdb_array` also loaded, a list of structs is reported as
+  `:struct_array`. Without the extension, the SQL and the values do not change.
+- **extensions:** the opt-in `duckdb_map` extension writes and reads DuckDB MAP columns.
+  Sequel's `pg_hstore` is the PostgreSQL counterpart, but a DuckDB MAP has typed keys
+  and values. `Sequel.duckdb_map("k" => 1)` returns a `Sequel::DuckDB::DuckDBMap`, which
+  Sequel writes as the map `MAP {'k': 1}`. An empty Hash gives `MAP {}`. The keys keep
+  their Ruby type, so an INTEGER-keyed map has Integer keys. A plain Ruby Hash still
+  means a condition. Load the extension with `DB.extension :duckdb_map`. MAP result
+  values are then `DuckDBMap` objects. `db.schema` reports a MAP column as `:map`. A
+  model typecasts an assigned Hash to a `DuckDBMap`. With `duckdb_array` also loaded, a
+  list of maps is reported as `:map_array`. Without the extension, the SQL and the
+  values do not change.
 
 ### Fixed
 
