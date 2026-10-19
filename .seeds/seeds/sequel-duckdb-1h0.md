@@ -4,7 +4,7 @@ title: Array, struct, map and JSON support for DuckDB columns
 status: captured
 type: question
 created_at: 2026-10-19T17:46:05.708957+00:00
-updated_at: 2026-10-19T17:46:05.708957+00:00
+updated_at: 2026-10-19T18:28:04.639726+00:00
 ---
 
 Not ruled. Split out of sequel-duckdb-75r (Question 1) on 2026-10-19, because Ryan wanted to revisit it.
@@ -44,3 +44,9 @@ A pass-through schema symbol (`:array`, `:struct`) only fixes the `auto_validati
 - (c) Write support for lists, structs and maps, each with a wrapper that literalizes as DuckDB syntax (`[1, 2]`, `{'a': 1}`, `MAP {'k': 1}`).
 - (d) JSON support comparable to `pg_json`: schema type `:json`, Ruby Hash/Array values serialized to JSON text on write and optionally parsed on read. DuckDB already reads JSON text from a String, so the gain is the automatic serialization and parsing.
 - Any of (b)-(d) could ship as an opt-in extension, the way sequel-duckdb-pbj's .2 and .5 were ruled to be opt-in.
+
+RULED 2026-10-19: directions (b), (c) and (d), each as an opt-in extension. Ryan: "I say b, c, d and as an extension if that's how postgres in Sequel is doing it." Checked: Sequel ships pg_array, pg_json, pg_row and pg_hstore as separate opt-in extensions under lib/sequel/extensions, so the condition holds and the extensions follow that pattern. Following pg_array and pg_json also means loaded values come back as the same wrapper classes that assignment produces, so Sequel models compare old and new values of the same class.
+
+RULED 2026-10-19: extension names duckdb_array, duckdb_struct, duckdb_map and duckdb_json (Ryan chose the recommended option over duckdb_list and over one combined extension).
+
+UPDATE 2026-10-19: converted to beads. sequel-duckdb-3j8 (convert result values by DuckDB column type in fetch_rows) comes first, because the wrappers must also come back on read; sequel-duckdb-6iq (TIME as Sequel::SQLTime) depends on it too. Then sequel-duckdb-23r (duckdb_array), sequel-duckdb-l6y (duckdb_struct), sequel-duckdb-9x9 (duckdb_map) and sequel-duckdb-aum (duckdb_json). Not built.
