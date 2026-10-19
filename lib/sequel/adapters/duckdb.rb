@@ -78,14 +78,15 @@ module Sequel
         raise Sequel::DatabaseConnectionError, "Unexpected error connecting to DuckDB: #{e.message}"
       end
 
-      # ruby-duckdb returns TIME and TIME_NS values as a Time on today's date. Sequel's
-      # convention for a time of day is Sequel::SQLTime, which is also what Sequel
-      # typecasts a value assigned to a TIME model column to. TIMETZ values stay the
-      # Time that ruby-duckdb returns, because that Time keeps the value's UTC offset.
+      # ruby-duckdb returns TIME, TIME_NS and TIMETZ values as a Time on today's date.
+      # Sequel's convention for a time of day is Sequel::SQLTime, which is also what
+      # Sequel typecasts a value assigned to a TIME model column to. TIMETZ values become
+      # Sequel::DuckDB::SQLTimeTZ, which keeps the value's UTC offset.
       def register_default_conversion_procs
         to_sqltime = ->(value) { Sequel::SQLTime.create(value.hour, value.min, value.sec, Rational(value.nsec, 1000)) }
         add_conversion_proc(:time, to_sqltime)
         add_conversion_proc(:time_ns, to_sqltime)
+        add_conversion_proc(:time_tz, SQLTimeTZ.method(:from_time))
       end
 
       # nil for an in-memory database, which is never shared.
@@ -117,7 +118,8 @@ module Sequel
       # the type :varchar with the alias "JSON", so register them as :json. Register
       # converters before you run queries. A later registration for the same type
       # replaces the earlier one, including the built-in converters for :time and
-      # :time_ns, which return Sequel::SQLTime.
+      # :time_ns, which return Sequel::SQLTime, and for :time_tz, which returns
+      # Sequel::DuckDB::SQLTimeTZ.
       #
       # @example
       #   db.add_conversion_proc(:json) { |value| JSON.parse(value) }

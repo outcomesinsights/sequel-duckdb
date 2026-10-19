@@ -3,6 +3,7 @@
 require_relative "../../../sequel/duckdb"
 require_relative "../../../sequel/duckdb/helpers/pathifier"
 require_relative "../../../sequel/duckdb/helpers/copier"
+require_relative "../../../sequel/duckdb/sql_time_tz"
 
 # Sequel is the database toolkit for Ruby
 module Sequel
@@ -380,6 +381,23 @@ module Sequel
 
       private
 
+      # A value assigned to a TIMETZ model column becomes a SQLTimeTZ, which keeps the UTC
+      # offset. A string without an offset gets the local offset.
+      def typecast_value_time_timezone(value)
+        case value
+        when SQLTimeTZ
+          value
+        when Time
+          SQLTimeTZ.from_time(value)
+        when DateTime
+          SQLTimeTZ.from_time(value.to_time)
+        when String
+          SQLTimeTZ.from_time(Time.parse(typecast_check_string_length(value, 100)))
+        else
+          raise Sequel::InvalidValue, "invalid value for TIMETZ: #{value.inspect}"
+        end
+      end
+
       # Map DuckDB data types to Sequel types
       #
       # @param duckdb_type [String] DuckDB data type
@@ -404,8 +422,10 @@ module Sequel
         when "TIMESTAMP", "DATETIME", "TIMESTAMP WITH TIME ZONE", "TIMESTAMPTZ",
              "TIMESTAMP_S", "TIMESTAMP_MS", "TIMESTAMP_US", "TIMESTAMP_NS"
           :datetime
-        when "TIME", "TIME WITH TIME ZONE", "TIMETZ", "TIME_NS"
+        when "TIME", "TIME_NS"
           :time
+        when "TIME WITH TIME ZONE", "TIMETZ"
+          :time_timezone
         when "INTERVAL"
           :interval
         when "BLOB", "BYTEA"
@@ -1141,6 +1161,8 @@ module Sequel
       # Only handles cases that differ from Sequel's default behavior
       def literal_append(sql, value)
         case value
+        when SQLTimeTZ
+          sql << "'#{value.strftime("%H:%M:%S.%6N%:z")}'"
         when Sequel::SQLTime
           # A time of day: Sequel writes it as 'HH:MM:SS.ffffff'
           super

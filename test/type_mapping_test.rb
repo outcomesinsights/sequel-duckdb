@@ -15,7 +15,7 @@ class TypeMappingTest < SequelDuckDBTest::TestCase
     "FLOAT" => :float, "REAL" => :float, "DOUBLE" => :float,
     "DECIMAL(10,2)" => :decimal, "NUMERIC" => :decimal,
     "DATE" => :date,
-    "TIME" => :time, "TIMETZ" => :time, "TIME_NS" => :time,
+    "TIME" => :time, "TIMETZ" => :time_timezone, "TIME_NS" => :time,
     "TIMESTAMP" => :datetime, "TIMESTAMPTZ" => :datetime, "TIMESTAMP_S" => :datetime,
     "TIMESTAMP_MS" => :datetime, "TIMESTAMP_NS" => :datetime,
     "INTERVAL" => :interval,

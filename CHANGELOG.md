@@ -22,11 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value assigned to a TIME model column is also a `Sequel::SQLTime` on today's date. It
   was a `Time` on 1970-01-01 before. So a model that is assigned the time it already has
   no longer reports the column as changed. A `Sequel::SQLTime` in a query is written as
-  `'HH:MM:SS.ffffff'`, so writes keep the fraction. TIMETZ result values do not change:
-  they stay the `Time` that ruby-duckdb returns, with the value's UTC offset.
-  `Sequel::SQLTime` is a subclass of `Time`, so `is_a?(Time)` is still true. Code that
-  compares the class exactly with `Time`, or that expects the date 1970-01-01, must
-  change.
+  `'HH:MM:SS.ffffff'`, so writes keep the fraction. `Sequel::SQLTime` is a subclass of
+  `Time`, so `is_a?(Time)` is still true. Code that compares the class exactly with
+  `Time`, or that expects the date 1970-01-01, must change.
+- **adapter (breaking):** TIMETZ columns keep their UTC offset. `db.schema` reports
+  them as `:time_timezone`, not `:time`. Result values are the new class
+  `Sequel::DuckDB::SQLTimeTZ`, a subclass of `Sequel::SQLTime` on today's date that
+  keeps the offset. A value assigned to a TIMETZ model column becomes the same class,
+  so assigning a row its own value no longer reports the column as changed. A
+  `SQLTimeTZ` in a query is written as `'HH:MM:SS.ffffff+HH:MM'`. Before, a model wrote
+  a TIMETZ value without its offset, so DuckDB applied the session time zone:
+  08:09:10.5+02:00 was stored as 08:09:10.5-07:00. Two values with the same instant
+  and different offsets are not equal. A plain `Time` in a dataset query is still
+  written as a timestamp without an offset.
 - **adapter:** a `Time` dated 1970-01-01 in a query is now written as a timestamp, for
   example `'1970-01-01 09:30:00'`, like any other `Time`. It was written as the time of
   day `'09:30:00'` before. DuckDB casts both forms to the same TIME value, so a

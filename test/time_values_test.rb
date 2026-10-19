@@ -3,7 +3,8 @@
 require_relative "spec_helper"
 
 # TIME and TIME_NS values are Sequel::SQLTime, both when a query loads them and when a
-# model typecasts an assigned value. TIMETZ values stay the Time that ruby-duckdb returns.
+# model typecasts an assigned value. TIMETZ values are Sequel::DuckDB::SQLTimeTZ, which
+# keeps the UTC offset.
 class TimeValuesTest < SequelDuckDBTest::TestCase
   def setup
     super
@@ -41,11 +42,13 @@ class TimeValuesTest < SequelDuckDBTest::TestCase
     assert_time_of_day [ 13, 45, 30, 123_456_789 ], row[:ns]
   end
 
-  def test_timetz_result_stays_a_time_with_its_offset
-    value = row[:tz]
+  def assert_time_with_offset(expected, value)
+    assert_instance_of Sequel::DuckDB::SQLTimeTZ, value
+    assert_equal expected, [ value.hour, value.min, value.sec, value.nsec, value.utc_offset ]
+  end
 
-    assert_instance_of Time, value
-    assert_equal [ 13, 45, 30, 123_456_000, 7200 ], [ value.hour, value.min, value.sec, value.nsec, value.utc_offset ]
+  def test_timetz_result_keeps_its_offset
+    assert_time_with_offset [ 13, 45, 30, 123_456_000, 7200 ], row[:tz]
   end
 
   def test_null_time_values_stay_nil
@@ -96,5 +99,56 @@ class TimeValuesTest < SequelDuckDBTest::TestCase
 
     assert_equal "'1970-01-01 09:30:00'", @db.literal(time)
     assert_time_of_day [ 9, 30, 0, 0 ], @db.get(Sequel.cast(time, :time))
+  end
+
+  def test_timetz_literal_has_fraction_and_offset
+    value = Sequel::DuckDB::SQLTimeTZ.from_time(Time.new(2026, 10, 19, 8, 9, 10.5r, "+02:00"))
+
+    assert_equal "'08:09:10.500000+02:00'", @db.literal(value)
+  end
+
+  def test_model_typecasts_assigned_string_to_sqltimetz_with_its_offset
+    event = @model.new
+    event.tz = "08:09:10.5+02:00"
+
+    assert_time_with_offset [ 8, 9, 10, 500_000_000, 7200 ], event.tz
+  end
+
+  def test_model_typecasts_assigned_time_to_sqltimetz_with_its_offset
+    event = @model.new
+    event.tz = Time.new(2001, 2, 3, 8, 9, 10, "-05:00")
+
+    assert_time_with_offset [ 8, 9, 10, 0, -18_000 ], event.tz
+  end
+
+  def test_saved_timetz_keeps_its_offset
+    @model.create(id: 3, tz: "08:09:10.5+02:00")
+
+    assert_time_with_offset [ 8, 9, 10, 500_000_000, 7200 ], row(3)[:tz]
+  end
+
+  def test_assigning_the_loaded_timetz_changes_nothing
+    event = @model[1]
+    event.set(tz: event.tz)
+    event.tz = "13:45:30.123456+02:00"
+
+    assert_empty event.changed_columns
+  end
+
+  def test_assigning_the_same_instant_with_another_offset_is_a_change
+    event = @model[1]
+    event.tz = "12:45:30.123456+01:00"
+
+    assert_equal [ :tz ], event.changed_columns
+  end
+
+  def test_where_on_loaded_timetz_matches_the_row
+    assert_equal 1, @db[:events].where(tz: row[:tz]).count
+  end
+
+  def test_invalid_timetz_value_raises
+    @model.raise_on_typecast_failure = true
+
+    assert_raises(Sequel::InvalidValue) { @model.new.tz = 42 }
   end
 end
