@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `db.schema` reports a STRUCT column as `:struct`. A model typecasts an assigned Hash to
   a `DuckDBStruct`. With `duckdb_array` also loaded, a list of structs is reported as
   `:struct_array`. Without the extension, the SQL and the values do not change.
+- **extensions:** the opt-in `duckdb_map` extension writes and reads DuckDB MAP columns.
+  Sequel's `pg_hstore` is the PostgreSQL counterpart, but a DuckDB MAP has typed keys
+  and values. `Sequel.duckdb_map("k" => 1)` returns a `Sequel::DuckDB::DuckDBMap`, which
+  Sequel writes as the map `MAP {'k': 1}`. An empty Hash gives `MAP {}`. The keys keep
+  their Ruby type, so an INTEGER-keyed map has Integer keys. A plain Ruby Hash still
+  means a condition. Load the extension with `DB.extension :duckdb_map`. MAP result
+  values are then `DuckDBMap` objects. `db.schema` reports a MAP column as `:map`. A
+  model typecasts an assigned Hash to a `DuckDBMap`. With `duckdb_array` also loaded, a
+  list of maps is reported as `:map_array`. Without the extension, the SQL and the
+  values do not change.
 
 ### Fixed
 
