@@ -55,6 +55,11 @@ module Sequel
   # @since 0.1.0
   module DuckDB
     module DriverDatabaseMethods
+      # The open ::DuckDB::Database and the number of open connections to it. Connecting
+      # and disconnecting change both, so they live in this object and not in instance
+      # variables, which a frozen Sequel::Database cannot change.
+      ConnectionState = Struct.new(:database, :connections)
+
       private
 
       # Open the DuckDB::Database once during Sequel::Database initialization.
@@ -64,12 +69,13 @@ module Sequel
       # (InstanceRegistry), and #disconnect gives it back once no connection is open.
       def adapter_initialize
         @conversion_procs = {}
+        @primary_keys = {}
+        @primary_key_sequences = {}
         register_default_conversion_procs
         @duckdb_mutex = Mutex.new
-        @duckdb_connections = 0
         @duckdb_file = duckdb_file_path(opts[:database])
         @duckdb_settings = InstanceRegistry.normalize_settings(opts[:config])
-        @duckdb_database = open_duckdb_database
+        @duckdb_state = ConnectionState.new(open_duckdb_database, 0)
       rescue Sequel::DatabaseConnectionError
         raise
       rescue ::DuckDB::Error => e
@@ -129,9 +135,10 @@ module Sequel
 
       def connect(_server)
         @duckdb_mutex.synchronize do
-          @duckdb_database ||= open_duckdb_database
-          conn = @duckdb_database.connect
-          @duckdb_connections += 1
+          state = @duckdb_state
+          state.database ||= open_duckdb_database
+          conn = state.database.connect
+          state.connections += 1
           conn
         end
       rescue ::DuckDB::Error => e
@@ -145,10 +152,11 @@ module Sequel
       def disconnect(opts = OPTS)
         super
         @duckdb_mutex.synchronize do
-          next unless @duckdb_file && @duckdb_database && @duckdb_connections.zero?
+          state = @duckdb_state
+          next unless @duckdb_file && state.database && state.connections.zero?
 
           InstanceRegistry.release(@duckdb_file)
-          @duckdb_database = nil
+          state.database = nil
         end
       end
 
@@ -159,7 +167,7 @@ module Sequel
           conn.close
         rescue ::DuckDB::Error # rubocop:disable Lint/SuppressedException -- best-effort cleanup on disconnect
         end
-        @duckdb_mutex.synchronize { @duckdb_connections -= 1 }
+        @duckdb_mutex.synchronize { @duckdb_state.connections -= 1 }
       end
 
       def valid_connection?(conn)

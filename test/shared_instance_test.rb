@@ -36,7 +36,7 @@ class SharedInstanceTest < SequelDuckDBTest::TestCase
   end
 
   def duckdb_database(db)
-    db.instance_variable_get(:@duckdb_database)
+    db.instance_variable_get(:@duckdb_state).database
   end
 
   # Opens the file read-write in another process. That works only when no process
@@ -212,5 +212,34 @@ class SharedInstanceTest < SequelDuckDBTest::TestCase
     _, status = Process.wait2(pid)
 
     assert_predicate status, :success?
+  end
+
+  # Sequel recommends Database#freeze for production. A frozen Database must still
+  # open and close connections (bead sequel-duckdb-vtj).
+  def test_frozen_file_database_disconnects_and_reconnects
+    db = open_db.freeze
+    db.create_table(:t) { Integer :x }
+    db[:t].insert(x: 1)
+    db.disconnect
+
+    assert other_process_can_open?
+    assert_equal 1, db[:t].count
+  end
+
+  def test_frozen_in_memory_database_keeps_its_data_across_disconnect
+    db = Sequel.connect(adapter: :duckdb, database: ":memory:").tap { |d| @dbs << d }.freeze
+    db.create_table(:t) { Integer :x }
+    db[:t].insert(x: 1)
+    db.disconnect
+
+    assert_equal 1, db[:t].count
+  end
+
+  def test_frozen_database_drops_a_schema
+    db = Sequel.connect(adapter: :duckdb, database: ":memory:").tap { |d| @dbs << d }.freeze
+    db.create_schema(:s)
+    db.drop_schema(:s)
+
+    refute_includes db.fetch("SELECT schema_name FROM information_schema.schemata").map(:schema_name), "s"
   end
 end

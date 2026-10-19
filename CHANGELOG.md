@@ -105,6 +105,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **connection:** a frozen `Sequel::Database` can open and close connections and drop a
+  schema. Sequel recommends `Database#freeze` for production, but every disconnect and
+  every `drop_schema` raised `FrozenError` after it, and later queries failed.
 - **connection:** the `config:` option was documented but ignored. Its DuckDB settings,
   for example `config: { threads: 4, memory_limit: "2GB" }`, now reach DuckDB. A file that
   is already open in this process keeps the settings of the first `Sequel::Database` that
