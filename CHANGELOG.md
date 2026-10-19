@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Sequel::SQLTime` is a subclass of `Time`, so `is_a?(Time)` is still true. Code that
   compares the class exactly with `Time`, or that expects the date 1970-01-01, must
   change.
+- **adapter:** a `Time` dated 1970-01-01 in a query is now written as a timestamp, for
+  example `'1970-01-01 09:30:00'`, like any other `Time`. It was written as the time of
+  day `'09:30:00'` before. DuckDB casts both forms to the same TIME value, so a
+  comparison with a TIME column gives the same result. Use `Sequel::SQLTime` for a time
+  of day.
 
 ### Added
 

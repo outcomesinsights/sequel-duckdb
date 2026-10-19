@@ -239,8 +239,8 @@ dataset.where(created_at: Time.new(2023, 5, 15, 14, 30, 0))
 # SQL: SELECT * FROM users WHERE (created_at = '2023-05-15 14:30:00')
 
 # Time-only literal
-dataset.where(start_time: Time.local(1970, 1, 1, 9, 30, 0))
-# SQL: SELECT * FROM users WHERE (start_time = '09:30:00')
+dataset.where(start_time: Sequel::SQLTime.create(9, 30, 0))
+# SQL: SELECT * FROM users WHERE (start_time = '09:30:00.000000')
 ```
 
 #### Boolean Literals

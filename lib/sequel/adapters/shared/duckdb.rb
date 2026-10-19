@@ -1144,16 +1144,7 @@ module Sequel
         when Sequel::SQLTime
           # A time of day: Sequel writes it as 'HH:MM:SS.ffffff'
           super
-        when Time
-          # Special handling for time-only values (year 1970 indicates time-only)
-          if value.year == 1970 && value.month == 1 && value.day == 1
-            # This is a time-only value, use TIME format
-            sql << "'#{value.strftime("%H:%M:%S")}'"
-          else
-            # Use our custom datetime formatting for consistency
-            literal_datetime_append(sql, value)
-          end
-        when DateTime
+        when Time, DateTime
           # Use our custom datetime formatting for consistency
           literal_datetime_append(sql, value)
         when String

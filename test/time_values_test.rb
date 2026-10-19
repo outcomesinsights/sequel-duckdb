@@ -88,4 +88,13 @@ class TimeValuesTest < SequelDuckDBTest::TestCase
   def test_where_on_sqltime_matches_the_row
     assert_equal 1, @db[:events].where(starts_at: Sequel::SQLTime.create(13, 45, 30, 123_456)).count
   end
+
+  # A plain Time is a timestamp, whatever its date. A Time on 1970-01-01 was once
+  # written as a time of day; Sequel::SQLTime is the class for that.
+  def test_time_on_1970_01_01_is_written_as_a_timestamp
+    time = Time.local(1970, 1, 1, 9, 30, 0)
+
+    assert_equal "'1970-01-01 09:30:00'", @db.literal(time)
+    assert_time_of_day [ 9, 30, 0, 0 ], @db.get(Sequel.cast(time, :time))
+  end
 end
