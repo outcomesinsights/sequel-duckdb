@@ -345,7 +345,7 @@ module Sequel
       # @param opts [Hash] Options
       # @return [Array<Array>] Schema information
       def schema(table_name, opts = {})
-        # The cache key of a qualified identifier (e.g., Sequel[:schema][:table]) is the table
+        # A qualified identifier (e.g., Sequel[:schema][:table]) is parsed as given
         if table_name.is_a?(Sequel::SQL::QualifiedIdentifier)
           parse_name = table_name
           actual_table_name = table_name.column.to_s.to_sym
@@ -366,16 +366,7 @@ module Sequel
           actual_table_name = table_name
         end
 
-        # Cache schema information for type conversion
-        schema_info = schema_parse_table(parse_name || actual_table_name, opts)
-        @schema_cache ||= {}
-        @schema_cache[actual_table_name] = {}
-
-        schema_info.each do |column_name, column_info|
-          @schema_cache[actual_table_name][column_name] = column_info
-        end
-
-        schema_info
+        schema_parse_table(parse_name || actual_table_name, opts)
       end
 
       # Get index information for a table
@@ -750,7 +741,6 @@ module Sequel
       #
       # @return [void]
       def remove_all_cached_schemas
-        @schema_cache = {}
         @schemas = {}
         @primary_keys = {}
         @primary_key_sequences = {}
@@ -893,26 +883,6 @@ module Sequel
         else
           value
         end
-      end
-
-      # Override the default type conversion to use our custom TIME handling
-      # This method needs to be public for Sequel models to access it
-      public
-
-      def typecast_value(column, value)
-        return value if value.nil?
-
-        # Get column schema information to determine the correct type
-        if @schema_cache && @schema_cache[column]
-          column_type = @schema_cache[column][:type]
-          case column_type
-          when :time
-            return typecast_value_time(value)
-          end
-        end
-
-        # Fall back to default Sequel type conversion
-        super
       end
     end
 

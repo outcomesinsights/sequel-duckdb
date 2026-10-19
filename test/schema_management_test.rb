@@ -411,17 +411,14 @@ describe "Schema Management" do
       @db.remove_all_cached_schemas
 
       # Access instance variables to verify they're hashes, not nil
-      schema_cache = @db.instance_variable_get(:@schema_cache)
       schemas = @db.instance_variable_get(:@schemas)
       primary_keys = @db.instance_variable_get(:@primary_keys)
       primary_key_sequences = @db.instance_variable_get(:@primary_key_sequences)
 
-      _(schema_cache).must_be_kind_of(Hash)
       _(schemas).must_be_kind_of(Hash)
       _(primary_keys).must_be_kind_of(Hash)
       _(primary_key_sequences).must_be_kind_of(Hash)
 
-      _(schema_cache).must_be_empty
       _(schemas).must_be_empty
       _(primary_keys).must_be_empty
       _(primary_key_sequences).must_be_empty
