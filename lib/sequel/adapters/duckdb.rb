@@ -63,6 +63,7 @@ module Sequel
       # shared with every other Sequel::Database on that file in this process
       # (InstanceRegistry), and #disconnect gives it back once no connection is open.
       def adapter_initialize
+        @conversion_procs = {}
         @duckdb_mutex = Mutex.new
         @duckdb_connections = 0
         @duckdb_file = duckdb_file_path(opts[:database])
@@ -94,6 +95,23 @@ module Sequel
       end
 
       public
+
+      # Registers a converter for result values of one DuckDB column type. Dataset
+      # fetches pass each non-NULL value of a column of that type to the converter and
+      # return what it gives back. A converter receives the whole column value, so a
+      # LIST of STRUCT gives it the complete Array.
+      #
+      # +type+ is the type name that ruby-duckdb reports, for example :time or :list.
+      # A column with a type alias is looked up by its alias first: JSON columns report
+      # the type :varchar with the alias "JSON", so register them as :json. Register
+      # converters before you run queries. A later registration for the same type
+      # replaces the earlier one.
+      #
+      # @example
+      #   db.add_conversion_proc(:time) { |value| Sequel::SQLTime.create(value.hour, value.min, value.sec) }
+      def add_conversion_proc(type, callable = nil, &block)
+        @conversion_procs[conversion_proc_key(type)] = callable || block
+      end
 
       def connect(_server)
         @duckdb_mutex.synchronize do
@@ -201,6 +219,22 @@ module Sequel
           column.respond_to?(:name) ? column.name.to_s : column.to_s
         end
       end
+
+      def conversion_proc_key(type)
+        type.to_s.downcase.to_sym
+      end
+
+      # The converter for each result column, in column order, or nil for a column
+      # with none. Empty when nothing is registered, so rows stay exactly as
+      # ruby-duckdb returns them.
+      def result_conversion_procs(result)
+        return [] if @conversion_procs.empty?
+
+        result.columns.map do |column|
+          type_alias = column.logical_type.alias
+          (type_alias && @conversion_procs[conversion_proc_key(type_alias)]) || @conversion_procs[column.type]
+        end
+      end
     end
 
     module DriverDatasetMethods
@@ -210,11 +244,15 @@ module Sequel
 
           col_names = db.send(:result_column_names, result)
           self.columns = col_names.map { |c| output_identifier(c) }
+          converters = db.send(:result_conversion_procs, result)
 
           result.each do |row_array|
             row_hash = {}
             col_names.each_with_index do |col_name, i|
-              row_hash[output_identifier(col_name)] = row_array[i]
+              value = row_array[i]
+              converter = converters[i]
+              value = converter.call(value) if converter && !value.nil?
+              row_hash[output_identifier(col_name)] = value
             end
             yield row_hash
           end

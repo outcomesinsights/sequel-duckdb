@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regexps (`exclude(name: /x/)`) are now written as `NOT regexp_matches(...)`.
   `create_table?` and `drop_table?` now emit `IF NOT EXISTS` / `IF EXISTS`. Other SQL is
   unchanged.
+- **adapter:** `Database#add_conversion_proc(type, callable = nil, &block)` registers a
+  converter for result values of one DuckDB column type. Dataset fetches pass each
+  non-NULL value of a column of that type to the converter. The converter receives the
+  whole value, so a LIST of STRUCT arrives as one Array. `type` is the type name that
+  ruby-duckdb reports, for example `:time` or `:list`. A column with a type alias is
+  looked up by its alias first. JSON columns report the type `:varchar` with the alias
+  `JSON`, so you register them as `:json`. With no converters registered, rows are
+  unchanged.
 
 ### Fixed
 
