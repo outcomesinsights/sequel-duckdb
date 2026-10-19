@@ -41,7 +41,7 @@ module Sequel
     class DuckDBArray < DelegateClass(Array)
       # Element types that get a :<type>_array schema type.
       ELEMENT_TYPES = %i[string integer bigint float decimal boolean date datetime time interval blob uuid struct
-                         map].freeze
+                         map json].freeze
 
       # Element types whose typecast method has another name.
       ELEMENT_TYPECASTS = { bigint: :integer }.freeze
