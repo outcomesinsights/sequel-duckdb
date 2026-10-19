@@ -4,7 +4,7 @@ title: Sequel types for DuckDB composite columns and the Ruby value for TIME
 status: captured
 type: question
 created_at: 2026-10-19T17:42:00.813900+00:00
-updated_at: 2026-10-19T17:42:00.813900+00:00
+updated_at: 2026-10-19T17:46:18.504865+00:00
 ---
 
 Not ruled. Two questions about the Sequel type that `db.schema` reports, and the Ruby value a model gets, for DuckDB columns that sequel-duckdb-4a8 (commit 4b1283d) did not cover.
@@ -61,3 +61,7 @@ Options:
 Agent recommendation: (b). It is the only option that fixes the changed-column defect, it gives one representation everywhere, and it matches other Sequel adapters. It needs a "Changed" entry in the CHANGELOG.
 
 Related bead: sequel-duckdb-agp removes the `typecast_value` override, which never acts. That bead does not change TIME behavior.
+
+RULED 2026-10-19 (Question 2, TIME): option (b). Ryan: "I think for item 3, B does make sense." TIME values become Sequel::SQLTime for both assigned and loaded values.
+
+UPDATE 2026-10-19 (Question 1, composite types): not ruled. Ryan asked to revisit it, so it moved to its own seed, sequel-duckdb-1h0, with new findings: Sequel core has no JSON or array type, and writing a Ruby Array or Hash through sequel-duckdb produces wrong SQL.
