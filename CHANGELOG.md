@@ -5,7 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-10-25
+
+### Breaking changes
+
+- **adapter:** TIME and TIME_NS result values are now `Sequel::SQLTime`, not
+  `Time`. Sequel's postgres and sqlite adapters use the same class for a time of day. The
+  value keeps the hour, minute, second and fraction, and TIME_NS keeps its nanoseconds. A
+  value assigned to a TIME model column is also a `Sequel::SQLTime` on today's date. It
+  was a `Time` on 1970-01-01 before. So a model that is assigned the time it already has
+  no longer reports the column as changed. A `Sequel::SQLTime` in a query is written as
+  `'HH:MM:SS.ffffff'`, so writes keep the fraction. `Sequel::SQLTime` is a subclass of
+  `Time`, so `is_a?(Time)` is still true. Code that compares the class exactly with
+  `Time`, or that expects the date 1970-01-01, must change.
+- **adapter:** TIMETZ columns keep their UTC offset. `db.schema` reports
+  them as `:time_timezone`, not `:time`. Result values are the new class
+  `Sequel::DuckDB::SQLTimeTZ`, a subclass of `Sequel::SQLTime` on today's date that
+  keeps the offset. A value assigned to a TIMETZ model column becomes the same class,
+  so assigning a row its own value no longer reports the column as changed. A
+  `SQLTimeTZ` in a query is written as `'HH:MM:SS.ffffff+HH:MM'`. Before, a model wrote
+  a TIMETZ value without its offset, so DuckDB applied the session time zone:
+  08:09:10.5+02:00 was stored as 08:09:10.5-07:00. Two values with the same instant
+  and different offsets are not equal. A plain `Time` in a dataset query is still
+  written as a timestamp without an offset.
 
 ### Changed
 
@@ -16,30 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged, for example `FORMAT PARQUET` and `COMPRESSION ZSTD`. Values that are not a
   single word, such as `delimiter: "|"`, are now quoted strings. The old text for those
   values was a DuckDB syntax error.
-- **adapter (breaking):** TIME and TIME_NS result values are now `Sequel::SQLTime`, not
-  `Time`. Sequel's postgres and sqlite adapters use the same class for a time of day. The
-  value keeps the hour, minute, second and fraction, and TIME_NS keeps its nanoseconds. A
-  value assigned to a TIME model column is also a `Sequel::SQLTime` on today's date. It
-  was a `Time` on 1970-01-01 before. So a model that is assigned the time it already has
-  no longer reports the column as changed. A `Sequel::SQLTime` in a query is written as
-  `'HH:MM:SS.ffffff'`, so writes keep the fraction. `Sequel::SQLTime` is a subclass of
-  `Time`, so `is_a?(Time)` is still true. Code that compares the class exactly with
-  `Time`, or that expects the date 1970-01-01, must change.
-- **adapter (breaking):** TIMETZ columns keep their UTC offset. `db.schema` reports
-  them as `:time_timezone`, not `:time`. Result values are the new class
-  `Sequel::DuckDB::SQLTimeTZ`, a subclass of `Sequel::SQLTime` on today's date that
-  keeps the offset. A value assigned to a TIMETZ model column becomes the same class,
-  so assigning a row its own value no longer reports the column as changed. A
-  `SQLTimeTZ` in a query is written as `'HH:MM:SS.ffffff+HH:MM'`. Before, a model wrote
-  a TIMETZ value without its offset, so DuckDB applied the session time zone:
-  08:09:10.5+02:00 was stored as 08:09:10.5-07:00. Two values with the same instant
-  and different offsets are not equal. A plain `Time` in a dataset query is still
-  written as a timestamp without an offset.
 - **adapter:** a `Time` dated 1970-01-01 in a query is now written as a timestamp, for
   example `'1970-01-01 09:30:00'`, like any other `Time`. It was written as the time of
   day `'09:30:00'` before. DuckDB casts both forms to the same TIME value, so a
   comparison with a TIME column gives the same result. Use `Sequel::SQLTime` for a time
   of day.
+- **adapter:** Remove the typecast_value override and its schema cache ([f75e08b](https://github.com/outcomesinsights/sequel-duckdb/commit/f75e08b4a507f9a933d60d72cdf80ae44be23d26))
 
 ### Added
 
@@ -57,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ruby-duckdb reports, for example `:time` or `:list`. A column with a type alias is
   looked up by its alias first. JSON columns report the type `:varchar` with the alias
   `JSON`, so you register them as `:json`. A column type without a converter keeps the
-  value that ruby-duckdb returns. The adapter registers converters for `:time` and
-  `:time_ns`, and a registration of your own replaces them.
+  value that ruby-duckdb returns. The adapter registers converters for `:time`,
+  `:time_ns` and `:time_tz`, and a registration of your own replaces them.
 - **extensions:** the opt-in `duckdb_array` extension writes and reads DuckDB LIST and
   ARRAY columns, as Sequel's `pg_array` does for PostgreSQL. `Sequel.duckdb_array([1, 2])`
   returns a `Sequel::DuckDB::DuckDBArray`, which Sequel writes as the list `[1, 2]`. A
@@ -102,6 +106,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrapper and parses an assigned String as JSON. With `duckdb_array` also loaded, a
   JSON list is reported as `:json_array`. Without the extension, the SQL and the values
   do not change.
+- **duckdb_ops:** Add opt-in duckdb_ops extension with Sequel.try_cast ([a8c0815](https://github.com/outcomesinsights/sequel-duckdb/commit/a8c081531c2bb071bb1a8d07752254346e39f32f))
+- **duckdb_ops:** Add named-argument builder and read\_\* helpers ([5409d10](https://github.com/outcomesinsights/sequel-duckdb/commit/5409d10f508452dd3b945b65bf0417767296a9f0))
+- **duckdb_ops:** Add Sequel.duckdb_lambda for DuckDB lambda expressions ([5de2362](https://github.com/outcomesinsights/sequel-duckdb/commit/5de2362580467f518de0c5ba3fe6253d655633a5))
+- **copy:** Add Dataset#copy_to_sql; Database#copy_to runs it ([a972d8f](https://github.com/outcomesinsights/sequel-duckdb/commit/a972d8f66ec6a3713f5c7fa612e0172f284d9332))
+- **dataset:** Declare supports_is_distinct_from? so IS DISTINCT FROM is native ([d8a1397](https://github.com/outcomesinsights/sequel-duckdb/commit/d8a13978a9c12e895d28bcf9fa2aea69006e7c2f))
 
 ### Fixed
 
@@ -125,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exist" for the same names. They now read the table or view that a query with that
   name reads, including a temporary table that has the name of a `main` table.
 - **schema:** `db.schema` reported type `:string` for FLOAT and REAL, unsigned and
-  128-bit integer, VARINT, TIMESTAMPTZ, TIMESTAMP_S/MS/NS, TIMETZ, TIME_NS and INTERVAL
+  128-bit integer, VARINT, TIMESTAMPTZ, TIMESTAMP_S/MS/NS, TIME_NS and INTERVAL
   columns. Sequel models then typecast an assigned value to a String, for example 1.5 to
   "1.5" for a FLOAT column. These columns now report `:float`, `:integer`, `:bigint`,
   `:datetime`, `:time` or `:interval`. List, struct, map, union, enum, JSON and BIT
@@ -152,6 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gives the file back once that database has no open connection. The file closes when no
   `Sequel::Database` in the process uses it, and the next query opens it again.
   In-memory databases are unchanged: each is separate and stays open after `disconnect`.
+- **dataset:** Declare supports_filtered_aggregates? so FILTER is native ([c7aad9c](https://github.com/outcomesinsights/sequel-duckdb/commit/c7aad9c9cfad8eaf28c0825004a23c2a6e52bc31))
+- **copy:** Escape paths, quote COPY options, infer-or-raise FORMAT ([13efc23](https://github.com/outcomesinsights/sequel-duckdb/commit/13efc239c0d491b6302af6207d19ab86a022f160))
 
 ## [0.3.1] - 2026-10-02
 
@@ -336,3 +347,4 @@ tag-based release workflow.
 [0.2.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.0...v0.2.1
 [0.3.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.1...v0.3.0
 [0.3.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.3.0...v0.3.1
+[0.4.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.3.1...v0.4.0
