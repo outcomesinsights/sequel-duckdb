@@ -105,6 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **dataset:** a CTE now works in INSERT, UPDATE and DELETE. `supports_cte?` took no
+  argument, so an INSERT from a dataset with a CTE raised `ArgumentError`. An UPDATE or a
+  DELETE on a dataset with a CTE left the WITH clause out of the SQL, so DuckDB could not
+  find the CTE's table. All three statements now start with the WITH clause.
 - **connection:** a frozen `Sequel::Database` can open and close connections and drop a
   schema. Sequel recommends `Database#freeze` for production, but every disconnect and
   every `drop_schema` raised `FrozenError` after it, and later queries failed.

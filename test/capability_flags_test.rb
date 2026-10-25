@@ -111,4 +111,31 @@ class CapabilityFlagsTest < SequelDuckDBTest::TestCase
 
     refute @db.table_exists?(:x)
   end
+
+  # Sequel calls supports_cte?(:insert), (:update) and (:delete), and writes the CTE
+  # before the statement (bead sequel-duckdb-b7v).
+  def cte_counting_large_values
+    @db.select(Sequel[@db[:big].select { count(1) }].as(:n)).with(:big, t.where { v > 1 }, materialized: true)
+  end
+
+  def test_insert_from_a_dataset_with_a_cte
+    @db.create_table(:etl) { Integer :n }
+    @db[:etl].insert(cte_counting_large_values)
+    @db[:etl].insert(cte_counting_large_values.from_self)
+
+    assert_match(/\AWITH "big" AS MATERIALIZED/, @db[:etl].insert_sql(cte_counting_large_values))
+    assert_equal [ 2, 2 ], @db[:etl].select_map(:n)
+  end
+
+  def test_update_with_a_cte
+    t.with(:x, @db.select(Sequel.as(1, :id))).where(id: @db[:x].select(:id)).update(v: 9)
+
+    assert_equal [ [ 1, 9 ], [ 2, 2 ], [ 3, 5 ] ], t.order(:id).select_map(%i[id v])
+  end
+
+  def test_delete_with_a_cte
+    t.with(:x, @db.select(Sequel.as(2, :id))).where(id: @db[:x].select(:id)).delete
+
+    assert_equal [ 1, 3 ], t.order(:id).select_map(:id)
+  end
 end

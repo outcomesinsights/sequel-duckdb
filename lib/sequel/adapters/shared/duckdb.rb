@@ -915,8 +915,12 @@ module Sequel
       MONTH_BASED_UNITS = %w[YEAR MONTH].freeze
       TIME_BASED_UNITS = %w[HOUR MINUTE SECOND].freeze
 
-      # Override select SQL clause order to support VALUES
+      # Clause order of each statement. A SELECT can be a VALUES list, and every
+      # statement can start with a WITH clause.
       Dataset.def_sql_method(self, :select, [ [ "if opts[:values]", %w[values compounds order limit] ], [ "else", %w[with select distinct columns from join where group having window compounds order limit lock] ] ])
+      Dataset.def_sql_method(self, :insert, %w[with insert into columns values])
+      Dataset.def_sql_method(self, :update, %w[with update table set where])
+      Dataset.def_sql_method(self, :delete, %w[with delete from where])
 
       # Returns the DuckDB COPY statement that writes this dataset to +path+,
       # without running it. Options are DuckDB COPY options, for example
@@ -977,7 +981,8 @@ module Sequel
         true
       end
 
-      def supports_cte?
+      # DuckDB runs a WITH clause before SELECT, INSERT, UPDATE and DELETE.
+      def supports_cte?(_type = :select)
         true
       end
 
