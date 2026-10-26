@@ -60,16 +60,29 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      # Production uses DuckDB library 1.5.x until 2.x's performance regressions are
-      # resolved; 1.5.x reaches end of life in March 2027. One job also runs 2.x.
-      # The same 1.5.x version is in the lint job and in release.yml.
+      # sequel-duckdb supports DuckDB library 1.5.x and 2.x until 1.5.x reaches end of
+      # life in March 2027. Production uses 1.5.x until 2.x's performance regressions
+      # are resolved. Every Ruby runs library 1.5.x with the duckdb gem 2.x (Gemfile).
+      # One job runs library 2.x, and one runs the duckdb gem 1.5.x
+      # (gemfiles/duckdb-1.5.gemfile). The same 1.5.x library version is in the lint
+      # job and in release.yml.
       matrix:
         ruby: ["3.3", "3.4", "4.0"]
         libduckdb: ["1.5.6"]
+        duckdb_gem: ["2.x"]
+        gemfile: ["Gemfile"]
         include:
           - ruby: "4.0"
             libduckdb: "2.0.0"
-    name: Test Ruby ${{ matrix.ruby }}, DuckDB ${{ matrix.libduckdb }}
+            duckdb_gem: "2.x"
+            gemfile: "Gemfile"
+          - ruby: "4.0"
+            libduckdb: "1.5.6"
+            duckdb_gem: "1.5.x"
+            gemfile: "gemfiles/duckdb-1.5.gemfile"
+    name: Test Ruby ${{ matrix.ruby }}, DuckDB ${{ matrix.libduckdb }}, duckdb gem ${{ matrix.duckdb_gem }}
+    env:
+      BUNDLE_GEMFILE: ${{ matrix.gemfile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -92,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-ruby-${{ matrix.ruby }}-duckdb-${{ matrix.libduckdb }}
+          name: coverage-ruby-${{ matrix.ruby }}-duckdb-${{ matrix.libduckdb }}-gem-${{ matrix.duckdb_gem }}
           path: coverage/
           retention-days: 90
 

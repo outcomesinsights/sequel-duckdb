@@ -40,10 +40,20 @@ cp -rf source dest          # NOT: cp -r source dest
 
 ## DuckDB library versions
 
-The tests run against two DuckDB C libraries. Production uses 1.5.x, because
-DuckDB 2.x has performance regressions. 1.5.x reaches end of life in March 2027.
-CI runs every Ruby on 1.5.x and one job on 2.x (`.github/workflows/main.yml`).
-Locally, `just test` uses the library that the duckdb gem was built against, and
+sequel-duckdb supports the DuckDB C library 1.5.x and 2.x until 1.5.x reaches
+end of life in March 2027 (Ryan, 2026-10-26). Production uses 1.5.x, because
+DuckDB 2.x has performance regressions. After March 2027, drop 1.5.x: the
+deferred bead sequel-duckdb-3oi ("Drop DuckDB 1.5.x support") lists what to remove.
+
+The gemspec does not depend on the duckdb gem, so each project picks its own
+duckdb gem version. `Gemfile` uses the duckdb gem 2.x, which builds against
+library 1.4 or newer. `gemfiles/duckdb-1.5.gemfile` holds the gem at 1.5.x for
+projects that still pin it.
+
+CI (`.github/workflows/main.yml`) runs every Ruby on library 1.5.x with gem 2.x,
+one job on library 2.x, and one job with gem 1.5.x. Locally, `just test` uses
+the library that the duckdb gem was built against.
+`BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile just test` runs gem 1.5.x, and
 `just test-libduckdb DIR` builds the gem against another library and runs the
 tests. The official 2.x Linux build needs an x86-64-v3 CPU (AVX2), so on an
 older CPU, DIR must be a build from source.
@@ -60,8 +70,10 @@ Releases are tag-based and cut weekly by a release agent; nothing about them is
 manual for a human. `.github/workflows/release.yml` publishes to rubygems.org
 via trusted publishing when a `v*` tag is pushed. To cut one:
 
-1. Update the gems. Run `bundle update`, then `just ci`, and commit
-   `Gemfile.lock` as `chore(deps): update gems`. Do not use `build:`, because
+1. Update the gems. Run `bundle update` and
+   `BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile bundle update`, then `just ci`
+   and `BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile just test`. Commit both
+   lockfiles as `chore(deps): update gems`. Do not use `build:`, because
    git-cliff counts it toward the version bump. `bundle update` stays inside
    the constraints in `Gemfile` and the gemspec. Then run `bundle outdated`.
    Each gem that it still lists is held back by a constraint. If the
