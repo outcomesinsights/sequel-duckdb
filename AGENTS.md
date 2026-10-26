@@ -46,16 +46,14 @@ DuckDB 2.x has performance regressions. After March 2027, drop 1.5.x: the
 deferred bead sequel-duckdb-3oi ("Drop DuckDB 1.5.x support") lists what to remove.
 
 The gemspec does not depend on the duckdb gem, so each project picks its own
-duckdb gem version. `Gemfile` uses the duckdb gem 2.x, which builds against
-library 1.4 or newer. `gemfiles/duckdb-1.5.gemfile` holds the gem at 1.5.x for
-projects that still pin it.
+duckdb gem version. Do not allow the duckdb gem 1.5.x (Ryan, 2026-10-26).
+`Gemfile` requires the duckdb gem 2.x (`~> 2.0`), which builds against library
+1.4 or newer, so it works with library 1.5.x and 2.x.
 
-CI (`.github/workflows/main.yml`) runs every Ruby on library 1.5.x with gem 2.x,
-one job on library 2.x, and one job with gem 1.5.x. Locally, `just test` uses
-the library that the duckdb gem was built against.
-`BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile just test` runs gem 1.5.x, and
-`just test-libduckdb DIR` builds the gem against another library and runs the
-tests. The official 2.x Linux build needs an x86-64-v3 CPU (AVX2), so on an
+CI (`.github/workflows/main.yml`) runs every Ruby on library 1.5.x and one job
+on library 2.x, all with gem 2.x. Locally, `just test` uses the library that the
+duckdb gem was built against, and `just test-libduckdb DIR` builds the gem
+against another library and runs the tests. The official 2.x Linux build needs an x86-64-v3 CPU (AVX2), so on an
 older CPU, DIR must be a build from source.
 
 When the two versions behave differently, write a test for each version that
@@ -70,10 +68,8 @@ Releases are tag-based and cut weekly by a release agent; nothing about them is
 manual for a human. `.github/workflows/release.yml` publishes to rubygems.org
 via trusted publishing when a `v*` tag is pushed. To cut one:
 
-1. Update the gems. Run `bundle update` and
-   `BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile bundle update`, then `just ci`
-   and `BUNDLE_GEMFILE=gemfiles/duckdb-1.5.gemfile just test`. Commit both
-   lockfiles as `chore(deps): update gems`. Do not use `build:`, because
+1. Update the gems. Run `bundle update`, then `just ci`. Commit the lockfile
+   as `chore(deps): update gems`. Do not use `build:`, because
    git-cliff counts it toward the version bump. `bundle update` stays inside
    the constraints in `Gemfile` and the gemspec. Then run `bundle outdated`.
    Each gem that it still lists is held back by a constraint. If the

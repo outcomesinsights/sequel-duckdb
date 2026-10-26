@@ -27,4 +27,3 @@ claude_stuff/
 # setup-ruby bundler-cache installs gems into vendor/bundle INSIDE the checkout;
 # zizmor honours this file and would otherwise audit the workflows gems ship.
 /vendor/
-/gemfiles/.bundle/

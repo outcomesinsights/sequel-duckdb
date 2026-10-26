@@ -807,8 +807,8 @@ db[:users].where(active: true).all
 - **Sequel**: 5.0 or higher
 - **DuckDB C library**: 1.5.x and 2.x. Support for 1.5.x ends when DuckDB 1.5.x
   reaches end of life in March 2027.
-- **ruby-duckdb (the `duckdb` gem)**: 1.5.x and 2.x. sequel-duckdb does not depend on
-  it, so add `gem "duckdb"` to your own Gemfile. ruby-duckdb 2.x builds against
+- **ruby-duckdb (the `duckdb` gem)**: 2.x. sequel-duckdb does not depend on it, so add
+  `gem "duckdb", "~> 2.0"` to your own Gemfile. ruby-duckdb 2.x builds against
   library 1.4 or newer, so it works with library 1.5.x.
 
 DuckDB 2.x aborts an open transaction after any failed statement, including a query

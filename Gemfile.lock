@@ -124,7 +124,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  duckdb (>= 1.5, < 3)
+  duckdb (~> 2.0)
   irb
   logger
   minitest (~> 6.0)

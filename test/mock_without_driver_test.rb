@@ -9,7 +9,7 @@ class MockWithoutDriverTest < Minitest::Test
 
   # The child keeps the parent's Bundler environment, so it loads the same Gemfile
   # and lockfile. Clearing only BUNDLE_GEMFILE once made the child pair the root
-  # Gemfile with gemfiles/duckdb-1.5.gemfile.lock (Bundler 4 passes BUNDLE_LOCKFILE),
+  # Gemfile with another Gemfile's lockfile (Bundler 4 passes BUNDLE_LOCKFILE),
   # and it rewrote that lockfile. The code below blocks require "duckdb" itself.
   def run_ruby(code)
     Open3.capture3(

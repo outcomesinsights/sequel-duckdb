@@ -4,4 +4,4 @@ source "https://rubygems.org"
 
 gemspec
 
-gem "duckdb", ">= 1.5", "< 3"
+gem "duckdb", "~> 2.0"
