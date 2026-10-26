@@ -74,4 +74,35 @@ class TableExistsTest < SequelDuckDBTest::TestCase
 
     assert_equal [ 1, 2 ], @db[:t1].order(:a).select_map(:a)
   end
+
+  # The user's own failed query is a version difference that the adapter keeps:
+  # DuckDB 2.x aborts the transaction and DuckDB 1.x does not.
+  def test_failed_user_query_aborts_the_transaction_on_duckdb_2
+    skip "DuckDB 1.x keeps the transaction" if ::DuckDB::LIBRARY_VERSION.to_i < 2
+
+    @db.transaction(rollback: :always) do
+      assert_raises(Sequel::DatabaseError) { @db[:missing].all }
+      error = assert_raises(Sequel::DatabaseError) { @db[:t1].insert(a: 1) }
+      assert_match(/transaction is aborted/, error.message)
+    end
+  end
+
+  def test_failed_user_query_keeps_the_transaction_on_duckdb_1
+    skip "DuckDB 2.x aborts the transaction" if ::DuckDB::LIBRARY_VERSION.to_i >= 2
+
+    @db.transaction(rollback: :always) do
+      assert_raises(Sequel::DatabaseError) { @db[:missing].all }
+      @db[:t1].insert(a: 1)
+    end
+  end
+
+  # On DuckDB 2.x the lookup changes the transaction's invalidation policy while it runs.
+  def test_missing_table_inside_a_transaction_restores_the_invalidation_policy
+    policy = Sequel.function(:current_setting, "current_transaction_invalidation_policy")
+    @db.transaction do
+      before = @db.get(policy)
+      refute @db.table_exists?(:missing)
+      assert_equal before, @db.get(policy)
+    end
+  end
 end

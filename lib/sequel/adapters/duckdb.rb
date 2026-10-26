@@ -199,6 +199,11 @@ module Sequel
 
       private
 
+      # DuckDB 2.0 made binder and catalog errors abort an open transaction.
+      def bind_errors_abort_transactions?
+        ::DuckDB::LIBRARY_VERSION.to_i >= 2
+      end
+
       def database_error_classes
         [ ::DuckDB::Error ]
       end

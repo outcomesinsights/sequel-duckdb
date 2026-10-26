@@ -294,19 +294,21 @@ module Sequel
       #
       # DuckDB resolves the name itself, as it does for any query, so every Sequel
       # identifier form, the search_path, temporary tables and views all work. The query
-      # reads no rows. A missing table is a catalog error, which does not abort an open
-      # DuckDB transaction, so no savepoint is needed.
+      # reads no rows. A missing table is a catalog error. It must not abort an open
+      # transaction, and DuckDB has no savepoints, so see keep_transaction_on_bind_error.
       #
       # @param table_name [Symbol, String, Sequel::SQL::Identifier, Sequel::SQL::QualifiedIdentifier] Name of the table
       # @param opts [Hash] Options (:schema qualifies an unqualified name)
       # @return [Boolean] true if table exists
       def table_exists?(table_name, opts = {})
-        from(qualify_with_schema_option(table_name, opts)).where(false).select(Sequel::NULL).all
-        true
-      rescue Sequel::DatabaseConnectionError, Sequel::DatabaseDisconnectError
-        raise
-      rescue Sequel::DatabaseError
-        false
+        keep_transaction_on_bind_error do
+          from(qualify_with_schema_option(table_name, opts)).where(false).select(Sequel::NULL).all
+          true
+        rescue Sequel::DatabaseConnectionError, Sequel::DatabaseDisconnectError
+          raise
+        rescue Sequel::DatabaseError
+          false
+        end
       end
 
       # Get list of tables
@@ -474,16 +476,18 @@ module Sequel
       # @return [Hash, nil] :catalog, :schema and :table, or nil if the name does not resolve
       def resolve_table(table_name, opts = {})
         table_name = qualify_with_schema_option(table_name, opts)
-        target = explain_plan(table_name)
-        return unless target
+        keep_transaction_on_bind_error do
+          target = explain_plan(table_name)
+          next unless target
 
-        candidates = fetch("SELECT table_catalog, table_schema, table_name FROM information_schema.tables " \
-                           "WHERE lower(table_name) = lower(?)", bare_table_name(table_name)).all
-        matches = candidates.select do |c|
-          explain_plan(qualified_name(c[:table_catalog], c[:table_schema], c[:table_name])) == target
+          candidates = fetch("SELECT table_catalog, table_schema, table_name FROM information_schema.tables " \
+                             "WHERE lower(table_name) = lower(?)", bare_table_name(table_name)).all
+          matches = candidates.select do |c|
+            explain_plan(qualified_name(c[:table_catalog], c[:table_schema], c[:table_name])) == target
+          end
+          match = matches.size > 1 ? first_in_search_order(matches) : matches.first
+          match && { catalog: match[:table_catalog], schema: match[:table_schema], table: match[:table_name] }
         end
-        match = matches.size > 1 ? first_in_search_order(matches) : matches.first
-        match && { catalog: match[:table_catalog], schema: match[:table_schema], table: match[:table_name] }
       end
 
       # resolve_table, but a name that does not resolve raises.
@@ -514,7 +518,7 @@ module Sequel
       end
 
       # The EXPLAIN plan of SELECT * FROM the name, or nil if DuckDB cannot bind the name.
-      # A bind error does not abort an open DuckDB transaction.
+      # Call it inside keep_transaction_on_bind_error.
       def explain_plan(table_name)
         plan = []
         execute("EXPLAIN (FORMAT JSON) #{from(table_name).sql}") { |row| plan << row }
@@ -523,6 +527,32 @@ module Sequel
         raise
       rescue Sequel::DatabaseError
         nil
+      end
+
+      # Runs the block so that a binder or catalog error in it, such as a missing table,
+      # does not abort an open transaction.
+      #
+      # DuckDB 1.x never aborts a transaction on those errors. DuckDB 2.x aborts it by
+      # default, and its current_transaction_invalidation_policy setting turns that off
+      # for the open transaction only. DuckDB 1.x does not know the value, and a failed
+      # SET aborts the transaction, so the setting is used only where
+      # bind_errors_abort_transactions? is true. The block must handle its own errors:
+      # if it raises, the policy is not restored, and the transaction ends anyway.
+      def keep_transaction_on_bind_error
+        return yield unless bind_errors_abort_transactions? && in_transaction?
+
+        setting = "current_transaction_invalidation_policy"
+        previous = get(Sequel.function(:current_setting, setting))
+        run("SET #{setting} = 'SYNTACTIC_ERRORS_DO_NOT_INVALIDATE'")
+        result = yield
+        run("SET #{setting} = #{literal(previous)}")
+        result
+      end
+
+      # True when a binder or catalog error aborts an open transaction. The native adapter
+      # answers from the loaded DuckDB library. Other adapters run no queries, so false.
+      def bind_errors_abort_transactions?
+        false
       end
 
       # DuckDB looks in the temp catalog first, then in the search_path schemas, then in the
