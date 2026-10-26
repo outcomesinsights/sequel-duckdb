@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-10-26
+
+### Added
+
+- Support for the DuckDB C library 2.x and the duckdb gem 2.x, alongside 1.5.x. CI
+  tests library 1.5.6 and 2.0.0, and the duckdb gem 1.5.x and 2.x. Support for library
+  1.5.x ends when DuckDB 1.5.x reaches end of life in March 2027. sequel-duckdb still
+  does not depend on the duckdb gem, so each project picks its own version.
+- **database:** Add attach and detach for DuckDB catalogs ([f82169b](https://github.com/outcomesinsights/sequel-duckdb/commit/f82169b0ad4cd66abe588dfdad431053535151e1))
+
+### Changed
+
+- **adapter:** Remove the unused primary key caches ([9a14254](https://github.com/outcomesinsights/sequel-duckdb/commit/9a14254abd8494e71af9e5478d081ff048b46701))
+
+### Fixed
+
+- **connection:** Honor the readonly option ([e8e94c5](https://github.com/outcomesinsights/sequel-duckdb/commit/e8e94c5a5a210aacac0a53cc8190f3dc76b3bbdf))
+- **schema:** Keep the transaction when a name lookup misses on DuckDB 2.x ([b3c02c6](https://github.com/outcomesinsights/sequel-duckdb/commit/b3c02c6029095e11fb048ef2b3c0e84a6c62e3ec))
+- **schema:** Let a mock Database drop and create schemas ([f9aad74](https://github.com/outcomesinsights/sequel-duckdb/commit/f9aad74f94fc9d4ed024accd9ccb4bc6ecdb628e))
+
 ## [0.4.0] - 2026-10-25
 
 ### Breaking changes
@@ -348,3 +368,4 @@ tag-based release workflow.
 [0.3.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.2.1...v0.3.0
 [0.3.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.3.0...v0.3.1
 [0.4.0]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.3.1...v0.4.0
+[0.4.1]: https://github.com/outcomesinsights/sequel-duckdb/compare/v0.4.0...v0.4.1
