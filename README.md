@@ -286,6 +286,12 @@ db = Sequel.connect('duckdb://relative/path/to/database.duckdb')
 db = Sequel.connect('duckdb:///path/to/database.duckdb?readonly=true')
 ```
 
+`readonly` opens the file with DuckDB's `access_mode` set to `READ_ONLY`, so writes
+raise `Sequel::DatabaseError`. All `Sequel::Database` objects on one file in one
+process share one DuckDB instance, so the first one to open the file sets its
+settings. Opening the same file again with other settings, such as read-write after
+read-only, raises `Sequel::DatabaseConnectionError`.
+
 ### Connection Hash
 
 ```ruby
@@ -797,10 +803,17 @@ db[:users].where(active: true).all
 
 ### Version Compatibility
 
-- **Ruby**: 3.1.0 or higher
+- **Ruby**: 3.3 or higher (CI tests 3.3, 3.4 and 4.0)
 - **Sequel**: 5.0 or higher
-- **DuckDB**: 0.8.0 or higher
-- **ruby-duckdb**: 1.0.0 or higher
+- **DuckDB C library**: 1.5.x and 2.x. Support for 1.5.x ends when DuckDB 1.5.x
+  reaches end of life in March 2027.
+- **ruby-duckdb (the `duckdb` gem)**: 1.5.x and 2.x. sequel-duckdb does not depend on
+  it, so add `gem "duckdb"` to your own Gemfile. ruby-duckdb 2.x builds against
+  library 1.4 or newer, so it works with library 1.5.x.
+
+DuckDB 2.x aborts an open transaction after any failed statement, including a query
+on a missing table; 1.5.x does not. `table_exists?` and `schema` keep the transaction
+on both versions.
 
 ### Getting Help
 
