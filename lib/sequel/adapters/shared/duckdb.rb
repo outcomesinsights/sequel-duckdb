@@ -764,8 +764,8 @@ module Sequel
       def remove_all_cached_schemas
         Sequel.synchronize do
           @schemas&.clear
-          @primary_keys.clear
-          @primary_key_sequences.clear
+          @primary_keys&.clear
+          @primary_key_sequences&.clear
         end
       end
 

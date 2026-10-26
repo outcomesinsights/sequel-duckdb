@@ -33,6 +33,29 @@ class MockAdapterTest < Minitest::Test
     assert_match(/INTERVAL 2 DAY|INTERVAL '2 day'|INTERVAL \(2\) DAY/i, sql)
   end
 
+  # Only the native adapter creates the primary key caches, so clearing the
+  # caches after a schema change must not assume that they exist.
+  def test_mock_duckdb_drop_schema_writes_sql
+    db = Sequel.mock(host: :duckdb)
+    db.drop_schema(:x, if_exists: true, cascade: true)
+
+    assert_equal [ "DROP SCHEMA IF EXISTS \"x\" CASCADE" ], db.sqls
+  end
+
+  def test_mock_duckdb_create_schema_writes_sql
+    db = Sequel.mock(host: :duckdb)
+    db.create_schema(:x, if_not_exists: true)
+
+    assert_equal [ "CREATE SCHEMA IF NOT EXISTS \"x\"" ], db.sqls
+  end
+
+  def test_mock_duckdb_url_drop_schema_writes_sql
+    db = Sequel.connect("mock://duckdb")
+    db.drop_schema(:x)
+
+    assert_equal [ "DROP SCHEMA \"x\"" ], db.sqls
+  end
+
   def test_pathifier_accessible_via_mock_adapter
     Sequel.mock(host: :duckdb)
     pathifier = Sequel::DuckDB::Helpers::Pathifier.new("/data/test.parquet")
