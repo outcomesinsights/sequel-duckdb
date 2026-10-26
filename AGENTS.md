@@ -46,17 +46,27 @@ Releases are tag-based and cut weekly by a release agent; nothing about them is
 manual for a human. `.github/workflows/release.yml` publishes to rubygems.org
 via trusted publishing when a `v*` tag is pushed. To cut one:
 
-1. Pick the version with `git-cliff --bumped-version` (configured in
+1. Update the gems. Run `bundle update`, then `just ci`, and commit
+   `Gemfile.lock` as `chore(deps): update gems`. Do not use `build:`, because
+   git-cliff counts it toward the version bump. `bundle update` stays inside
+   the constraints in `Gemfile` and the gemspec. Then run `bundle outdated`.
+   Each gem that it still lists is held back by a constraint. If the
+   constraint is in `Gemfile` or the gemspec (the "Requested" column), file a
+   bead to raise it, unless an open bead already covers it. A constraint in
+   another gem, such as `rubocop-ast` holding back `prism`, is not ours to
+   change. The release does not wait for those beads. If `just ci` fails after
+   the update, the release waits until a fix is on main.
+2. Pick the version with `git-cliff --bumped-version` (configured in
    `cliff.toml`). While the gem is 0.x a breaking change bumps the minor
    version and anything else bumps the patch. If it prints the latest `v*` tag
    unchanged ("There is nothing to bump"), there is nothing to release.
-2. Set `VERSION` in `lib/sequel/duckdb/version.rb`, run `bundle install` so
+3. Set `VERSION` in `lib/sequel/duckdb/version.rb`, run `bundle install` so
    `Gemfile.lock` agrees, and add the section printed by
    `git-cliff --unreleased --bump` to the top of `CHANGELOG.md`, below its
    header.
-3. Land that commit on main and wait for the CI workflow (`main.yml`) to go
+4. Land that commit on main and wait for the CI workflow (`main.yml`) to go
    green on the push to main.
-4. Push the matching tag, e.g. `git tag v0.3.0 && git push origin v0.3.0`.
+5. Push the matching tag, e.g. `git tag v0.3.0 && git push origin v0.3.0`.
    The workflow refuses a tag that does not equal `v` + `VERSION`, a commit
    that is not on main, or one without a green `main.yml` run from a push to
    main. It confirms rubygems.org serves the version afterwards. `v*` tags
