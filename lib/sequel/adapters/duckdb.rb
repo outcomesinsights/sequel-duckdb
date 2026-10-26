@@ -74,7 +74,7 @@ module Sequel
         register_default_conversion_procs
         @duckdb_mutex = Mutex.new
         @duckdb_file = duckdb_file_path(opts[:database])
-        @duckdb_settings = InstanceRegistry.normalize_settings(opts[:config])
+        @duckdb_settings = InstanceRegistry.normalize_settings(duckdb_config)
         @duckdb_state = ConnectionState.new(open_duckdb_database, 0)
       rescue Sequel::DatabaseConnectionError
         raise
@@ -96,6 +96,19 @@ module Sequel
       end
 
       # nil for an in-memory database, which is never shared.
+      # The DuckDB settings: the config: option, plus access_mode READ_ONLY when the
+      # readonly option (readonly: true, or ?readonly=true in the URL) is true.
+      def duckdb_config
+        config = opts[:config] || {}
+        return config unless typecast_value_boolean(opts[:readonly])
+
+        mode = config.find { |name, _| name.to_s == "access_mode" }&.last
+        return config.merge(access_mode: "READ_ONLY") if mode.nil?
+        return config if mode.to_s.casecmp?("READ_ONLY")
+
+        raise Sequel::DatabaseConnectionError, "readonly: true conflicts with config access_mode #{mode.inspect}"
+      end
+
       def duckdb_file_path(database_path)
         return nil if database_path.nil? || database_path == ":memory:"
         return "/#{database_path}" if database_path.match?(/^[a-zA-Z]/) && !database_path.start_with?(":")
