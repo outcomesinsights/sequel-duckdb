@@ -1,10 +1,12 @@
 ---
 id: sequel-duckdb-8it
 title: 'One DuckDB instance per file: share it across Sequel::Database objects, and close it on disconnect'
-status: captured
+status: resolved
 type: question
 created_at: 2026-10-15T13:05:17.133281+00:00
-updated_at: 2026-10-16T13:38:05.454255+00:00
+updated_at: 2026-10-26T14:51:16.789177+00:00
+resolved_at: 2026-10-26T14:51:16.789168+00:00
+resolution: 'Shipped in 0.4.0. 367f3b2 (bead sequel-duckdb-zn2): lib/sequel/duckdb/instance_registry.rb shares one ::DuckDB::Database per file across Sequel::Databases, counted by reference; the last disconnect closes it; :memory: is never shared. 40c1c6f: config: reaches DuckDB, and a different setting on an open file raises Sequel::DatabaseConnectionError (ruled 2026-10-16). Tests: test/shared_instance_test.rb (test_two_live_databases_share_one_instance, test_last_disconnect_closes_the_file, test_different_config_raises). 2026-10-26: readonly: now maps to access_mode READ_ONLY under the same first-opener rule. Efficacy: minor tweaking (the open config question needed a second ruling); inherent unknown.'
 tags:
   - duckdb
   - t_shank
