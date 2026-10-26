@@ -388,7 +388,7 @@ class EndToEndTest < SequelDuckDBTest::TestCase
       Boolean :boolean_field
 
       # Binary type
-      String :blob_field, type: :blob
+      File :blob_field
     end
 
     dataset = @db[:type_compatibility_test]
