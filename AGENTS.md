@@ -38,6 +38,20 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
+## DuckDB library versions
+
+The tests run against two DuckDB C libraries. Production uses 1.5.x, because
+DuckDB 2.x has performance regressions. 1.5.x reaches end of life in March 2027.
+CI runs every Ruby on 1.5.x and one job on 2.x (`.github/workflows/main.yml`).
+Locally, `just test` uses the library that the duckdb gem was built against, and
+`just test-libduckdb DIR` builds the gem against another library and runs the
+tests. The official 2.x Linux build needs an x86-64-v3 CPU (AVX2), so on an
+older CPU, DIR must be a build from source.
+
+When the two versions behave differently, write a test for each version that
+skips on the other one. Do not change a DuckDB setting for the whole connection
+to make 2.x behave like 1.5.x.
+
 <!-- BEGIN BEADS INTEGRATION profile:full hash:d4f96305 -->
 
 ## Releases and Commit Messages

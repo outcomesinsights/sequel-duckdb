@@ -46,14 +46,7 @@ jobs:
         with:
           just-version: "1" # mise.toml's pin; zizmor flags unpinned-tools without it
       - name: Install DuckDB C library
-        run: |
-          DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
-          echo "Installing DuckDB v${DUCKDB_VERSION}"
-          wget -q "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
-          unzip libduckdb-linux-amd64.zip -d libduckdb
-          sudo mv libduckdb/duckdb.* /usr/local/include/
-          sudo mv libduckdb/libduckdb.so /usr/local/lib/
-          sudo ldconfig /usr/local/lib
+        run: bin/install-libduckdb 1.5.6
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: "4.0"
@@ -67,9 +60,16 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # Production uses DuckDB library 1.5.x until 2.x's performance regressions are
+      # resolved; 1.5.x reaches end of life in March 2027. One job also runs 2.x.
+      # The same 1.5.x version is in the lint job and in release.yml.
       matrix:
         ruby: ["3.3", "3.4", "4.0"]
-    name: Test Ruby ${{ matrix.ruby }}
+        libduckdb: ["1.5.6"]
+        include:
+          - ruby: "4.0"
+            libduckdb: "2.0.0"
+    name: Test Ruby ${{ matrix.ruby }}, DuckDB ${{ matrix.libduckdb }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,14 +79,9 @@ jobs:
         with:
           just-version: "1" # mise.toml's pin; zizmor flags unpinned-tools without it
       - name: Install DuckDB C library
-        run: |
-          DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
-          echo "Installing DuckDB v${DUCKDB_VERSION}"
-          wget -q "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
-          unzip libduckdb-linux-amd64.zip -d libduckdb
-          sudo mv libduckdb/duckdb.* /usr/local/include/
-          sudo mv libduckdb/libduckdb.so /usr/local/lib/
-          sudo ldconfig /usr/local/lib
+        run: bin/install-libduckdb "$LIBDUCKDB_VERSION"
+        env:
+          LIBDUCKDB_VERSION: ${{ matrix.libduckdb }}
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: ${{ matrix.ruby }}
@@ -97,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-ruby-${{ matrix.ruby }}
+          name: coverage-ruby-${{ matrix.ruby }}-duckdb-${{ matrix.libduckdb }}
           path: coverage/
           retention-days: 90
 

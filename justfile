@@ -1,6 +1,21 @@
 test:
     bundle exec rake test
 
+# Runs the tests against another DuckDB C library. DIR holds include/duckdb.h and
+# lib/libduckdb.so, for example a DuckDB 2.x build. The duckdb gem is compiled
+# against DIR into a bundle outside the repo, one per DIR, so the default bundle
+# and its library stay as they are. Example: just test-libduckdb ~/.local/opt/duckdb/v2.0.0
+test-libduckdb DIR:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir=$(cd "{{ DIR }}" && pwd)
+    export BUNDLE_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/sequel-duckdb/bundle-$(printf %s "$dir" | sha1sum | cut -c1-12)"
+    export BUNDLE_BUILD__DUCKDB="--with-duckdb-include=$dir/include --with-duckdb-lib=$dir/lib"
+    export LD_LIBRARY_PATH="$dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    bundle install --quiet
+    bundle exec ruby -e 'require "duckdb"; puts "DuckDB library #{DuckDB::LIBRARY_VERSION}"'
+    bundle exec rake test
+
 # Installs the pinned tools (mise.toml) and the bundle, then arms the tracked hooks
 # (.githooks, gator's githooks standard). A clone needs git and mise. bd bootstrap,
 # never bd init: in a clone with .beads, init re-points the hooks at an absolute

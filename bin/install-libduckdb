@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Installs a DuckDB C library release (headers and libduckdb.so). CI runs it
+# before bundler compiles the duckdb gem, once for each library version that
+# CI tests. The gem version in Gemfile.lock does not decide the library
+# version: ruby-duckdb 2.x builds against libduckdb 1.4 or newer.
+#
+# Usage: bin/install-libduckdb VERSION [PREFIX]
+#   VERSION is a DuckDB release without the v, for example 1.5.6.
+#   PREFIX defaults to /usr/local. sudo is used when PREFIX is not writable.
+#
+# DuckDB renamed the release file in 2.0: 1.x ships libduckdb-linux-amd64.zip,
+# 2.x ships duckdb-shared-libs-linux-amd64.tar.gz. The 2.x Linux build needs an
+# x86-64-v3 CPU (AVX2, BMI2); older CPUs crash with SIGILL when it loads.
+set -euo pipefail
+
+version=${1:?usage: bin/install-libduckdb VERSION [PREFIX]}
+prefix=${2:-/usr/local}
+
+major=${version%%.*}
+if ((major >= 2)); then
+  asset=duckdb-shared-libs-linux-amd64.tar.gz
+else
+  asset=libduckdb-linux-amd64.zip
+fi
+url="https://github.com/duckdb/duckdb/releases/download/v${version}/${asset}"
+echo "Installing DuckDB v${version} from ${asset} into ${prefix}"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+curl -fsSL -o "$tmp/$asset" "$url"
+mkdir "$tmp/lib"
+case "$asset" in
+  *.zip) unzip -q "$tmp/$asset" -d "$tmp/lib" ;;
+  *.tar.gz) tar -xzf "$tmp/$asset" -C "$tmp/lib" ;;
+esac
+
+sudo=""
+if ! mkdir -p "$prefix/include" "$prefix/lib" 2>/dev/null || [ ! -w "$prefix/lib" ]; then
+  sudo=sudo
+  sudo mkdir -p "$prefix/include" "$prefix/lib"
+fi
+find "$tmp/lib" -maxdepth 1 -name 'duckdb*.h*' -exec $sudo install -m 0644 {} "$prefix/include/" \;
+$sudo install -m 0755 "$tmp/lib/libduckdb.so" "$prefix/lib/"
+if [ "$prefix" = /usr/local ]; then
+  $sudo ldconfig "$prefix/lib"
+fi
+echo "Installed DuckDB v${version} into ${prefix}"

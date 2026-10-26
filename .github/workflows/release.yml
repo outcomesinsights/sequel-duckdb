@@ -87,16 +87,9 @@ jobs:
             echo "::error::CI on $SHA is '$ci'. Land the commit on main, let CI pass, then re-run this workflow."
             exit 1
           fi
+      # The production DuckDB library version; main.yml's matrix has the same one.
       - name: Install DuckDB C library
-        run: |
-          DUCKDB_VERSION=$(grep -P '^\s+duckdb \(' Gemfile.lock | grep -oP 'duckdb \(\K[0-9]+\.[0-9]+\.[0-9]+')
-          echo "Installing DuckDB v${DUCKDB_VERSION}"
-          wget -q "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
-          unzip libduckdb-linux-amd64.zip -d libduckdb
-          sudo mv libduckdb/duckdb.* /usr/local/include/
-          sudo mv libduckdb/libduckdb.so /usr/local/lib/
-          sudo ldconfig /usr/local/lib
-          rm -rf libduckdb libduckdb-linux-amd64.zip
+        run: bin/install-libduckdb 1.5.6
       # No bundler cache on the release trigger: a cache written by a branch or
       # PR run could supply the gems for the suite that gates publishing.
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
