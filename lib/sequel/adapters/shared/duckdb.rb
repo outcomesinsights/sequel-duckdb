@@ -788,15 +788,11 @@ module Sequel
       # Remove all cached schema information
       #
       # Called after schema modifications to ensure cache consistency. It empties the
-      # caches in place, because a frozen Database cannot replace them.
+      # cache in place, because a frozen Database cannot replace it.
       #
       # @return [void]
       def remove_all_cached_schemas
-        Sequel.synchronize do
-          @schemas&.clear
-          @primary_keys&.clear
-          @primary_key_sequences&.clear
-        end
+        Sequel.synchronize { @schemas&.clear }
       end
 
       # List all schemas in the database

@@ -69,8 +69,6 @@ module Sequel
       # (InstanceRegistry), and #disconnect gives it back once no connection is open.
       def adapter_initialize
         @conversion_procs = {}
-        @primary_keys = {}
-        @primary_key_sequences = {}
         register_default_conversion_procs
         @duckdb_mutex = Mutex.new
         @duckdb_file = duckdb_file_path(opts[:database])

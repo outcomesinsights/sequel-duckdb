@@ -407,21 +407,15 @@ describe "Schema Management" do
       _(tables).must_include(:test_table)
     end
 
-    it "properly initializes cache variables as hashes" do
+    # The adapter caches only schemas. The primary key caches of Sequel's Postgres
+    # adapter were copied here once and never read, so they were removed.
+    it "leaves the schema cache an empty Hash" do
       @db.remove_all_cached_schemas
 
-      # Access instance variables to verify they're hashes, not nil
       schemas = @db.instance_variable_get(:@schemas)
-      primary_keys = @db.instance_variable_get(:@primary_keys)
-      primary_key_sequences = @db.instance_variable_get(:@primary_key_sequences)
 
       _(schemas).must_be_kind_of(Hash)
-      _(primary_keys).must_be_kind_of(Hash)
-      _(primary_key_sequences).must_be_kind_of(Hash)
-
       _(schemas).must_be_empty
-      _(primary_keys).must_be_empty
-      _(primary_key_sequences).must_be_empty
     end
   end
 end
