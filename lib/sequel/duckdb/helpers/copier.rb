@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "sql_options"
+
 module Sequel
   module DuckDB
     module Helpers
@@ -9,9 +11,6 @@ module Sequel
       # destination's file extension. A destination with neither (for example a
       # directory for a partitioned COPY) raises Sequel::Error.
       class Copier
-        # Option values that DuckDB accepts as a bare keyword (FORMAT PARQUET).
-        BARE_WORD = /\A[A-Za-z_][A-Za-z0-9_]*\z/
-
         def initialize(src, dst, options = Sequel::OPTS)
           @src = src
           @dst = dst
@@ -31,21 +30,11 @@ module Sequel
         end
 
         def options_str
-          opts_str = { format: format }.merge(@options).map { |k, v| format_option(k, v) }.compact.join(", ").strip
-          opts_str.empty? ? "" : "(#{opts_str})"
+          SqlOptions.list({ format: format }.merge(@options))
         end
 
         def format_option(key, value)
-          return "PARTITION_BY (#{Array(value).map { |name| quoted_identifier(name) }.join(", ")})" if key.to_s == "partition_by"
-
-          key = key.to_s.upcase
-          case value
-          when true then key
-          when false then nil
-          when Integer, Float then "#{key} #{value}"
-          when BARE_WORD then "#{key} #{value.to_s.upcase}"
-          else "#{key} #{string_literal(value)}"
-          end
+          SqlOptions.option(key, value)
         end
 
         def format
@@ -61,11 +50,7 @@ module Sequel
         private
 
         def string_literal(value)
-          "'#{value.to_s.gsub("'", "''")}'"
-        end
-
-        def quoted_identifier(name)
-          "\"#{name.to_s.gsub('"', '""')}\""
+          SqlOptions.string_literal(value)
         end
       end
     end

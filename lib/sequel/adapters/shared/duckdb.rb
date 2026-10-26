@@ -894,6 +894,43 @@ module Sequel
         sql
       end
 
+      # Runs a DuckDB ATTACH, which opens the database file at +path+ as the catalog
+      # +as+. The catalog is part of the DuckDB database, so every pool connection sees
+      # it. It lasts until Database#disconnect closes the last connection; attach again
+      # after that. See attach_sql for the options.
+      def attach(path, as:, **options)
+        run(attach_sql(path, as:, **options))
+      end
+
+      # The ATTACH statement that #attach runs. The alias +as+ is required: an alias
+      # that DuckDB derives from the file name can equal a schema name in the file,
+      # which makes schema.table ambiguous.
+      #
+      # @param path [String] The database file; a string literal in the SQL
+      # @param as [Symbol, String] The catalog name
+      # @param if_not_exists [Boolean] Do nothing if the catalog is already attached
+      # @param options [Hash] DuckDB ATTACH options, for example read_only: true or
+      #   type: :sqlite. A true value renders the bare keyword (READ_ONLY).
+      # @return [String]
+      def attach_sql(path, as:, if_not_exists: false, **options)
+        sql = +"ATTACH "
+        sql << "IF NOT EXISTS " if if_not_exists
+        sql << "#{literal(path.to_s)} AS #{Sequel::DuckDB::Helpers::SqlOptions.quoted_identifier(as)}"
+        list = Sequel::DuckDB::Helpers::SqlOptions.list(options)
+        sql << " #{list}" unless list.empty?
+        sql
+      end
+
+      # Runs a DuckDB DETACH of the catalog +name+.
+      def detach(name, if_exists: false)
+        run(detach_sql(name, if_exists:))
+      end
+
+      # The DETACH statement that #detach runs.
+      def detach_sql(name, if_exists: false)
+        "DETACH DATABASE #{"IF EXISTS " if if_exists}#{Sequel::DuckDB::Helpers::SqlOptions.quoted_identifier(name)}"
+      end
+
       # Runs a DuckDB COPY that writes +source+ (a Dataset or a SQL string) to
       # +path+. For a Dataset this is the SQL from Dataset#copy_to_sql.
       def copy_to(source, path, options = Sequel::OPTS)

@@ -539,6 +539,38 @@ db[:users].copy_to_sql("/data/users.csv", header: true, delimiter: "|")
 # => COPY (SELECT * FROM "users") TO '/data/users.csv' (FORMAT CSV, HEADER, DELIMITER '|')
 ```
 
+### Attaching database files
+
+`Database#attach` runs a DuckDB `ATTACH`, and `Database#detach` runs `DETACH DATABASE`.
+The catalog name `as:` is required. A name that DuckDB derives from the file name can
+equal a schema name inside the file, and then `schema.table` is ambiguous. Other DuckDB
+`ATTACH` options pass through, for example `type: :sqlite`.
+
+```ruby
+db.attach("/data/dataset.duckdb", as: :dataset, read_only: true)
+db[Sequel[:dataset][:people]].count
+db.detach(:dataset, if_exists: true)
+
+db.attach_sql("/data/dataset.duckdb", as: :dataset, read_only: true, if_not_exists: true)
+# => ATTACH IF NOT EXISTS '/data/dataset.duckdb' AS "dataset" (READ_ONLY)
+```
+
+An attached catalog belongs to the DuckDB database, which all pool connections of a
+`Sequel::Database` share. It lasts until `Database#disconnect` closes the last
+connection. After that, attach it again; `if_not_exists: true` makes a repeat safe.
+
+`search_path` is different: DuckDB keeps it per connection. Set it on every new
+connection with Sequel's `connect_sqls` option. Put the writable catalog first, because
+`CREATE TABLE` without a schema goes to the first entry, and a read-only catalog there
+makes it fail.
+
+```ruby
+db = Sequel.connect("duckdb:///exports/42/work.duckdb",
+                    connect_sqls: [ "SET search_path = 'work.main'" ])
+db.attach("/data/dataset.duckdb", as: :dataset, read_only: true)
+db.create_table(:summary) { Integer :n } # created in work.main
+```
+
 ### Lists
 
 Sequel writes a Ruby Array as a parenthesized list, such as `(1, 2, 3)`, for `IN`
