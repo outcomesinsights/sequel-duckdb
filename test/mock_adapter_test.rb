@@ -49,6 +49,13 @@ class MockAdapterTest < Minitest::Test
     assert_equal [ "CREATE SCHEMA IF NOT EXISTS \"x\"" ], db.sqls
   end
 
+  def test_mock_duckdb_create_view_accepts_a_dataset
+    db = Sequel.mock(host: :duckdb)
+    db.create_view(:v, db[:items])
+
+    assert_equal [ "CREATE VIEW \"v\" AS SELECT * FROM \"items\"" ], db.sqls
+  end
+
   def test_mock_duckdb_url_drop_schema_writes_sql
     db = Sequel.connect("mock://duckdb")
     db.drop_schema(:x)

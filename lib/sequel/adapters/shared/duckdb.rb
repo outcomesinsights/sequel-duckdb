@@ -872,7 +872,9 @@ module Sequel
                    read_something_sql(some_paths, options).then do |read_stmt|
                      from(read_stmt)
                    end.sql
-        elsif source.is_a?(Dataset)
+        elsif source.is_a?(::Sequel::Dataset)
+                   # Not the bare Dataset, which here means Sequel::DuckDB::Dataset and
+                   # so rejects the datasets of a mock Database.
                    source.sql
         elsif source.is_a?(String)
                    source
