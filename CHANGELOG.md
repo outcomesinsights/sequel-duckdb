@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-10-27
+
+### Changed
+
+- The duckdb gem 1.5.x is no longer supported. Use `gem "duckdb", "~> 2.0"`. The gem
+  2.x builds against the DuckDB C library 1.4 or newer, so library 1.5.x is still
+  supported until March 2027.
+
+### Fixed
+
+- **view:** Use CREATE OR REPLACE VIEW in create_or_replace_view ([2f54ca1](https://github.com/outcomesinsights/sequel-duckdb/commit/2f54ca152fccec00b02a1d044ee6eb51211942ef))
+- **view:** Accept a mock Database's datasets as a view source ([72273ab](https://github.com/outcomesinsights/sequel-duckdb/commit/72273abe4d3e264af7b6b3b57db70c8bc45f87a7))
+
 ## [0.4.1] - 2026-10-26
 
 ### Added
