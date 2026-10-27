@@ -1,10 +1,12 @@
 ---
 id: sequel-duckdb-75r
 title: Sequel types for DuckDB composite columns and the Ruby value for TIME
-status: captured
+status: resolved
 type: question
 created_at: 2026-10-19T17:42:00.813900+00:00
-updated_at: 2026-10-19T17:46:18.504865+00:00
+updated_at: 2026-10-27T17:39:07.170222+00:00
+resolved_at: 2026-10-27T17:39:07.170210+00:00
+resolution: 'Question 2 (TIME) shipped as option (b) in bf1e9dc (bead sequel-duckdb-6iq): lib/sequel/adapters/duckdb.rb register_default_conversion_procs converts TIME to Sequel::SQLTime, and the adapter has no typecast_value_time. Probe 2026-10-27: assigning the loaded time leaves changed_columns empty. Question 1 moved to sequel-duckdb-1h0, now resolved; db.schema reports struct, map, json and <scalar>_array. Efficacy: no tweak needed.'
 ---
 
 Not ruled. Two questions about the Sequel type that `db.schema` reports, and the Ruby value a model gets, for DuckDB columns that sequel-duckdb-4a8 (commit 4b1283d) did not cover.

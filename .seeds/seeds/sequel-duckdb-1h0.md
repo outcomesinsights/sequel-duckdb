@@ -1,10 +1,12 @@
 ---
 id: sequel-duckdb-1h0
 title: Array, struct, map and JSON support for DuckDB columns
-status: captured
+status: resolved
 type: question
 created_at: 2026-10-19T17:46:05.708957+00:00
-updated_at: 2026-10-19T18:28:04.639726+00:00
+updated_at: 2026-10-27T17:39:06.339220+00:00
+resolved_at: 2026-10-27T17:39:06.339208+00:00
+resolution: 'Shipped as four opt-in extensions: lib/sequel/extensions/duckdb_array.rb, duckdb_struct.rb, duckdb_map.rb, duckdb_json.rb (beads sequel-duckdb-23r, l6y, 9x9, aum), on result conversion by column type in lib/sequel/adapters/duckdb.rb fetch_rows (sequel-duckdb-3j8). Probe 2026-10-27 round-trips LIST, STRUCT, MAP and JSON through the wrappers, and a model accepts a Ruby Array. Efficacy: minor tweak, caught in planning: the list schema type became :integer_array (pg_array style) at bead conversion, not :array.'
 ---
 
 Not ruled. Split out of sequel-duckdb-75r (Question 1) on 2026-10-19, because Ryan wanted to revisit it.
@@ -50,3 +52,5 @@ RULED 2026-10-19: directions (b), (c) and (d), each as an opt-in extension. Ryan
 RULED 2026-10-19: extension names duckdb_array, duckdb_struct, duckdb_map and duckdb_json (Ryan chose the recommended option over duckdb_list and over one combined extension).
 
 UPDATE 2026-10-19: converted to beads. sequel-duckdb-3j8 (convert result values by DuckDB column type in fetch_rows) comes first, because the wrappers must also come back on read; sequel-duckdb-6iq (TIME as Sequel::SQLTime) depends on it too. Then sequel-duckdb-23r (duckdb_array), sequel-duckdb-l6y (duckdb_struct), sequel-duckdb-9x9 (duckdb_map) and sequel-duckdb-aum (duckdb_json). Not built.
+
+UPDATE 2026-10-27: Direction (b) said lists get the schema type `:array`. The build reports `:"<scalar>_array"`, for example `:integer_array`, as Sequel's pg_array does. Bead sequel-duckdb-23r chose this at conversion, because Ryan ruled to follow Sequel's PostgreSQL extensions. Probe (claude_stuff/seed-resolve-probe-20261027-103654.log): `db.schema` reports l=integer_array, st=struct, m=map, j=json.

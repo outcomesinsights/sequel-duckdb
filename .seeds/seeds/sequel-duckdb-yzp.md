@@ -4,7 +4,7 @@ title: 'DuckDB merges d + 30 days with d + 1 month (interval equality in its opt
 status: captured
 type: question
 created_at: 2026-10-16T13:44:51.378532+00:00
-updated_at: 2026-10-16T13:48:47.295789+00:00
+updated_at: 2026-10-27T17:39:05.513797+00:00
 ---
 
 ## The defect
@@ -51,3 +51,14 @@ Related: conceptql bead conceptql-a4j bumps sequel-duckdb in conceptql's Gemfile
 Ryan: "fix the day/hour case too". The upstream report (open question 1) is not ruled.
 
 UPDATE 2026-10-16: the day/time case shipped in 6ec6ec5 (bead sequel-duckdb-eca). Time units are written as INTERVAL n HOUR + d. The subtraction form was rejected, because it merges 720 hours with 1 month (claude_stuff/interval-third-form-probe-\*.log). The upstream report is still not ruled.
+
+UPDATE 2026-10-27: The defect is still present in libduckdb 2.0.0 (claude_stuff/interval-merge-duckdb2-20261027-103759.log). Raw SQL, without sequel-duckdb's rewrite:
+
+```
+select d + interval 30 day as a, d + interval 1 month as b      -> [2008-06-16, 2008-06-16]
+select d + interval 1 month as b, d + interval 30 day as a      -> [2008-06-17, 2008-06-17]
+select max(d + interval 30 day) a, max(d + interval 1 month) b  -> [2008-06-16, 2008-06-16]
+timestamptz 2026-03-07 12:00-08: d + 1 day, d + 24 hour (America/Los_Angeles) -> [2026-03-08 19:00 UTC, 2026-03-08 19:00 UTC]
+```
+
+So sequel-duckdb's interval forms (c139c5e, 6ec6ec5) are still needed on 2.x. Ryan chose on 2026-10-27 to record this only. The upstream report (open question 1) stays not ruled.
