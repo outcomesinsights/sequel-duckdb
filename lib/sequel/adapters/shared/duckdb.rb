@@ -643,6 +643,13 @@ module Sequel
         true
       end
 
+      # create_or_replace_view emits CREATE OR REPLACE VIEW. Without this, Sequel
+      # runs DROP VIEW first and logs its failure at ERROR, and an unqualified DROP
+      # VIEW can resolve to a view in another catalog.
+      def supports_create_or_replace_view?
+        true
+      end
+
       # DuckDB-specific schema generation methods
 
       # Generate SQL for primary key column
@@ -864,7 +871,9 @@ module Sequel
       # @option options [Hash] :options Options for the data source (e.g., path for parquet)
       # @return [String] CREATE VIEW SQL
       def create_view_sql(name, source, options = OPTS)
-        options = source if source.is_a?(Hash)
+        # A Hash source holds the file options. Keep the caller's options too, such
+        # as the :replace that create_or_replace_view adds.
+        options = source.merge(options) if source.is_a?(Hash)
         some_paths = options[:path] || options[:paths] || options.dig(:options, :path) || options.dig(:options, :paths)
         # Handle DuckDB-specific source patterns
         source = if options[:using] || some_paths
