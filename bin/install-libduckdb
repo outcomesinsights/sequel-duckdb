@@ -11,6 +11,13 @@
 # DuckDB renamed the release file in 2.0: 1.x ships libduckdb-linux-amd64.zip,
 # 2.x ships duckdb-shared-libs-linux-amd64.tar.gz. The 2.x Linux build needs an
 # x86-64-v3 CPU (AVX2, BMI2); older CPUs crash with SIGILL when it loads.
+#
+# The script installs only a version whose asset SHA-256 is pinned below, and
+# it stops when the download does not match. To pin another version, take the
+# digest that GitHub records for the asset:
+#   gh api repos/duckdb/duckdb/releases/tags/vVERSION \
+#     --jq '.assets[] | select(.name=="ASSET") | .digest'
+# and check that sha256sum of a download gives the same value.
 set -euo pipefail
 
 version=${1:?usage: bin/install-libduckdb VERSION [PREFIX]}
@@ -22,12 +29,21 @@ if ((major >= 2)); then
 else
   asset=libduckdb-linux-amd64.zip
 fi
+case "$version" in
+  1.5.6) sha256=b845005f5132a7d8180057c35e14a7626632258782f871a90861b19c1c03841b ;;
+  2.0.0) sha256=993ad89e7dfca66cd6da994c2cad090c2fc160ddf9f550498a098ab4bb13cfb1 ;;
+  *)
+    echo "bin/install-libduckdb: no SHA-256 is pinned for DuckDB v${version}; pin one in this script" >&2
+    exit 1
+    ;;
+esac
 url="https://github.com/duckdb/duckdb/releases/download/v${version}/${asset}"
 echo "Installing DuckDB v${version} from ${asset} into ${prefix}"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 curl -fsSL -o "$tmp/$asset" "$url"
+echo "${sha256}  $tmp/$asset" | sha256sum --check --strict -
 mkdir "$tmp/lib"
 case "$asset" in
   *.zip) unzip -q "$tmp/$asset" -d "$tmp/lib" ;;
