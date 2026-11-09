@@ -4,7 +4,7 @@ title: 'DuckDB merges d + 30 days with d + 1 month (interval equality in its opt
 status: captured
 type: question
 created_at: 2026-10-16T13:44:51.378532+00:00
-updated_at: 2026-10-27T17:39:05.513797+00:00
+updated_at: 2026-11-09T14:11:51.035168+00:00
 ---
 
 ## The defect
@@ -62,3 +62,9 @@ timestamptz 2026-03-07 12:00-08: d + 1 day, d + 24 hour (America/Los_Angeles) ->
 ```
 
 So sequel-duckdb's interval forms (c139c5e, 6ec6ec5) are still needed on 2.x. Ryan chose on 2026-10-27 to record this only. The upstream report (open question 1) stays not ruled.
+
+UPDATE 2026-11-09: DuckDB fixed the defect upstream, but only on main, which becomes 2.x. The issue is duckdb/duckdb#28308, and it closed on 2026-11-06. The fix is PR #28331, merged into `main` on 2026-11-06. It makes `BoundConstantExpression::Hash` and `Equals` compare INTERVAL constants by their raw (months, days, micros) fields. The fix was not backported to the 1.5 branch.
+
+Ryan, 2026-11-09: "looks like the issue was fixed, but only for 2.0+. We're not moving to 2.0 until after the new year, so please just make note that we should revisit our patch at that time."
+
+So sequel-duckdb keeps its interval forms (c139c5e, 6ec6ec5) while the library stays on 1.5.x. Revisit them when the fleet moves to DuckDB 2.x, after 2027-01-01. Before removing them, run test/interval_merge_test.rb and the raw-SQL probe against the 2.x release that contains #28331. Also check the aggregate case: on v2.0.0 the binder merged the `max()` aggregates before the optimizer ran. Keep the forms if the library range still allows 1.5.x.
