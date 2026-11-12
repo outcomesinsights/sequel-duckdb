@@ -8,6 +8,9 @@ just = "1"
 uv = "0"
 
 "aqua:numtide/treefmt" = "2"
+# prettier uses mise's npm backend, which installs the package and NO node, so node
+# is pinned with it (gator-ncm).
+node = "24"
 prettier = "3"
 taplo = "0"
 
