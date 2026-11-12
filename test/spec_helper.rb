@@ -30,6 +30,39 @@ module SequelDuckDBTest
     Sequel.connect("duckdb::memory:")
   end
 
+  # Closes every Sequel::Database that a test opened, after the test's own teardown.
+  # Sequel keeps each Database in Sequel::DATABASES, and an in-memory DuckDB database
+  # stays open after #disconnect, so each test used to leave a DuckDB instance and its
+  # worker threads alive until the process exited. On a 40-core host, the suite held
+  # about 20,000 threads, and Kernel#fork then failed with ENOMEM on the Ubuntu 26.04
+  # runner (bead sequel-duckdb-k1a). It is prepended to Minitest::Test, so it also
+  # covers tests that do not inherit from TestCase.
+  module DatabaseCleanup
+    def before_setup
+      @databases_before_test = Sequel.synchronize { Sequel::DATABASES.dup }
+      super
+    end
+
+    def after_teardown
+      super
+    ensure
+      opened = Sequel.synchronize { Sequel::DATABASES - @databases_before_test.to_a }
+      opened.each { |db| DatabaseCleanup.close(db) }
+    end
+
+    def self.close(db)
+      db.disconnect
+      state = db.instance_variable_get(:@duckdb_state)
+      # A file database gave its instance back in #disconnect. An in-memory one did not.
+      if state&.database && db.instance_variable_get(:@duckdb_file).nil?
+        state.database.close
+        state.database = nil
+      end
+      Sequel.synchronize { Sequel::DATABASES.delete(db) }
+    end
+  end
+  Minitest::Test.prepend(DatabaseCleanup)
+
   # Base test class for all sequel-duckdb tests
   class TestCase < Minitest::Test
     # Get a fresh mock database for each test
