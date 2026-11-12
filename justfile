@@ -46,13 +46,14 @@ ci: fmt-check lint test hygiene
 pre-commit: fmt-check lint seeds-check
 
 # Verify the seed store is plausible and has not been rewritten underneath us.
-# `--against-git` compares the committed corpus with the working tree. It is on the
+# `--gate` runs the violation checks plus `--against-git`, which compares the committed
+# corpus with the working tree, and it honours SEEDS_GATE_CONFIRM=1. It is on the
 # commit path and NOT in `ci`: a commit is the only way a seed file reaches history,
 # and CI runners have no seeds installed. Skips when seeds is absent, so a clone
 # without the tool can still commit. treefmt.toml excludes `.seeds/**` for the same
 # reason: a formatter must never rewrite the store.
 seeds-check:
-    @command -v seeds >/dev/null 2>&1 || exit 0; seeds check --against-git
+    @command -v seeds >/dev/null 2>&1 || exit 0; seeds check --gate
 
 bundle-update *ARGS:
     bundle update {{ ARGS }}
